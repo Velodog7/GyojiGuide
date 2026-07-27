@@ -229,6 +229,11 @@
     100%{ transform:scale(1.04); text-shadow:0 0 1.4cqw rgba(242,193,78,.5), 0 .2cqw 1.2cqw #000 }
   }
   .call__stack{ display:flex; flex-direction:column; align-items:center; gap:.35cqw }
+  /* a wrestler from your team, called out on the dohyō */
+  .call__mine{ font-style:normal; font-family:"IBM Plex Mono",ui-monospace,monospace;
+        font-size:1cqw; font-weight:700; letter-spacing:.18em; text-transform:uppercase;
+        color:#0d0f15; background:var(--sun); padding:.2cqw .8cqw; border-radius:99px;
+        box-shadow:0 0 1.4cqw rgba(var(--sun-rgb),.6); }
   .call__pill{
     font-style:normal; font-weight:700;
     font-size:.85cqw; letter-spacing:.24em; text-transform:uppercase;
@@ -464,6 +469,11 @@
     opacity:0; pointer-events:none; z-index:-1;
   }
   .slot.won::after{ animation:bloom 1.7s ease-out }
+  /* a soft gold halo marks a wrestler from your team on the clay */
+  .slot.mine::after{ content:""; position:absolute; left:50%; bottom:1cqw; z-index:-1;
+        width:20cqw; height:20cqw; transform:translateX(-50%); border-radius:50%;
+        background:radial-gradient(closest-side, rgba(var(--sun-rgb),.34), rgba(var(--sun-rgb),0) 72%);
+        pointer-events:none; }
 
   /* ── how the bout ends ────────────────────────────────────────
      The loser's exit is chosen by the kimarite. --dir points toward his own
@@ -1003,6 +1013,11 @@
   }
   .bout__mid.pending{ color:var(--faint); font-style:italic; letter-spacing:.04em }
   .bout__name{ font-size:15px }
+  /* your team's wrestlers, flagged in the day's matchups */
+  .bout__star{ font-style:normal; color:var(--sun); font-size:11px; margin:0 5px;
+        text-shadow:0 0 6px rgba(var(--sun-rgb),.6) }
+  .bout__name.is-mine{ color:var(--sun) }
+  .bout.mine-e, .bout.mine-w{ border-color:rgba(var(--sun-rgb),.4) }
   .bout.won-e .bout__e .bout__name,
   .bout.won-w .bout__w .bout__name{ color:var(--win); font-weight:600 }
   body.hide-results .bout.won-e .bout__e .bout__name,
@@ -1503,7 +1518,7 @@
       <span>Play each day's bouts on the clay, with standings between days and the yūshō revealed at senshūraku.</span>
     </button>
     <button class="optcard" data-run="sim">
-      <b>Simulate the whole basho</b>
+      <b>Simulate to the end</b>
       <span>Skip to the end and score your team over all fifteen days at once.</span>
     </button>
   </div>
@@ -1665,6 +1680,7 @@ function paint(){
     const name = ring[side], el = slots[side];
     el.style.setProperty("--flip", name ? flipFor(name, side) : (side === "east" ? 1 : -1));
     el.style.setProperty("--bowx", BOWX[side] + "cqw");
+    el.classList.toggle("mine", !!name && myPicks().has(name));   // a pick from your team
     if (el.dataset.name === (name || "")) continue;     // already standing there
     el.dataset.name = name || "";
     if (!name) { el.innerHTML = ""; continue; }
@@ -2296,10 +2312,12 @@ function recordLine(name, reveal){
 const ARROW = { up:"▲", down:"▼", same:"—", new:"★" };
 function nameCall(_side, name, rank){
   const d = DETAIL[name] || {};
+  const mine = myPicks().has(name);
   const move = d.move
     ? `<span class="call__move ${d.dir}">${ARROW[d.dir] || ""} ${d.move}</span>`
     : "";
-  return `<span class="call__stack">` +
+  return `<span class="call__stack${mine ? " is-mine" : ""}">` +
+         (mine ? `<em class="call__mine">★ My Team</em>` : "") +
          `<em class="call__pill">Win</em>` +
          `<em class="call__kanji">${d.kanji || "&nbsp;"}</em>` +
          `<span class="call__romaji">${name}</span>` +
@@ -2386,16 +2404,18 @@ function mountDay(d){
   for (const div of ["makuuchi","juryo"]) {
     const list = document.getElementById("l-" + div);
     list.innerHTML = "";
+    const mine = myPicks();
     card[div].forEach((b, i) => {
       const el = document.createElement("button");
-      el.className = "bout" + (b[2] ? ` won-${b[2]}` : "");
+      const me = c => mine.has(c) ? " is-mine" : "";
+      el.className = "bout" + (b[2] ? ` won-${b[2]}` : "") + (mine.has(b[1]) ? " mine-e" : "") + (mine.has(b[5]) ? " mine-w" : "");
       el.dataset.i = i;
       el.setAttribute("aria-current", "false");
       el.innerHTML = `
-        <span class="bout__e"><span class="bout__rank">${b[0]}</span><span class="bout__name">${b[1]}</span></span>
+        <span class="bout__e"><span class="bout__rank">${b[0]}</span><span class="bout__name${me(b[1])}">${mine.has(b[1]) ? `<i class="bout__star">★</i>` : ""}${b[1]}</span></span>
         <span class="bout__mid${b[2] ? "" : " pending"}">${b[2] ? b[3] : "upcoming"}${
           b[2] ? `<span>${b[2] === "e" ? "East wins" : "West wins"}</span>` : ""}</span>
-        <span class="bout__w"><span class="bout__name">${b[5]}</span><span class="bout__rank">${b[4]}</span></span>
+        <span class="bout__w"><span class="bout__name${me(b[5])}">${b[5]}${mine.has(b[5]) ? `<i class="bout__star">★</i>` : ""}</span><span class="bout__rank">${b[4]}</span></span>
         <span class="bout__past" title="Head-to-head, east–west">${b[6]}</span>`;
       el.onclick = () => { stop(); loadBout(div, i); };
       list.appendChild(el);
@@ -2854,6 +2874,27 @@ let team = {};
 try { team = JSON.parse(localStorage.getItem("dohyo.team") || "{}"); } catch { team = {}; }
 const saveTeam = () => { try { localStorage.setItem("dohyo.team", JSON.stringify(team)); } catch {} };
 
+/* A team handed over from the Gyoji Guide (index page) arrives as ?team=<base64
+   of {band:name}>. Map it in, keeping only picks that are real and rank-eligible. */
+function importIncomingTeam(){
+  let raw = null;
+  try { raw = new URLSearchParams(location.search).get("team"); } catch { return; }
+  if (!raw) return;
+  let obj = null;
+  try { obj = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(raw))))); }
+  catch { try { obj = JSON.parse(raw); } catch { return; } }
+  if (!obj || typeof obj !== "object") return;
+  const clean = {}, seen = new Set();
+  for (const band of BANDS) {
+    const name = obj[band.id];
+    if (name && ROSTER[name] && !seen.has(name) && eligible(band).includes(name)) {
+      clean[band.id] = name; seen.add(name);
+    }
+  }
+  if (Object.keys(clean).length) { team = clean; saveTeam(); }
+  try { history.replaceState(null, "", location.pathname); } catch {}   // tidy the URL
+}
+
 /* how the person chose to run it, back on the opening screen */
 let watchScope = "all";                       // "all" | "mine"
 const myPicks = () => new Set(Object.values(team).filter(Boolean));
@@ -3208,6 +3249,7 @@ function enter(explore){
   stopCeremony();
   document.body.classList.remove("setup");
   applyFit();                                    // menu is back — resize the ring to full
+  mountDay(daySel.value);                        // rebuild the matchups now the team is set
   if (explore) { selectTab("makuuchi"); return; }
   if (runChoice === "sim") {
     teamDay = BASHO_LEN;                        // straight to the finish
@@ -3383,6 +3425,7 @@ async function runCeremony(){
 function stopCeremony(){ ceremonyOn = false; cClear(); }
 
 document.body.classList.add("setup");           // the dohyō stays up while they choose
+importIncomingTeam();                            // a team handed over from Gyoji Guide, if any
 paintIntroSlots();
 syncIntro();
 runCeremony();
