@@ -1117,7 +1117,7 @@
 
   /* the page title, set over the roof while the team is being built */
   .stage__title{
-    position:absolute; top:26%; left:50%; transform:translate(-50%,-50%);
+    position:absolute; top:23%; left:50%; transform:translate(-50%,-50%);
     z-index:5; width:92%; text-align:center; pointer-events:none;
   }
   body:not(.setup) .stage__title{ display:none }
@@ -1167,10 +1167,7 @@
     overflow:hidden; border:1px solid var(--line); background:var(--surface);
     isolation:isolate; container-type:inline-size;
   }
-  .pcard select{                                  /* invisible, covers the card to re-pick */
-    position:absolute; inset:0; z-index:7; width:100%; height:100%;
-    opacity:0; cursor:pointer; border:0; -webkit-appearance:none; appearance:none;
-  }
+  .pcard.filled{ cursor:pointer }
   .pcard.empty{ border:1px dashed var(--line2); display:grid; place-items:center; text-align:center;
         transition:border-color .15s, background .15s }
   .pcard.empty:hover{ border-color:var(--sun); background:rgba(var(--sun-rgb),.06) }
@@ -1190,7 +1187,7 @@
   .pc-photo{ position:absolute; left:50%; top:9%; transform:translateX(-50%);
         width:70%; height:54%; z-index:1; overflow:hidden; border-radius:9px;
         border:1px solid rgba(255,255,255,.22); box-shadow:0 10px 24px rgba(0,0,0,.5);
-        background:rgba(255,255,255,.04); }
+        background:#f4f4f2; }
   .pc-photo img{ width:100%; height:100%; object-fit:cover; object-position:center top; }
   .pc-frame{ position:absolute; inset:5px; border:1px solid rgba(255,255,255,.2);
         border-radius:8px; z-index:4; pointer-events:none }
@@ -1214,7 +1211,7 @@
         gap:5px; padding:8px; background:rgba(8,6,14,.86); border-top:1px solid rgba(255,255,255,.14) }
   .pc-rankline{ flex:1; min-width:0; font-family:"Space Grotesk",sans-serif; font-weight:700;
         font-size:clamp(.72rem,5.8cqw,.9rem); color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.85);
-        overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left }
   .pc-side{ flex:none; font-family:"IBM Plex Mono",monospace; font-weight:600;
         font-size:clamp(8px,4cqw,9.5px); letter-spacing:.1em; text-transform:uppercase;
         color:rgba(255,255,255,.62); white-space:nowrap }
@@ -1224,6 +1221,61 @@
         letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-bottom:8px }
   .pc-empty .pc-cta{ display:block; margin-top:8px; font-family:"IBM Plex Mono",monospace;
         font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; color:var(--sun) }
+
+  /* ── the draft modal: available rikishi as cards that flip to reveal ── */
+  .pickmodal{ position:fixed; inset:0; z-index:90; display:none;
+        background:rgba(4,3,8,.82); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+        padding:4vh 16px; overflow-y:auto; }
+  .pickmodal.open{ display:block }
+  .pickmodal__panel{ width:min(1040px,100%); margin:0 auto; }
+  .pickmodal__head{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
+        margin-bottom:18px; }
+  .pickmodal__title{ font-family:"Space Grotesk",sans-serif; font-weight:700; color:var(--ink);
+        font-size:clamp(20px,3vw,28px); letter-spacing:-.01em; }
+  .pickmodal__title span{ display:block; margin-top:4px; font-family:"IBM Plex Mono",monospace;
+        font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--sun); font-weight:500; }
+  .pickmodal__close{ flex:none; width:38px; height:38px; border-radius:9px;
+        border:1px solid var(--line2); background:var(--surface); color:var(--ink);
+        font-size:16px; cursor:pointer; }
+  .pickmodal__close:hover{ border-color:var(--tangerine); color:var(--tangerine) }
+  .pickmodal__grid{ display:grid; gap:14px;
+        grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); }
+
+  /* Each option is a two-sided card that flips in 3D to reveal the rikishi.
+     Inside the flip, container-query containment on the card would break its
+     containing block (footer/name escape), so it is turned off here and the
+     internals are sized in px — everything stays within the card. */
+  .flip{ perspective:1100px; cursor:pointer; background:none; border:0; padding:0;
+        aspect-ratio:5/7; }
+  .flip__inner{ position:relative; width:100%; height:100%;
+        transform-style:preserve-3d; transform:rotateY(180deg);
+        transition:transform .6s cubic-bezier(.3,.8,.35,1); }
+  .flip.revealed .flip__inner{ transform:rotateY(0deg) }
+  .flip__face{ position:absolute; inset:0; -webkit-backface-visibility:hidden;
+        backface-visibility:hidden; border-radius:var(--radius); overflow:hidden; }
+  .flip__front{ transform:rotateY(0deg) }
+  .flip__back{ transform:rotateY(180deg);
+        background:linear-gradient(158deg,#241a3f,#0f1c37);
+        border:1px solid var(--line2); display:grid; place-items:center; }
+  .flip__back::before{ content:"力"; font-family:"Zen Kaku Gothic New","Noto Serif JP",serif;
+        font-weight:900; font-size:52px; color:rgba(216,178,90,.5);
+        text-shadow:0 2px 10px rgba(0,0,0,.6); }
+  .flip__back::after{ content:""; position:absolute; inset:6px; border-radius:9px;
+        border:1px solid rgba(216,178,90,.28); }
+  .flip .pcard{ position:relative; width:100%; height:100%; aspect-ratio:auto;
+        container-type:normal; }
+  .flip .pc-bg{ font-size:64px }
+  .flip .pc-kanji{ font-size:16px }
+  .flip .pc-name{ font-size:14px }
+  .flip .pc-rankline{ font-size:.82rem }
+  .flip .pc-side{ font-size:9px }
+  .flip .pc-flag{ font-size:13px }
+  .flip .pc-brk{ font-size:.5rem }
+  .flip:hover .pcard.filled{ border-color:#fff }
+  .flip .pc-x{ display:none }              /* no remove button inside the picker */
+  @media (prefers-reduced-motion:reduce){
+    .flip__inner{ transition:none }
+  }
 
   /* the run bar — where the basho has got to, and what happens next */
   .runbar{ display:flex; align-items:center; justify-content:space-between; gap:16px;
@@ -1474,6 +1526,16 @@
       <button class="intro__skip" id="introSkip">Just explore</button>
       <button class="intro__go" id="introGo" disabled>Enter the dohyō</button>
     </div>
+  </div>
+</div>
+
+<div class="pickmodal" id="pickModal" role="dialog" aria-modal="true" aria-label="Choose a rikishi">
+  <div class="pickmodal__panel">
+    <div class="pickmodal__head">
+      <div class="pickmodal__title" id="pickTitle">Choose a rikishi<span id="pickSub"></span></div>
+      <button class="pickmodal__close" id="pickClose" aria-label="Close">✕</button>
+    </div>
+    <div class="pickmodal__grid" id="pickGrid"></div>
   </div>
 </div>
 
@@ -2771,10 +2833,21 @@ const bandOf = name => {
   const { tier, num } = rankOf(name);
   return BANDS.find(b => b.id !== "any" && b.fits(tier, num));
 };
+/* banzuke order, highest rank first: Y > O > S > K > M1..M17 > J1..J14,
+   and East before West at the same rank */
+const RANK_ORDER = { Y:0, O:1, S:2, K:3, M:4, J:5 };
+function rankSort(a, b){
+  const ra = rankOf(a), rb = rankOf(b);
+  const ta = RANK_ORDER[ra.tier] ?? 9, tb = RANK_ORDER[rb.tier] ?? 9;
+  if (ta !== tb) return ta - tb;
+  if (ra.num !== rb.num) return ra.num - rb.num;
+  const sa = ROSTER[a].code.slice(-1), sb = ROSTER[b].code.slice(-1);
+  return sa === sb ? 0 : (sa === "e" ? -1 : 1);
+}
 function eligible(band){
   return Object.keys(ROSTER)
     .filter(n => { const r = rankOf(n); return band.fits(r.tier, r.num); })
-    .sort((a, b) => elo(b) - elo(a));
+    .sort(rankSort);
 }
 
 let team = {};
@@ -3013,7 +3086,7 @@ const rankLabel = name => {
 const sideOf = name => (ROSTER[name]?.code.slice(-1) === "e" ? "East" : "West");
 
 /* one filled trading card for a chosen rikishi */
-function pcardInner(name, bandLabel){
+function pcardInner(name, bandLabel, withX = true){
   const kanji = DETAIL[name]?.kanji || "";
   const code  = ROSTER[name]?.code.slice(0, -1) || "";
   const src   = RIKISHI[name]?.src || "";
@@ -3021,7 +3094,7 @@ function pcardInner(name, bandLabel){
   return `<div class="pc-bg" aria-hidden="true">${code}</div>` +
     (src ? `<div class="pc-photo"><img src="${src}" alt="${name}"></div>` : "") +
     `<div class="pc-frame"></div><span class="pc-brk">${bandLabel}</span>` +
-    `<button class="pc-x" type="button" aria-label="Remove ${name}">✕</button>` +
+    (withX ? `<button class="pc-x" type="button" aria-label="Remove ${name}">✕</button>` : "") +
     `<div class="pc-idblock">${kanji ? `<div class="pc-kanji">${kanji}</div>` : ""}<div class="pc-name">${name}</div></div>` +
     `<div class="pc-foot"><span class="pc-rankline">${rankLabel(name)}</span>` +
     `<span class="pc-side">${sideOf(name)}</span>` +
@@ -3030,37 +3103,75 @@ function pcardInner(name, bandLabel){
 }
 
 function paintIntroSlots(){
-  const picked = myPicks();
   introSlots.innerHTML = BANDS.map(band => {
     const cur = team[band.id] || "";
-    const opts = eligible(band)
-      .filter(n => n === cur || !picked.has(n))
-      .map(n => `<option value="${n}"${n === cur ? " selected" : ""}>${n} · ${ROSTER[n].code.slice(0,-1)}</option>`)
-      .join("");
-    const select = `<select data-band="${band.id}" aria-label="${band.label}"><option value="">— pick a rikishi —</option>${opts}</select>`;
     if (!cur) {
-      return `<div class="pcard empty">
+      return `<div class="pcard empty" data-band="${band.id}" role="button" tabindex="0" aria-label="Draft ${band.label}">
         <div class="pc-empty"><b>${band.label}</b>Empty<span class="pc-cta">Tap to draft →</span></div>
-        ${select}</div>`;
+      </div>`;
     }
-    return `<div class="pcard filled r-${ROSTER[cur].code[0]}">${pcardInner(cur, band.label)}${select}</div>`;
+    return `<div class="pcard filled r-${ROSTER[cur].code[0]}" data-band="${band.id}" role="button" tabindex="0">${pcardInner(cur, band.label)}</div>`;
   }).join("");
-  introSlots.querySelectorAll("select").forEach(sel => {
-    sel.onchange = () => {
-      const v = sel.value;
-      if (v) team[sel.dataset.band] = v; else delete team[sel.dataset.band];
-      saveTeam(); paintIntroSlots(); syncIntro();
-    };
+  introSlots.querySelectorAll(".pcard").forEach(card => {
+    const band = card.dataset.band;
+    const open = () => openPicker(band);
+    card.onclick = open;
+    card.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
   });
   introSlots.querySelectorAll(".pc-x").forEach(x => {
     x.onclick = e => {
       e.stopPropagation();
-      const card = x.closest(".pcard");
-      const band = card.querySelector("select").dataset.band;
+      const band = x.closest(".pcard").dataset.band;
       delete team[band]; saveTeam(); paintIntroSlots(); syncIntro();
     };
   });
 }
+
+/* the draft modal — the available rikishi for a band, dealt face-down, then
+   flipped over to reveal them. Tap one to draft it into the slot. */
+const pickModal = document.getElementById("pickModal");
+const pickGrid  = document.getElementById("pickGrid");
+let pickFlipT = [];
+function openPicker(bandId){
+  const band = BANDS.find(b => b.id === bandId);
+  const picked = myPicks();
+  const cur = team[bandId] || "";
+  const options = eligible(band).filter(n => n === cur || !picked.has(n));
+  document.getElementById("pickSub").textContent = band.label;
+  pickGrid.innerHTML = options.map(n =>
+    `<button class="flip" data-name="${n}" aria-label="Draft ${n}">
+      <div class="flip__inner">
+        <div class="flip__face flip__back"></div>
+        <div class="flip__face flip__front">
+          <div class="pcard filled r-${ROSTER[n].code[0]}">${pcardInner(n, band.label, false)}</div>
+        </div>
+      </div>
+    </button>`).join("");
+  pickGrid.querySelectorAll(".flip").forEach(f => {
+    f.onclick = () => {
+      team[bandId] = f.dataset.name;
+      saveTeam(); closePicker(); paintIntroSlots(); syncIntro();
+    };
+  });
+  pickModal.classList.add("open");
+  document.body.style.overflow = "hidden";
+  // deal them in: each card flips face-up in turn
+  pickFlipT.forEach(clearTimeout); pickFlipT = [];
+  const cards = [...pickGrid.querySelectorAll(".flip")];
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  cards.forEach((f, i) => {
+    if (still) { f.classList.add("revealed"); return; }
+    pickFlipT.push(setTimeout(() => f.classList.add("revealed"), 120 + i * 55));
+  });
+}
+function closePicker(){
+  pickModal.classList.remove("open");
+  document.body.style.overflow = "";
+  pickFlipT.forEach(clearTimeout); pickFlipT = [];
+}
+document.getElementById("pickClose").onclick = closePicker;
+pickModal.onclick = e => { if (e.target === pickModal) closePicker(); };
+document.addEventListener("keydown", e => { if (e.key === "Escape" && pickModal.classList.contains("open")) closePicker(); });
 
 function pickGroup(host, attr, onPick){
   host.querySelectorAll(".optcard").forEach(btn => {
