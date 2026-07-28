@@ -32,6 +32,7 @@
   .play{background:var(--red);border-color:var(--red);color:#fff;font-weight:600;min-width:78px}
   .play:hover{background:var(--red2);border-color:var(--red2)}
   .play.playing{background:var(--gold);border-color:var(--gold);color:#241c10}
+  #song.on,#radio.on{background:var(--gold);border-color:var(--gold);color:#241c10;font-weight:600}
   .seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
   .seg button{border:0;border-radius:0;background:transparent;padding:8px 11px}
   .seg button.active{background:var(--red);color:#fff}
@@ -101,6 +102,10 @@
       <button id="play" class="play">▶ Play</button>
       <button id="clear">Clear</button>
       <button id="rand">Randomize</button>
+    </div>
+    <div class="grp">
+      <button id="song" title="Auto-composed song: fades in to 16 tracks over 2 min, then out to 0">Create Song</button>
+      <button id="radio" title="Plays one auto song after another, forever">Radio Mode</button>
     </div>
     <div class="grp">
       <label>Tempo</label>
@@ -378,7 +383,10 @@
   }
 
   // ---------- Controls ----------
-  playBtn.addEventListener('click',()=>{ state.playing?stop():start(); });
+  playBtn.addEventListener('click',()=>{
+    if(state.playing){ (songOn||radioOn)?cancelAuto():stop(); }
+    else start();
+  });
   document.getElementById('clear').addEventListener('click',()=>{
     state.tracks.forEach(t=>t.steps.fill(false));
     cellEls.flat().forEach(c=>c.classList.remove('on'));
@@ -526,6 +534,48 @@
   const rnd=document.getElementById('rnd'), rndVal=document.getElementById('rndVal');
   rnd.addEventListener('input',e=>{ rndVal.textContent=e.target.value+'%'; });
 
+  // ---------- Auto Song / Radio mode ----------
+  const songBtn=document.getElementById('song'), radioBtn=document.getElementById('radio');
+  const RAISE_MS=120000;   // 2 min: 1 -> 16 live tracks
+  const FADE_MS=30000;     // 30 s: 16 -> 0 live tracks
+  const PEAK=16, GAP_MS=4000, TICK=250;
+  let songTimer=null, songT0=0, radioOn=false, songOn=false;
+  function clearSongTimer(){ if(songTimer){ clearTimeout(songTimer); songTimer=null; } }
+  function autoBadges(){ songBtn.classList.toggle('on', songOn && !radioOn); radioBtn.classList.toggle('on', radioOn); }
+  function cancelAuto(){ radioOn=false; songOn=false; clearSongTimer(); autoBadges(); if(state.playing) stop(); }
+  function beginSong(){
+    randomizeMusical();          // fresh pattern (keeps current tempo, steps, randomness)
+    if(!state.playing) start();
+    limit.value=1; applyLimit(1); // open on a single track: 1/20
+    songT0=performance.now();
+    songTick();
+  }
+  function songTick(){
+    const t=performance.now()-songT0, total=RAISE_MS+FADE_MS;
+    let live;
+    if(t<RAISE_MS)      live=1+Math.round((t/RAISE_MS)*(PEAK-1));      // 1 -> 16
+    else if(t<total){ const f=(t-RAISE_MS)/FADE_MS; live=Math.round(PEAK*(1-f)); } // 16 -> 0
+    else live=0;
+    live=Math.max(0, Math.min(live, poolIndices().length));
+    limit.value=Math.min(live, +limit.max);
+    applyLimit(live);
+    if(t>=total){                 // song over
+      stop();
+      if(radioOn){ songTimer=setTimeout(()=>{ if(radioOn) beginSong(); }, GAP_MS); }
+      else { songOn=false; autoBadges(); }
+      return;
+    }
+    songTimer=setTimeout(songTick, TICK);
+  }
+  songBtn.addEventListener('click',()=>{
+    if(songOn && !radioOn){ cancelAuto(); return; } // toggle off
+    cancelAuto(); songOn=true; radioOn=false; autoBadges(); beginSong();
+  });
+  radioBtn.addEventListener('click',()=>{
+    if(radioOn){ cancelAuto(); return; }            // toggle off
+    cancelAuto(); radioOn=true; songOn=true; autoBadges(); beginSong();
+  });
+
   const bpm=document.getElementById('bpm'), bpmNum=document.getElementById('bpmNum');
   function setBpm(v){ v=Math.min(240,Math.max(40,v||110)); state.bpm=v; bpm.value=v; bpmNum.value=v; }
   bpm.addEventListener('input',e=>setBpm(+e.target.value));
@@ -550,7 +600,9 @@
   // keyboard
   window.addEventListener('keydown',e=>{
     if(e.code==='Space' && e.target.tagName!=='INPUT' && e.target.tagName!=='TEXTAREA'){
-      e.preventDefault(); state.playing?stop():start();
+      e.preventDefault();
+      if(state.playing){ (songOn||radioOn)?cancelAuto():stop(); }
+      else start();
     }
   });
 
