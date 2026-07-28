@@ -102,6 +102,15 @@
    .filter(function (e) { return e.pat && e.pat.tracks.length; });
 
   var SONG_SECONDS = 30;                      // radio moves to the next loop after this long
+  var SHUFFLE = 0.88;                         // radio-mode randomness: 88% jump to a random song, 12% in order
+  function chooseNext() {
+    if (PLAYLIST.length <= 1) return cur;
+    if (Math.random() < SHUFFLE) {
+      var i; do { i = Math.floor(Math.random() * PLAYLIST.length); } while (i === cur);
+      return i;
+    }
+    return (cur + 1) % PLAYLIST.length;
+  }
 
   /* ---- preferences ---- */
   var prefs = { vol: 0.7, muted: false, enabled: true };
@@ -154,13 +163,39 @@
   function setSong(i) {
     cur = (i + PLAYLIST.length) % PLAYLIST.length;
     var s = PLAYLIST[cur];
-    STEPS = s.pat.steps; BPM = s.pat.bpm; SWING = s.pat.swing || 0;
+    STEPS = s.pat.steps; SWING = s.pat.swing || 0;
+    var jitter = Math.round((Math.random() * 2 - 1) * 16);      // ±16 BPM, fresh each play
+    BPM = Math.max(40, Math.min(240, (s.pat.bpm || 110) + jitter));
     used = s.pat.tracks.filter(function (t) { return t.idx < SAMPLES.length; });
     if (nameEl) nameEl.textContent = s.name;
     if (subEl) subEl.textContent = used.length + " tracks · " + BPM + " BPM";
   }
   function scheduleStep(sName, time) {
-    used.forEach(function (t) { if (t.steps[sName]) playSample(t.idx, time, t.vol); });
+    var hit = false;
+    used.forEach(function (t) { if (t.steps[sName]) { playSample(t.idx, time, t.vol); hit = true; } });
+    if (hit) beatKick = 1;                     // a struck step gives the visualizer a shove
+  }
+
+  /* ---- random, music-like visualizer ---- */
+  var eqTimer = null, beatKick = 0, eqBars = null;
+  function startEq() {
+    if (eqTimer || !eqEl) return;
+    eqBars = eqEl.children;
+    eqTimer = setInterval(tickEq, 95);
+  }
+  function stopEq() {
+    clearInterval(eqTimer); eqTimer = null;
+    if (eqEl) for (var i = 0; i < eqEl.children.length; i++) eqEl.children[i].style.height = "5px";
+  }
+  function tickEq() {
+    if (!eqBars) return;
+    var kick = beatKick; beatKick = Math.max(0, beatKick - 0.34);   // decays between hits
+    for (var i = 0; i < eqBars.length; i++) {
+      var r = Math.random();
+      // mostly low with the odd tall spike, plus a shared jump on each beat — reads like real levels
+      var h = 5 + r * r * 12 + kick * (5 + Math.random() * 7);
+      eqBars[i].style.height = Math.max(5, Math.min(20, h)).toFixed(1) + "px";
+    }
   }
   function loop() {
     while (nextT < AC.currentTime + AHEAD) {
@@ -179,29 +214,38 @@
   function begin() {
     playing = true; setState("playing");
     step = 0; nextT = AC.currentTime + 0.06; songStartT = AC.currentTime;
-    loop();
+    startEq(); loop();
   }
   function advance() {
-    setSong(cur + 1); step = 0; songStartT = AC.currentTime;
+    setSong(chooseNext()); step = 0; songStartT = AC.currentTime;   // 88% random next in radio mode
     timer = setTimeout(loop, LOOK);            // keep the clock running seamlessly
   }
   function next() {
     if (!AC) { start(); return; }
-    clearTimeout(timer); setSong(cur + 1);
+    clearTimeout(timer); setSong(chooseNext());
     step = 0; nextT = AC.currentTime + 0.05; songStartT = AC.currentTime;
     if (!playing) { playing = true; setState("playing"); }
-    loop();
+    startEq(); loop();
   }
   function stop() {
-    playing = false; clearTimeout(timer); setState("paused");
+    playing = false; clearTimeout(timer); stopEq(); setState("paused");
   }
   function start() {
-    return ensureAudio()
-      .then(function () { return AC.resume ? AC.resume().catch(function () {}) : null; })
-      .then(function () {
-        if (AC.state === "running") begin();
-        else armGesture();                     // autoplay refused — wait for a gesture
-      });
+    return ensureAudio().then(function () {
+      if (!AC) return;
+      if (AC.resume) AC.resume();              // request resume (the browser may defer it)
+      if (kickIfRunning()) return;             // autoplay allowed → straight to playing
+      armGesture();                            // otherwise begin on the first interaction
+      var tries = 0;                           // some browsers resume a beat later w/o a gesture — poll briefly
+      var iv = setInterval(function () {
+        if (kickIfRunning()) { clearInterval(iv); disarm(); }
+        else if (++tries > 10) clearInterval(iv);
+      }, 200);
+    });
+  }
+  function kickIfRunning() {
+    if (AC && AC.state === "running") { if (prefs.enabled && !playing) begin(); return true; }
+    return false;
   }
   function toggle() {
     prefs.enabled = !playing; savePrefs();
@@ -210,24 +254,26 @@
 
   /* ---- gesture arming for autoplay-blocked browsers ---- */
   var armed = false;
+  function onGesture() {
+    if (!AC) return;
+    if (AC.resume) AC.resume().then(function () {
+      if (AC.state === "running") { disarm(); if (prefs.enabled && !playing) begin(); }
+    });
+    else { disarm(); if (prefs.enabled && !playing) begin(); }
+  }
+  function disarm() {
+    window.removeEventListener("pointerdown", onGesture, true);
+    window.removeEventListener("keydown", onGesture, true);
+    window.removeEventListener("touchstart", onGesture, true);
+    armed = false;
+  }
   function armGesture() {
     setState("armed");
+    if (subEl && !playing) subEl.textContent = "tap to start";
     if (armed) return; armed = true;
-    var go = function () {
-      if (!AC) return;
-      AC.resume().then(function () {
-        if (AC.state === "running") {
-          window.removeEventListener("pointerdown", go, true);
-          window.removeEventListener("keydown", go, true);
-          window.removeEventListener("touchstart", go, true);
-          armed = false;
-          if (prefs.enabled && !playing) begin();
-        }
-      });
-    };
-    window.addEventListener("pointerdown", go, true);
-    window.addEventListener("keydown", go, true);
-    window.addEventListener("touchstart", go, true);
+    window.addEventListener("pointerdown", onGesture, true);
+    window.addEventListener("keydown", onGesture, true);
+    window.addEventListener("touchstart", onGesture, true);
   }
 
   /* ---- UI ---- */
@@ -248,10 +294,8 @@
       ".tkr-pp:hover{background:#ff6a4d}" +
       ".tkr[data-state='playing'] .tkr-pp{background:#e6b453;color:#241c10}" +
       ".tkr-eq{flex:none;display:flex;gap:2px;align-items:flex-end;height:20px;width:20px}" +
-      ".tkr-eq i{width:3px;background:#6b5a4c;border-radius:2px;height:5px}" +
-      ".tkr[data-state='playing'] .tkr-eq i{background:#ff6a4d;animation:tkrEq .7s ease-in-out infinite}" +
-      ".tkr-eq i:nth-child(2){animation-delay:.15s}.tkr-eq i:nth-child(3){animation-delay:.3s}.tkr-eq i:nth-child(4){animation-delay:.45s}" +
-      "@keyframes tkrEq{0%,100%{height:5px}50%{height:18px}}" +
+      ".tkr-eq i{width:3px;background:#6b5a4c;border-radius:2px;height:5px;transition:height .1s ease,background .1s ease}" +
+      ".tkr[data-state='playing'] .tkr-eq i{background:#ff6a4d}" +
       ".tkr-meta{min-width:0;display:flex;flex-direction:column;line-height:1.15;margin-right:2px}" +
       ".tkr-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}" +
       ".tkr-sub{font-size:10px;color:#a8998c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}" +
