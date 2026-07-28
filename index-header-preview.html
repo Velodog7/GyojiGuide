@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gyoji Guide — header preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@500&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#0e0f14; --ink:#f1f2f6; --muted:#8a8f9e; --gold:#d8b25a; --border:#242833; --oy:-32%; }
+  *{ box-sizing:border-box }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:"Inter",system-ui,sans-serif }
+  .page{ width:min(1180px,100%); margin:0 auto; padding:0 20px }
+  .hero{ position:relative; overflow:hidden; min-height:clamp(240px,32vw,340px);
+        display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+        gap:10px; padding:0 0 26px; border-bottom:1px solid var(--border); background:#000 }
+  .hero-ceremony{ position:absolute; left:50%; top:var(--oy); transform:translateX(-50%);
+        width:100%; aspect-ratio:1200/1520; border:0; z-index:1; pointer-events:none }
+  .hero::before{ content:""; position:absolute; inset:0; z-index:2; pointer-events:none;
+        background:linear-gradient(180deg, rgba(6,6,10,.45) 0%, rgba(6,6,10,0) 26%,
+                    rgba(6,6,10,0) 55%, rgba(6,6,10,.72) 100%) }
+  .hero-link{ position:absolute; top:14px; left:14px; z-index:3; display:inline-flex; align-items:center;
+        gap:7px; padding:7px 13px; font-family:"IBM Plex Mono",monospace; font-size:.7rem; letter-spacing:.08em;
+        text-transform:uppercase; color:var(--gold); text-decoration:none; background:rgba(0,0,0,.42);
+        border:1px solid rgba(216,178,90,.5); border-radius:99px; backdrop-filter:blur(6px) }
+  .hero-link:hover{ background:var(--gold); color:#14151b }
+  .hero-logo{ position:relative; z-index:3; text-align:center; pointer-events:none }
+  .hero-logo b{ display:block; font-family:"Space Grotesk",sans-serif; font-weight:700;
+        font-size:clamp(2rem,6vw,3.4rem); letter-spacing:.02em; line-height:1;
+        text-shadow:0 2px 20px rgba(0,0,0,.85) }
+  .hero-logo b span{ color:var(--gold) }
+  .hero-logo em{ display:block; margin-top:8px; font-style:normal; font-family:"IBM Plex Mono",monospace;
+        font-size:clamp(.6rem,1.6vw,.78rem); letter-spacing:.34em; text-transform:uppercase; color:#d9dde8;
+        text-shadow:0 1px 8px rgba(0,0,0,.9) }
+  .note{ max-width:70ch; margin:26px auto; color:var(--muted); line-height:1.6; font-size:.92rem }
+  .note b{ color:var(--ink) } .note code{ font-family:"IBM Plex Mono",monospace; color:var(--gold); font-size:.85rem }
+  .tune{ display:flex; gap:14px; align-items:center; justify-content:center; margin:18px 0; color:var(--muted); font-size:.85rem }
+  .tune input{ width:220px }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="hero">
+    <iframe class="hero-ceremony" src="dohyo.html?ceremony=1" title="Dohyo-iri ceremony" scrolling="no" tabindex="-1"></iframe>
+    <a class="hero-link" href="dohyo.html">&#11041; Enter the Dohyo</a>
+    <div class="hero-logo" role="img" aria-label="Gyoji Guide">
+      <b>Gyoji <span>Guide</span></b>
+      <em>Fantasy Sumo &middot; Nagoya 2026</em>
+    </div>
+  </header>
+  <div class="tune">
+    <label>Framing:&nbsp; <input id="oy" type="range" min="-60" max="0" value="-32"></label>
+    <span id="oyv">-32%</span>
+  </div>
+  <p class="note"><b>Preview.</b> The static hero image is replaced by the live dohyo-iri ceremony from
+    <code>dohyo.html?ceremony=1</code> &mdash; the exact same animation, embedded as a banner, with a gradient
+    scrim so the logo stays legible. The &ldquo;Framing&rdquo; slider maps to the <code>--oy</code> crop offset in the real header.</p>
+</div>
+<script>
+  var oy=document.getElementById('oy'), oyv=document.getElementById('oyv');
+  oy.addEventListener('input',function(){ document.documentElement.style.setProperty('--oy', oy.value+'%'); oyv.textContent=oy.value+'%'; });
+</script>
+</body>
+</html>
