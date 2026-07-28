@@ -740,7 +740,7 @@
     const backbone=byRole('backbone'), drums=byRole('drum'), mids=byRole('mid'),
           sticks=byRole('sticks'), lights=byRole('light'), quicks=byRole('quick'), crashes=byRole('crash');
     shuffle(drums);
-    const coreDrums=drums.slice(0,Math.min(2,drums.length));
+    const coreDrums=drums.slice(0,Math.min(3,drums.length));   // the 3 drums that carry the beat
     const core=[...backbone, ...coreDrums];
     const extraDrums=drums.slice(coreDrums.length);
     const crashIdx = crashes.length ? crashes[0] : null;
@@ -751,12 +751,18 @@
     const intro=[...pick(lights,1)];
     const bridge=[...pick(lights,1), ...pick(quicks,1)];
     const outro=[...pick(sticks,1)];
-    const startDrum = coreDrums.length ? coreDrums[0] : (backbone.length ? backbone[0] : core[0]);
-    const restCore = core.filter(i=>i!==startDrum); shuffle(restCore);
-    const introBuild=[startDrum, ...restCore, ...intro];
+    // Intro: ONE drum held for 4 measures, then build to 3 drums + 1 stick over the next 16.
+    const d1=coreDrums[0], d2=coreDrums[1]!=null?coreDrums[1]:d1, d3=coreDrums[2]!=null?coreDrums[2]:d2;
+    const introStick = sticks.length ? sticks[0] : (lights.length ? lights[0] : d1);
+    const introBuild=[
+      {at:0,  set:[d1]},
+      {at:4,  set:[d1,d2]},
+      {at:10, set:[d1,d2,d3]},
+      {at:16, set:[d1,d2,d3,introStick]}
+    ];
     const vm=()=>4+2*((Math.random()*2)|0);            // 4 or 6 measures
     const sections=[
-      {type:'Intro',  bars:4,    layers:intro,  crash:false, build:introBuild},
+      {type:'Intro',  bars:20,   layers:[introStick], crash:false, build:introBuild},
       {type:'Verse',  bars:vm(), layers:verseA, crash:false},
       {type:'Chorus', bars:8,    layers:chorus, crash:true},
       {type:'Verse',  bars:vm(), layers:verseB, crash:false},
@@ -783,13 +789,21 @@
     let bar=0;
     song.sections.forEach((sec,si)=>{
       const at=bar*barDur;
-      if(sec.build && sec.build.length){         // gradual build-up (intro): one drum -> full core
-        const secMs=sec.bars*barDur, seq=sec.build, N=seq.length;
-        for(let k=0;k<N;k++){
-          const set=new Set(seq.slice(0,k+1));
-          const when=at + secMs*(k/N);
-          if(si===0 && k===0) setAudibleBySet(set);            // open on a single drum
-          else songTimers.push(setTimeout(()=>{ if(autoMode) setAudibleBySet(set); }, when));
+      if(sec.build && sec.build.length){         // gradual build-up (intro)
+        const seq=sec.build;
+        if(typeof seq[0]==='object'){            // event-timed: [{at:measures, set:[idx...]}]
+          seq.forEach(ev=>{
+            const when=at + (ev.at||0)*barDur;
+            if(si===0 && (ev.at||0)===0) setAudibleBySet(new Set(ev.set));   // open on one drum
+            else songTimers.push(setTimeout(()=>{ if(autoMode) setAudibleBySet(new Set(ev.set)); }, when));
+          });
+        } else {                                 // legacy flat reveal (even spread)
+          const secMs=sec.bars*barDur, N=seq.length;
+          for(let k=0;k<N;k++){
+            const set=new Set(seq.slice(0,k+1)); const when=at+secMs*(k/N);
+            if(si===0 && k===0) setAudibleBySet(set);
+            else songTimers.push(setTimeout(()=>{ if(autoMode) setAudibleBySet(set); }, when));
+          }
         }
       } else {
         if(si===0) applySection(song,0);
