@@ -4,20 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Taiko Loop Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#211c19;--ink:#f3ece4;--muted:#a8998c;--red:#e0472c;--red2:#ff6a4d;--gold:#e6b453;--line:#3a312b}
+  :root{--bg:#0e0f14;--surface:#181a22;--ink:#f1f2f6;--muted:#878da0;--red:#e23b2e;--red2:#f04e3e;--gold:#d8b25a;--line:#2a2e3a;
+    --sans:"Inter",system-ui,sans-serif;--display:"Space Grotesk","Inter",sans-serif;--mono:"IBM Plex Mono",monospace}
   html,body{margin:0;height:100%}
-  body{background:var(--bg);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    display:flex;align-items:center;justify-content:center}
+  body{background:var(--surface);color:var(--ink);
+    font-family:var(--sans);display:flex;align-items:center;justify-content:center}
   .player{display:flex;align-items:center;gap:12px;padding:14px 16px;width:100%;box-sizing:border-box}
   .btn{flex:none;width:52px;height:52px;border-radius:50%;border:0;cursor:pointer;
     background:var(--red);color:#fff;font-size:20px;line-height:52px;transition:.12s}
   .btn:hover{background:var(--red2)}
-  .btn.playing{background:var(--gold);color:#241c10}
+  .btn.playing{background:var(--gold);color:#141017}
   .meta{min-width:0}
-  .title{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .sub{font-size:11px;color:var(--muted);margin-top:2px}
+  .title{font-family:var(--display);font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px}
   .bars{display:flex;gap:2px;margin-top:6px;height:14px;align-items:flex-end}
   .bar{width:3px;background:var(--line);border-radius:2px;height:5px;transition:height .05s,background .05s}
   .bar.on{background:var(--red2)}

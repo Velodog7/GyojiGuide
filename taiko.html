@@ -4,17 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Taiko Beat Loop Constructor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Serif+JP:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#161311; --panel:#211c19; --panel2:#2b2420; --ink:#f3ece4;
-    --muted:#a8998c; --line:#3a312b; --red:#e0472c; --red2:#ff6a4d;
-    --gold:#e6b453; --on:#e0472c; --beat:#332a24; --accent:#c9402a;
+    --bg:#0e0f14; --panel:#181a22; --panel2:#1f2230; --ink:#f1f2f6;
+    --muted:#878da0; --line:#2a2e3a; --red:#e23b2e; --red2:#f04e3e;
+    --gold:#d8b25a; --on:#e23b2e; --beat:#202432; --accent:#e23b2e;
+    --sans:"Inter",system-ui,-apple-system,sans-serif;
+    --display:"Space Grotesk","Inter",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+    --radius:12px;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-  .wrap{max-width:1180px;margin:0 auto;padding:18px 16px 60px}
-  h1{font-size:22px;margin:0 0 2px;letter-spacing:.3px}
+    font-family:var(--sans)}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 16px 60px}
+  h1{font-family:var(--display);font-size:24px;margin:0 0 2px;letter-spacing:-.2px;font-weight:700}
+  h1 .jp{font-family:"Noto Serif JP",serif;font-weight:700}
   h1 span{color:var(--red2)}
   .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
 
@@ -23,7 +31,7 @@
     display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:14px;
     box-shadow:0 6px 22px rgba(0,0,0,.35)}
   .grp{display:flex;align-items:center;gap:8px}
-  .grp label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+  .grp label{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.9px}
   button{font-family:inherit;color:var(--ink);background:var(--panel2);
     border:1px solid var(--line);border-radius:9px;padding:8px 12px;cursor:pointer;
     font-size:13px;transition:.12s}
@@ -31,23 +39,54 @@
   button:active{transform:translateY(1px)}
   .play{background:var(--red);border-color:var(--red);color:#fff;font-weight:600;min-width:78px}
   .play:hover{background:var(--red2);border-color:var(--red2)}
-  .play.playing{background:var(--gold);border-color:var(--gold);color:#241c10}
-  #song.on,#radio.on{background:var(--gold);border-color:var(--gold);color:#241c10;font-weight:600}
+  .play.playing{background:var(--gold);border-color:var(--gold);color:#141017}
+  #song.on,#radio.on,#libBtn.on{background:var(--gold);border-color:var(--gold);color:#141017;font-weight:600}
+
+  /* Library dialog */
+  #libDlg{max-width:940px;width:94%}
+  .lib-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .lib-head h3{margin:0;font-size:19px}
+  .lib-head h3 span{color:var(--red2)}
+  .lib-cols{display:flex;gap:16px;align-items:flex-start}
+  .lib-col{flex:1;min-width:0}
+  .lib-col h4{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+  .lib-scroll{max-height:58vh;overflow:auto;padding-right:4px;display:flex;flex-direction:column;gap:8px}
+  .songcard{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 10px;cursor:grab}
+  .songcard:hover{border-color:var(--red)}
+  .songcard.dragging{opacity:.45}
+  .sc-main{flex:1;min-width:0}
+  .sc-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sc-meta{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px;letter-spacing:.2px}
+  .sc-actions,.pl-btns{display:flex;gap:4px;flex:none}
+  .mini{padding:4px 8px;font-size:12px;border-radius:7px;line-height:1}
+  .mini.del:hover{border-color:var(--red2);color:var(--red2)}
+  .plbox{background:#14161d;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;overflow:hidden}
+  .pl-head{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  .pl-name{font-weight:600;font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pl-count{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .pl-drop{min-height:46px;padding:8px;display:flex;flex-direction:column;gap:6px}
+  .pl-drop.over{background:rgba(224,71,44,.14);outline:2px dashed var(--red);outline-offset:-4px}
+  .drophint{color:var(--muted);font-size:12px;text-align:center;padding:10px;border:1px dashed var(--line);border-radius:8px}
+  .plitem{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 9px;cursor:grab}
+  .plitem.dragging{opacity:.45}
+  .pi-grip{color:var(--muted);font-size:11px;letter-spacing:-2px}
+  .pi-name{flex:1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .empty{color:var(--muted);font-size:13px;padding:12px;border:1px dashed var(--line);border-radius:8px;line-height:1.5}
   .seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
   .seg button{border:0;border-radius:0;background:transparent;padding:8px 11px}
   .seg button.active{background:var(--red);color:#fff}
   input[type=range]{accent-color:var(--red);width:110px}
-  .val{font-variant-numeric:tabular-nums;font-size:13px;min-width:40px;color:var(--gold)}
+  .val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;min-width:44px;color:var(--gold)}
   .bpmbox{width:56px;background:var(--panel2);border:1px solid var(--line);
     color:var(--ink);border-radius:8px;padding:6px;text-align:center;font-size:14px;
-    font-variant-numeric:tabular-nums}
+    font-family:var(--mono);font-variant-numeric:tabular-nums}
 
   .board{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}
   .grid{width:100%;border-collapse:collapse}
   .grid th,.grid td{padding:0}
   .stephead td{height:26px}
   .stephead .track-h{background:var(--panel2);border-bottom:1px solid var(--line)}
-  .snum{font-size:10px;color:var(--muted);text-align:center;border-bottom:1px solid var(--line);
+  .snum{font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;border-bottom:1px solid var(--line);
     border-left:1px solid var(--line);background:var(--panel2)}
   .snum.beat{color:var(--gold)}
 
@@ -55,7 +94,7 @@
   .trk:last-child{border-bottom:0}
   .trk.limmuted .cell{opacity:.22}
   .trk.limmuted .tname{color:var(--muted)}
-  .trk.limmuted .tctl{background:#241f1b}
+  .trk.limmuted .tctl{background:#171923}
   .tctl{position:sticky;left:0;z-index:5;background:var(--panel2);
     border-right:2px solid var(--line);width:190px;min-width:190px;padding:6px 8px}
   .tctl .row1{display:flex;align-items:center;gap:6px}
@@ -65,7 +104,7 @@
   .badge{font-size:9px;color:var(--muted);border:1px solid var(--line);border-radius:5px;
     padding:1px 4px;cursor:pointer}
   .badge.on-m{background:var(--red);color:#fff;border-color:var(--red)}
-  .badge.on-s{background:var(--gold);color:#241c10;border-color:var(--gold)}
+  .badge.on-s{background:var(--gold);color:#141017;border-color:var(--gold)}
   .tvol{width:100%;margin-top:5px;height:14px}
 
   .cell{width:100%;height:38px;border-left:1px solid var(--line);cursor:pointer;
@@ -94,7 +133,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Taiko <span>Beat Loop</span> Constructor</h1>
+  <h1><span class="jp">太鼓</span> Taiko <span>Beat Loop</span> Constructor</h1>
   <p class="sub">Click cells to build a loop across 20 taiko samples. Space = play/stop.</p>
 
   <div class="transport">
@@ -106,6 +145,8 @@
     <div class="grp">
       <button id="song" title="Auto-composed song: fades in to 16 tracks over 2 min, then out to 0">Create Song</button>
       <button id="radio" title="Plays one auto song after another, forever">Radio Mode</button>
+      <button id="saveSong" title="Save the current song so it replays identically">Save Song…</button>
+      <button id="libBtn" title="Open the song library & playlists">♫ Library</button>
     </div>
     <div class="grp">
       <label>Tempo</label>
@@ -177,6 +218,25 @@
     <button id="ioCopy">Copy</button>
     <button id="ioDo" class="play">Load</button>
     <button id="ioClose">Close</button>
+  </div>
+</dialog>
+
+<dialog id="libDlg">
+  <div class="lib-head">
+    <h3>♫ Song <span>Library</span></h3>
+    <button id="libNewPl">+ New playlist</button>
+    <span style="flex:1"></span>
+    <button id="libClose">Close</button>
+  </div>
+  <div class="lib-cols">
+    <div class="lib-col">
+      <h4>Saved songs — drag a card into a playlist →</h4>
+      <div id="libSongs" class="lib-scroll"></div>
+    </div>
+    <div class="lib-col">
+      <h4>Playlists — drop zone · drag to reorder</h4>
+      <div id="libPlaylists" class="lib-scroll"></div>
+    </div>
   </div>
 </dialog>
 
@@ -349,6 +409,7 @@
     if(v){ ensureAudio(); if(AC.state==='suspended')AC.resume();
            setTimeout(()=>playSample(ti,0,state.tracks[ti].vol),10); }
     refreshLimit();
+    currentSong=null;
   }
   grid.addEventListener('mousedown',e=>{
     const cell=e.target.closest('.cell'); if(!cell)return;
@@ -384,7 +445,7 @@
 
   // ---------- Controls ----------
   playBtn.addEventListener('click',()=>{
-    if(state.playing){ (songOn||radioOn)?cancelAuto():stop(); }
+    if(state.playing){ autoMode?cancelAuto():stop(); }
     else start();
   });
   document.getElementById('clear').addEventListener('click',()=>{
@@ -479,7 +540,7 @@
     buildGrid();
     resetLimit();
   }
-  document.getElementById('rand').addEventListener('click', randomizeMusical);
+  document.getElementById('rand').addEventListener('click', ()=>{ randomizeMusical(); currentSong=null; });
   function syncCells(){
     for(let t=0;t<NUM_TRACKS;t++)for(let s=0;s<STEPS;s++){
       const c=cellEls[t][s]; if(c) c.classList.toggle('on',!!state.tracks[t].steps[s]);
@@ -534,46 +595,97 @@
   const rnd=document.getElementById('rnd'), rndVal=document.getElementById('rndVal');
   rnd.addEventListener('input',e=>{ rndVal.textContent=e.target.value+'%'; });
 
-  // ---------- Auto Song / Radio mode ----------
+  // ---------- Songs: deterministic arc playback ----------
   const songBtn=document.getElementById('song'), radioBtn=document.getElementById('radio');
   const RAISE_MS=120000;   // 2 min: 1 -> 16 live tracks
   const FADE_MS=30000;     // 30 s: 16 -> 0 live tracks
   const PEAK=16, GAP_MS=4000, TICK=250;
-  let songTimer=null, songT0=0, radioOn=false, songOn=false;
+  let songTimer=null, songT0=0, autoMode=null;      // 'song' | 'radio' | 'playlist'
+  let currentOrder=null, currentSong=null;
+  let plQueue=[], plIndex=0;
+
   function clearSongTimer(){ if(songTimer){ clearTimeout(songTimer); songTimer=null; } }
-  function autoBadges(){ songBtn.classList.toggle('on', songOn && !radioOn); radioBtn.classList.toggle('on', radioOn); }
-  function cancelAuto(){ radioOn=false; songOn=false; clearSongTimer(); autoBadges(); if(state.playing) stop(); }
-  function beginSong(){
-    randomizeMusical();          // fresh pattern (keeps current tempo, steps, randomness)
-    if(!state.playing) start();
-    limit.value=1; applyLimit(1); // open on a single track: 1/20
-    songT0=performance.now();
-    songTick();
+  function badges(){
+    songBtn.classList.toggle('on', autoMode==='song');
+    radioBtn.classList.toggle('on', autoMode==='radio');
+    const lb=document.getElementById('libBtn'); if(lb) lb.classList.toggle('on', autoMode==='playlist');
   }
-  function songTick(){
+  function cancelAuto(){ autoMode=null; plQueue=[]; plIndex=0; clearSongTimer(); badges(); if(state.playing) stop(); }
+
+  // arc position (ms) -> how many tracks should sound
+  function arcLive(t){
+    const total=RAISE_MS+FADE_MS;
+    if(t<RAISE_MS) return 1+Math.round((t/RAISE_MS)*(PEAK-1));       // 1 -> 16
+    if(t<total){ const f=(t-RAISE_MS)/FADE_MS; return Math.round(PEAK*(1-f)); } // 16 -> 0
+    return 0;
+  }
+  // deterministically keep the first L tracks of the saved order audible
+  function setAudibleByOrder(order,L){
+    const pool=new Set(poolIndices());
+    const keep=new Set((order||[]).slice(0,L).filter(i=>pool.has(i)));
+    limitMuted=new Set([...pool].filter(i=>!keep.has(i)));
+    updateLimVisuals();
+    const aud=[...pool].filter(i=>!limitMuted.has(i)).length;
+    limitVal.textContent=aud+' / '+pool.size;
+  }
+  function arcTick(){
     const t=performance.now()-songT0, total=RAISE_MS+FADE_MS;
-    let live;
-    if(t<RAISE_MS)      live=1+Math.round((t/RAISE_MS)*(PEAK-1));      // 1 -> 16
-    else if(t<total){ const f=(t-RAISE_MS)/FADE_MS; live=Math.round(PEAK*(1-f)); } // 16 -> 0
-    else live=0;
-    live=Math.max(0, Math.min(live, poolIndices().length));
-    limit.value=Math.min(live, +limit.max);
-    applyLimit(live);
-    if(t>=total){                 // song over
-      stop();
-      if(radioOn){ songTimer=setTimeout(()=>{ if(radioOn) beginSong(); }, GAP_MS); }
-      else { songOn=false; autoBadges(); }
-      return;
-    }
-    songTimer=setTimeout(songTick, TICK);
+    let L=Math.max(0, Math.min(arcLive(t), PEAK, currentOrder?currentOrder.length:0));
+    setAudibleByOrder(currentOrder, L);
+    limit.value=Math.min(L, +limit.max);
+    if(t>=total){ onSongEnd(); return; }
+    songTimer=setTimeout(arcTick, TICK);
   }
+  function onSongEnd(){
+    stop();
+    if(autoMode==='radio'){ songTimer=setTimeout(()=>{ if(autoMode==='radio') playSongObject(generateSong()); }, GAP_MS); }
+    else if(autoMode==='playlist'){
+      plIndex++;
+      if(plIndex<plQueue.length){ songTimer=setTimeout(()=>{ if(autoMode==='playlist') playSongObject(plQueue[plIndex]); }, GAP_MS); }
+      else { autoMode=null; badges(); }
+    } else { autoMode=null; badges(); }
+  }
+
+  // entrance order for the current pattern: anchors (backbone/drum) first, so they
+  // arrive first and — because the fade-out reuses the same order — leave last.
+  function buildOrder(){
+    const prio={backbone:0,drum:1,mid:2,sticks:3,light:4,quick:5,crash:6};
+    return poolIndices()
+      .map(i=>({i, k:(prio[roleOf(state.tracks[i].name)]??3), r:Math.random()}))
+      .sort((a,b)=> a.k-b.k || a.r-b.r)
+      .map(o=>o.i);
+  }
+  function songFromCurrent(){
+    return { p:encodePattern(currentPattern()), order:buildOrder(), raise:RAISE_MS, fade:FADE_MS, peak:PEAK };
+  }
+  function generateSong(){ randomizeMusical(); const s=songFromCurrent(); currentSong=s; return s; }
+
+  function applySongPattern(dp){
+    STEPS=dp.steps||16;
+    document.querySelectorAll('#stepsSeg button').forEach(x=>x.classList.toggle('active',+x.dataset.steps===STEPS));
+    setBpm(dp.bpm||110);
+    state.swing=dp.swing||0; swing.value=state.swing; swingVal.textContent=state.swing+'%';
+    state.tracks.forEach(t=>{ t.steps=new Array(128).fill(false); t.mute=false; t.solo=false; });
+    (dp.tracks||[]).forEach(tk=>{ const t=state.tracks[tk.idx]; if(!t)return; t.vol=tk.vol; (tk.steps||[]).forEach((v,s)=>{ if(v)t.steps[s]=true; }); });
+    limitMuted=new Set();
+    buildGrid();
+  }
+  function playSongObject(song){
+    currentSong=song;
+    applySongPattern(decodePattern(song.p));
+    currentOrder=(song.order && song.order.length ? song.order : buildOrder()).slice();
+    if(!state.playing) start();
+    songT0=performance.now();
+    arcTick();
+  }
+
   songBtn.addEventListener('click',()=>{
-    if(songOn && !radioOn){ cancelAuto(); return; } // toggle off
-    cancelAuto(); songOn=true; radioOn=false; autoBadges(); beginSong();
+    if(autoMode==='song'){ cancelAuto(); return; }
+    cancelAuto(); autoMode='song'; badges(); playSongObject(generateSong());
   });
   radioBtn.addEventListener('click',()=>{
-    if(radioOn){ cancelAuto(); return; }            // toggle off
-    cancelAuto(); radioOn=true; songOn=true; autoBadges(); beginSong();
+    if(autoMode==='radio'){ cancelAuto(); return; }
+    cancelAuto(); autoMode='radio'; badges(); playSongObject(generateSong());
   });
 
   const bpm=document.getElementById('bpm'), bpmNum=document.getElementById('bpmNum');
@@ -601,7 +713,7 @@
   window.addEventListener('keydown',e=>{
     if(e.code==='Space' && e.target.tagName!=='INPUT' && e.target.tagName!=='TEXTAREA'){
       e.preventDefault();
-      if(state.playing){ (songOn||radioOn)?cancelAuto():stop(); }
+      if(state.playing){ autoMode?cancelAuto():stop(); }
       else start();
     }
   });
@@ -633,6 +745,7 @@
     });
     buildGrid();
     resetLimit();
+    currentSong=null;
   }
   document.getElementById('savePreset').addEventListener('click',()=>{
     const name=prompt('Preset name:'); if(!name)return;
@@ -672,6 +785,100 @@
   ioDo.addEventListener('click',()=>{ try{applyPattern(JSON.parse(ioText.value)); dlg.close();}catch(e){alert('Invalid pattern text');}});
   ioCopy.addEventListener('click',()=>{ ioText.select(); document.execCommand('copy'); });
   document.getElementById('ioClose').addEventListener('click',()=>dlg.close());
+
+  // ---------- Song library + playlists (localStorage, drag & drop) ----------
+  const SONGS_KEY='taiko_songs_v1', PL_KEY='taiko_playlists_v1';
+  const libDlg=document.getElementById('libDlg');
+  const libSongs=document.getElementById('libSongs');
+  const libPlaylists=document.getElementById('libPlaylists');
+  function loadStore(k){ try{return JSON.parse(localStorage.getItem(k)||'{}');}catch(e){return {};} }
+  function saveStore(k,o){ try{localStorage.setItem(k,JSON.stringify(o));}catch(e){} }
+  function esc(s){ return (s+'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function songMeta(song){ try{const d=decodePattern(song.p); return d.tracks.length+' trk · '+d.bpm+' BPM · '+d.steps+' steps';}catch(e){return '';} }
+
+  function playSavedSong(song){ cancelAuto(); autoMode='song'; badges(); playSongObject(song); libDlg.close(); }
+  function playPlaylist(list){
+    if(!list.length){ alert('That playlist is empty — drag some songs in first.'); return; }
+    cancelAuto(); autoMode='playlist'; plQueue=list.slice(); plIndex=0; badges(); playSongObject(plQueue[0]); libDlg.close();
+  }
+
+  function renderLibrary(){
+    const songs=loadStore(SONGS_KEY);
+    libSongs.innerHTML='';
+    const names=Object.keys(songs);
+    if(!names.length){ libSongs.innerHTML='<div class="empty">No saved songs yet. Hit <b>Create Song</b>, then <b>Save Song…</b>.</div>'; }
+    names.forEach(name=>{
+      const card=document.createElement('div'); card.className='songcard'; card.draggable=true; card.dataset.song=name;
+      card.innerHTML='<div class="sc-main"><div class="sc-name">'+esc(name)+'</div><div class="sc-meta">'+songMeta(songs[name])+'</div></div>'+
+        '<div class="sc-actions"><button class="mini play" title="Play song">▶</button><button class="mini del" title="Delete song">✕</button></div>';
+      card.querySelector('.play').onclick=()=>playSavedSong(songs[name]);
+      card.querySelector('.del').onclick=()=>{ if(confirm('Delete song “'+name+'”?')){ const o=loadStore(SONGS_KEY); delete o[name]; saveStore(SONGS_KEY,o); renderLibrary(); } };
+      card.addEventListener('dragstart',e=>{ e.dataTransfer.setData('text/plain',JSON.stringify({t:'song',name})); e.dataTransfer.effectAllowed='copy'; card.classList.add('dragging'); });
+      card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+      libSongs.appendChild(card);
+    });
+    renderPlaylists();
+  }
+
+  function renderPlaylists(){
+    const pls=loadStore(PL_KEY);
+    libPlaylists.innerHTML='';
+    const names=Object.keys(pls);
+    if(!names.length){ libPlaylists.innerHTML='<div class="empty">No playlists yet. Click <b>New playlist</b>, then drag songs from the left.</div>'; return; }
+    names.forEach(pn=>{
+      const list=pls[pn];
+      const box=document.createElement('div'); box.className='plbox';
+      box.innerHTML='<div class="pl-head"><span class="pl-name">'+esc(pn)+'</span>'+
+        '<span class="pl-count">'+list.length+' song'+(list.length===1?'':'s')+'</span>'+
+        '<span class="pl-btns"><button class="mini play" title="Play playlist">▶</button><button class="mini del" title="Delete playlist">✕</button></span></div>'+
+        '<div class="pl-drop"></div>';
+      const drop=box.querySelector('.pl-drop');
+      if(!list.length) drop.innerHTML='<div class="drophint">Drop songs here</div>';
+      list.forEach((s,idx)=>{
+        const it=document.createElement('div'); it.className='plitem'; it.draggable=true; it.dataset.idx=idx;
+        it.innerHTML='<span class="pi-grip">⋮⋮</span><span class="pi-name">'+esc(s.name||'song')+'</span><button class="mini del" title="Remove from playlist">✕</button>';
+        it.querySelector('.del').onclick=()=>{ const o=loadStore(PL_KEY); o[pn].splice(idx,1); saveStore(PL_KEY,o); renderPlaylists(); };
+        it.addEventListener('dragstart',e=>{ e.stopPropagation(); e.dataTransfer.setData('text/plain',JSON.stringify({t:'item',pl:pn,idx})); e.dataTransfer.effectAllowed='move'; it.classList.add('dragging'); });
+        it.addEventListener('dragend',()=>it.classList.remove('dragging'));
+        drop.appendChild(it);
+      });
+      box.querySelector('.pl-head .play').onclick=()=>playPlaylist(list);
+      box.querySelector('.pl-head .del').onclick=()=>{ if(confirm('Delete playlist “'+pn+'”?')){ const o=loadStore(PL_KEY); delete o[pn]; saveStore(PL_KEY,o); renderPlaylists(); } };
+      drop.addEventListener('dragover',e=>{ e.preventDefault(); drop.classList.add('over'); });
+      drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+      drop.addEventListener('drop',e=>{
+        e.preventDefault(); drop.classList.remove('over');
+        let d; try{ d=JSON.parse(e.dataTransfer.getData('text/plain')); }catch(_){ return; }
+        const o=loadStore(PL_KEY), songs=loadStore(SONGS_KEY);
+        const items=[...drop.querySelectorAll('.plitem')];
+        const after=items.find(el=>{ const r=el.getBoundingClientRect(); return e.clientY < r.top + r.height/2; });
+        let at = after ? +after.dataset.idx : o[pn].length;
+        if(d.t==='song'){
+          if(songs[d.name]) o[pn].splice(at,0, Object.assign({name:d.name}, songs[d.name]));
+        }else if(d.t==='item'){
+          const moved=o[d.pl][d.idx];
+          if(d.pl===pn){ o[pn].splice(d.idx,1); if(at>d.idx) at--; o[pn].splice(at,0,moved); }
+          else { o[d.pl].splice(d.idx,1); o[pn].splice(at,0,moved); }
+        }
+        saveStore(PL_KEY,o); renderPlaylists();
+      });
+      libPlaylists.appendChild(box);
+    });
+  }
+
+  document.getElementById('libBtn').addEventListener('click',()=>{ renderLibrary(); libDlg.showModal(); });
+  document.getElementById('libClose').addEventListener('click',()=>libDlg.close());
+  document.getElementById('libNewPl').addEventListener('click',()=>{
+    const name=prompt('New playlist name:'); if(!name)return;
+    const o=loadStore(PL_KEY); if(!o[name]) o[name]=[]; saveStore(PL_KEY,o); renderPlaylists();
+  });
+  document.getElementById('saveSong').addEventListener('click',()=>{
+    const song=currentSong||songFromCurrent();  // the exact played song if there is one, else the current grid
+    const name=prompt('Save song as:'); if(!name)return;
+    const o=loadStore(SONGS_KEY); o[name]=song; saveStore(SONGS_KEY,o);
+    if(libDlg.open) renderLibrary();
+    else alert('Saved “'+name+'”. Open Library to organize it.');
+  });
 
   // ---------- init ----------
   buildGrid();
