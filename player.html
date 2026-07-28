@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taiko Loop Player</title>
+<style>
+  :root{--bg:#211c19;--ink:#f3ece4;--muted:#a8998c;--red:#e0472c;--red2:#ff6a4d;--gold:#e6b453;--line:#3a312b}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex;align-items:center;justify-content:center}
+  .player{display:flex;align-items:center;gap:12px;padding:14px 16px;width:100%;box-sizing:border-box}
+  .btn{flex:none;width:52px;height:52px;border-radius:50%;border:0;cursor:pointer;
+    background:var(--red);color:#fff;font-size:20px;line-height:52px;transition:.12s}
+  .btn:hover{background:var(--red2)}
+  .btn.playing{background:var(--gold);color:#241c10}
+  .meta{min-width:0}
+  .title{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sub{font-size:11px;color:var(--muted);margin-top:2px}
+  .bars{display:flex;gap:2px;margin-top:6px;height:14px;align-items:flex-end}
+  .bar{width:3px;background:var(--line);border-radius:2px;height:5px;transition:height .05s,background .05s}
+  .bar.on{background:var(--red2)}
+  .err{padding:16px;color:var(--muted);font-size:13px;text-align:center}
+  a{color:var(--gold)}
+</style>
+</head>
+<body>
+<div id="root" class="player"></div>
+<script src="taiko-data.js"></script>
+<script>
+(function(){
+  "use strict";
+  const root=document.getElementById('root');
+  const params=new URLSearchParams(location.search);
+  const code=params.get('p');
+  const autoplay=params.get('autoplay')==='1';
+
+  if(!code){
+    root.innerHTML='<div class="err">No pattern in the link.<br>Create one in the constructor and use <b>Embed…</b>.</div>';
+    return;
+  }
+  let pat;
+  try{ pat=decodePattern(code); }
+  catch(e){ root.innerHTML='<div class="err">Sorry, this pattern link is invalid.</div>'; return; }
+
+  const STEPS=pat.steps, BPM=pat.bpm, SWING=pat.swing;
+  const used=pat.tracks.filter(t=>t.idx<SAMPLES.length);
+
+  // UI
+  root.innerHTML=
+    '<button class="btn" id="pp" title="Play/Stop">▶</button>'+
+    '<div class="meta">'+
+      '<div class="title">Taiko Loop</div>'+
+      '<div class="sub">'+used.length+' tracks · '+BPM+' BPM · '+STEPS+' steps</div>'+
+      '<div class="bars" id="bars"></div>'+
+    '</div>';
+  const barsEl=document.getElementById('bars');
+  const barDivs=[];
+  for(let s=0;s<STEPS;s++){const d=document.createElement('div');d.className='bar';barsEl.appendChild(d);barDivs.push(d);}
+
+  // Audio
+  let AC=null, master=null, playing=false;
+  const buffers={}; // idx -> AudioBuffer
+  function ensureAudio(){
+    if(AC) return Promise.resolve();
+    AC=new (window.AudioContext||window.webkitAudioContext)();
+    master=AC.createGain(); master.gain.value=0.9; master.connect(AC.destination);
+    return Promise.all(used.map(t=>
+      fetch(SAMPLES[t.idx].file).then(r=>r.arrayBuffer()).then(b=>AC.decodeAudioData(b))
+        .then(buf=>{buffers[t.idx]=buf;}).catch(e=>console.warn('decode fail',t.idx,e))
+    ));
+  }
+  function playSample(idx,when,gain){
+    const buf=buffers[idx]; if(!buf) return;
+    const src=AC.createBufferSource(); src.buffer=buf;
+    const g=AC.createGain(); g.gain.value=gain; src.connect(g); g.connect(master);
+    src.start(when||0);
+  }
+
+  // Scheduler
+  let step=0, nextT=0, timer=null;
+  const LOOK=25, AHEAD=0.1;
+  const sps=()=> (60/BPM)/4;
+  function scheduleStep(s,time){
+    used.forEach(t=>{ if(t.steps[s]) playSample(t.idx,time,t.vol); });
+    const vis=(time-AC.currentTime)*1000;
+    setTimeout(()=>flash(s), Math.max(0,vis));
+  }
+  function loop(){
+    while(nextT < AC.currentTime + AHEAD){
+      let t=nextT;
+      if(step%2===1) t+=(SWING/100)*sps();
+      scheduleStep(step,t);
+      nextT+=sps(); step=(step+1)%STEPS;
+    }
+    timer=setTimeout(loop,LOOK);
+  }
+  function flash(s){
+    barDivs.forEach((d,i)=>{
+      const active = used.some(t=>t.steps[i]);
+      d.classList.toggle('on', i===s && active);
+      d.style.height = (i===s? (active?14:9) : (active?9:5))+'px';
+    });
+  }
+  const pp=document.getElementById('pp');
+  function start(){
+    ensureAudio().then(()=>{
+      if(AC.state==='suspended') AC.resume();
+      playing=true; step=0; nextT=AC.currentTime+0.06; loop();
+      pp.textContent='■'; pp.classList.add('playing');
+    });
+  }
+  function stop(){
+    playing=false; clearTimeout(timer);
+    pp.textContent='▶'; pp.classList.remove('playing');
+    barDivs.forEach(d=>{d.classList.remove('on');d.style.height=(used.some((t,i)=>false)?9:5)+'px';});
+  }
+  pp.addEventListener('click',()=> playing?stop():start());
+
+  // Optional autoplay (browsers usually require a click first; we try, and fall back silently)
+  if(autoplay){ start(); }
+
+  // Expose a tiny API so host pages can trigger playback themselves
+  window.TaikoLoop={play:start, stop:stop, toggle:()=>playing?stop():start()};
+})();
+</script>
+</body>
+</html>

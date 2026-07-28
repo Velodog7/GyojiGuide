@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Embed example</title>
+<style>body{font-family:system-ui;background:#161311;color:#f3ece4;max-width:640px;margin:40px auto;padding:0 16px}</style>
+</head>
+<body>
+  <h1>My page with a taiko loop</h1>
+  <p>Paste the iframe you copied from the constructor's <b>Embed…</b> button. Example:</p>
+
+  <!-- Replace the p=... value with your own pattern code -->
+  <iframe src="player.html?p=AXgAAQMAVQEBDVUQEDdVREQ" width="260" height="104" style="border:0;border-radius:12px"></iframe>
+
+  <p>You can also trigger it from your own button:</p>
+  <button onclick="document.querySelector('iframe').contentWindow.TaikoLoop.toggle()">Play / Stop the loop</button>
+</body>
+</html>
