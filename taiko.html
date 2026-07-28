@@ -204,9 +204,9 @@
       <span class="val" id="limitVal">–</span>
     </div>
     <div class="grp">
-      <label title="How loose the next Randomize is: 0% = clean repeating pattern, 100% = wild">Randomness</label>
-      <input type="range" id="rnd" min="0" max="100" value="25">
-      <span class="val" id="rndVal">25%</span>
+      <label title="How loose the next Randomize is: 0% = clean repeating pattern, 200% = wild">Randomness</label>
+      <input type="range" id="rnd" min="0" max="200" value="50">
+      <span class="val" id="rndVal">50%</span>
     </div>
   </div>
 
@@ -767,7 +767,7 @@
       {type:'Chorus', bars:8,    layers:chorus, crash:true},
       {type:'Verse',  bars:vm(), layers:verseB, crash:false},
       {type:'Chorus', bars:8,    layers:chorus, crash:true},
-      {type:'Bridge', bars:2+((Math.random()*2)|0), layers:bridge, crash:false},
+      {type:'Bridge', bars:4, layers:bridge, crash:false},
       {type:'Chorus', bars:8,    layers:chorus, crash:true},
       {type:'Outro',  bars:4,    layers:outro,  crash:false}
     ];
