@@ -355,7 +355,9 @@
   .shout--kim b{ font-size:3cqw; color:var(--win) }
   .shout--kim span{ letter-spacing:.3em }
   .shout--kim.on{ animation:kimCall 2.4s cubic-bezier(.2,.9,.3,1) both }
-  /* よいしょ — called out on each of the yokozuna's shiko stomps */
+  /* よいしょ — called out on each of the yokozuna's shiko stomps. Sits lower,
+     down by his feet, so it never collides with the ceremony caption above. */
+  .shout--yoisho{ bottom:calc(26cqw + 30px) }
   .shout--yoisho b{ color:var(--sun) }
   .shout--yoisho.on{ animation:yoisho .85s cubic-bezier(.2,.9,.3,1) both }
   @keyframes yoisho{
@@ -1061,7 +1063,7 @@
   /* the ring stays full size during setup — same as the simulation */
   body:not(.setup) #intro{ display:none }
 
-  .intro{ width:min(960px,100%); margin:0 auto; padding:8px 20px 44px }
+  .intro{ width:min(1180px,100%); margin:0 auto; padding:8px 20px 44px }
   .intro__back{ position:fixed; top:14px; left:14px; z-index:70; margin:0 }
   .intro__title{ text-align:center; margin-bottom:6px;
         font-family:"Space Grotesk",sans-serif; font-weight:700;
@@ -1176,7 +1178,10 @@
   .slotpick__line b{ font-family:ui-monospace,Menlo,monospace; color:var(--ink); font-weight:600 }
 
   /* ── team picker: full trading cards, à la Gyoji Guide ─────── */
-  .intro__slots{ grid-template-columns:repeat(auto-fill,minmax(190px,1fr)) !important }
+  .intro__slots{ grid-template-columns:repeat(7,minmax(0,1fr)) !important; gap:8px !important }
+  @media (max-width:720px){
+    .intro__slots{ grid-template-columns:repeat(auto-fill,minmax(140px,1fr)) !important }
+  }
   .pcard{
     position:relative; aspect-ratio:5/7; border-radius:var(--radius);
     overflow:hidden; border:1px solid var(--line); background:var(--surface);
