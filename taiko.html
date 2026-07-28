@@ -52,6 +52,9 @@
 
   .trk{border-bottom:1px solid var(--line)}
   .trk:last-child{border-bottom:0}
+  .trk.limmuted .cell{opacity:.22}
+  .trk.limmuted .tname{color:var(--muted)}
+  .trk.limmuted .tctl{background:#241f1b}
   .tctl{position:sticky;left:0;z-index:5;background:var(--panel2);
     border-right:2px solid var(--line);width:190px;min-width:190px;padding:6px 8px}
   .tctl .row1{display:flex;align-items:center;gap:6px}
@@ -122,6 +125,11 @@
     <div class="grp">
       <label>Master</label>
       <input type="range" id="master" min="0" max="100" value="85">
+    </div>
+    <div class="grp">
+      <label title="Randomly thins the playing tracks down to this many">Live Tracks</label>
+      <input type="range" id="limit" min="0" max="60" value="60">
+      <span class="val" id="limitVal">–</span>
     </div>
   </div>
 
@@ -199,8 +207,15 @@
     src.start(when||0);
   }
 
+  let limitMuted = new Set(); // tracks silenced by the Live Tracks limiter
   function anySolo(){ return state.tracks.some(t=>t.solo); }
-  function audible(t){ const solo=anySolo(); return solo ? t.solo : !t.mute; }
+  function audible(t, idx){
+    const solo=anySolo();
+    const base = solo ? t.solo : !t.mute;
+    if(!base) return false;
+    if(idx!=null && limitMuted.has(idx)) return false;
+    return true;
+  }
 
   // ---------- Scheduler ----------
   let currentStep=0, nextNoteTime=0, timerId=null;
@@ -209,7 +224,7 @@
   function scheduleStep(step, time){
     for(let t=0;t<NUM_TRACKS;t++){
       const trk=state.tracks[t];
-      if(trk.steps[step] && audible(trk)){
+      if(trk.steps[step] && audible(trk, t)){
         playSample(t, time, trk.vol);
       }
     }
@@ -250,11 +265,13 @@
   const grid = document.getElementById('grid');
   const playBtn = document.getElementById('play');
   let cellEls = []; // [track][step]
+  let trkRowEls = []; // [track] -> <tr>
 
   function cellW(){ return STEPS>=128?13 : STEPS>=64?18 : STEPS>=32?24 : 34; }
   function buildGrid(){
     grid.innerHTML='';
     cellEls = [];
+    trkRowEls = [];
     const cw = cellW();
     // header row with step numbers
     const head = document.createElement('tr');
@@ -307,6 +324,7 @@
         rowCells.push(cell);
       }
       cellEls.push(rowCells);
+      trkRowEls.push(tr);
       grid.appendChild(tr);
     });
   }
@@ -320,6 +338,7 @@
     cell.classList.toggle('on',v);
     if(v){ ensureAudio(); if(AC.state==='suspended')AC.resume();
            setTimeout(()=>playSample(ti,0,state.tracks[ti].vol),10); }
+    refreshLimit();
   }
   grid.addEventListener('mousedown',e=>{
     const cell=e.target.closest('.cell'); if(!cell)return;
@@ -358,38 +377,142 @@
   document.getElementById('clear').addEventListener('click',()=>{
     state.tracks.forEach(t=>t.steps.fill(false));
     cellEls.flat().forEach(c=>c.classList.remove('on'));
+    resetLimit();
   });
-  const RAND_MAX_TRACKS = 20; // keep it musical: only this many tracks active at once
-  function densityFor(name){
-    // returns [onBeatProb, offBeatProb] by sound family
-    if(name.startsWith('Deep')||name.startsWith('Big')) return [0.30,0.08];
-    if(name.startsWith('Mid')||name.startsWith('Drum')) return [0.22,0.10];
-    if(name.startsWith('Lt')||name.startsWith('Sticks')||name.startsWith('Quick')) return [0.18,0.14];
-    return [0.14,0.06]; // crashes / dynamics: rare
+  // ---------- Musical randomizer ----------
+  // Builds a balanced 20-piece taiko ensemble. Every instrument gets a rhythm motif
+  // that is one 4/4 bar on a 16th-note grid, tiled across all bars, so the parts lock
+  // to a shared time signature instead of firing at random.
+  const RAND_TRACKS = 20;
+  function roleOf(name){
+    if(name.startsWith('Deep')||name.startsWith('Big')||name.startsWith('Taiko')) return 'backbone';
+    if(name.startsWith('Mid'))    return 'mid';
+    if(name.startsWith('Drum'))   return 'drum';
+    if(name.startsWith('Quick'))  return 'quick';
+    if(name.startsWith('Crash'))  return 'crash';
+    if(name.startsWith('Lt'))     return 'light';
+    if(name.startsWith('Sticks')) return 'sticks';
+    return 'drum';
   }
-  document.getElementById('rand').addEventListener('click',()=>{
-    // clear everything first
-    state.tracks.forEach(t=>t.steps.fill(false));
-    // choose up to RAND_MAX_TRACKS random distinct tracks
-    const idxs=[...Array(NUM_TRACKS).keys()];
-    for(let i=idxs.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[idxs[i],idxs[j]]=[idxs[j],idxs[i]];}
-    const chosen=idxs.slice(0, Math.min(RAND_MAX_TRACKS, NUM_TRACKS));
-    chosen.forEach(ti=>{
-      const [pb,po]=densityFor(state.tracks[ti].name);
-      let any=false;
-      for(let s=0;s<STEPS;s++){
-        const p = (s%4===0)?pb:po;
-        if(Math.random()<p){ state.tracks[ti].steps[s]=true; any=true; }
+  const MOTIFS={
+    backbone:[[0,8],[0,4,8,12],[0,8,12],[0,6,8,14],[0,4,8,10,12]],   // the "don" pulse
+    mid:[[4,12],[6,14],[10],[4,7,12,15],[2,10]],                     // off-beat accents
+    drum:[[0,2,4,6,8,10,12,14],[0,3,4,7,8,11,12,15],[0,2,4,6,8,10,12,14,15],[0,4,6,8,12,14]],
+    sticks:[[2,6,10,14],[0,2,4,6,8,10,12,14],[0,1,2,3,8,9,10,11],[4,12]],
+    light:[[1,3,5,7,9,11,13,15],[3,7,11,15],[1,5,9,13],[7,15]],      // fast ghost fills
+    quick:[[7,15],[15],[3,11],[7]],                                 // pickups
+    crash:[[0]]
+  };
+  const VOL={backbone:[0.80,1.00],mid:[0.60,0.85],drum:[0.58,0.85],sticks:[0.45,0.72],light:[0.32,0.60],quick:[0.60,0.85],crash:[0.70,0.92]};
+  const _pick=a=>a[(Math.random()*a.length)|0];
+  const _rng=a=>a[0]+Math.random()*(a[1]-a[0]);
+  const _chance=p=>Math.random()<p;
+  function tracksByRole(role){ const ids=[]; for(let i=0;i<NUM_TRACKS;i++){ if(roleOf(state.tracks[i].name)===role) ids.push(i);} return ids; }
+
+  function chooseEnsemble(){
+    const target={backbone:5,mid:3,drum:5,sticks:3,light:3,quick:1,crash:(_chance(0.6)?1:0)};
+    let sum=Object.values(target).reduce((a,b)=>a+b,0);
+    const shrink=['light','sticks','mid','quick','drum'];
+    while(sum>RAND_TRACKS){ for(const r of shrink){ if(target[r]>0){target[r]--;sum--;break;} } }
+    while(sum<RAND_TRACKS){ target.drum++; sum++; }
+    const chosen=[];
+    for(const role in target){
+      const pool=tracksByRole(role); shuffle(pool);
+      pool.slice(0,target[role]).forEach(idx=>chosen.push({idx,role}));
+    }
+    return chosen;
+  }
+
+  function randomizeMusical(){
+    // 1) time-signature length: whole bars of 16 sixteenth-notes
+    STEPS=_pick([16,32,32,64]);
+    document.querySelectorAll('#stepsSeg button').forEach(x=>x.classList.toggle('active',+x.dataset.steps===STEPS));
+    const bars=Math.max(1,Math.round(STEPS/16));
+
+    // 2) clear every track
+    state.tracks.forEach(t=>{ t.steps=new Array(128).fill(false); });
+
+    // 3) balanced ensemble, each part a bar-aligned motif tiled across the loop
+    const chosen=chooseEnsemble();
+    let leadFilled=false;
+    chosen.forEach(({idx,role})=>{
+      const t=state.tracks[idx];
+      t.vol=_rng(VOL[role]);
+      const arr=t.steps;
+      if(role==='crash'){
+        arr[0]=true;
+        if(STEPS>=32 && _chance(0.5)) arr[(STEPS/2)|0]=true;
+      }else{
+        const motif=_pick(MOTIFS[role]);
+        for(let b=0;b<bars;b++) motif.forEach(m=>{ const s=b*16+m; if(s<STEPS) arr[s]=true; });
+        if(!leadFilled && (role==='backbone'||role==='drum') && bars>1 && _chance(0.7)){
+          leadFilled=true; const base=(bars-1)*16;              // small fill in the last bar
+          [10,12,13,14,15].forEach(m=>{ if(_chance(0.6)) arr[base+m]=true; });
+        }
       }
-      if(!any){ state.tracks[ti].steps[(Math.random()*STEPS)|0]=true; } // avoid a silent chosen track
     });
-    syncCells();
-  });
+
+    // 4) tempo + feel
+    setBpm(88+(Math.random()*62|0));
+    state.swing=_chance(0.3)?(6+(Math.random()*12|0)):0;
+    swing.value=state.swing; swingVal.textContent=state.swing+'%';
+
+    // 5) render and reset the live-tracks limiter to the full ensemble
+    buildGrid();
+    resetLimit();
+  }
+  document.getElementById('rand').addEventListener('click', randomizeMusical);
   function syncCells(){
     for(let t=0;t<NUM_TRACKS;t++)for(let s=0;s<STEPS;s++){
       const c=cellEls[t][s]; if(c) c.classList.toggle('on',!!state.tracks[t].steps[s]);
     }
   }
+
+  // ---------- Live Tracks limiter ----------
+  const limit=document.getElementById('limit'), limitVal=document.getElementById('limitVal');
+  function shuffle(a){for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+  function poolIndices(){ // tracks that have steps AND aren't manually muted/solo-hidden
+    const solo=anySolo(), pool=[];
+    for(let i=0;i<NUM_TRACKS;i++){
+      const t=state.tracks[i];
+      let has=false; for(let s=0;s<STEPS;s++){ if(t.steps[s]){has=true;break;} }
+      const base = solo ? t.solo : !t.mute;
+      if(has && base) pool.push(i);
+    }
+    return pool;
+  }
+  function updateLimVisuals(){
+    for(let i=0;i<NUM_TRACKS;i++){ if(trkRowEls[i]) trkRowEls[i].classList.toggle('limmuted', limitMuted.has(i)); }
+  }
+  function showLimVal(pool){
+    const aud=pool.filter(i=>!limitMuted.has(i)).length;
+    limitVal.textContent = aud+' / '+pool.length;
+  }
+  function refreshLimit(){ // keep max + display in sync after edits (no random re-muting)
+    const pool=poolIndices();
+    [...limitMuted].forEach(i=>{ if(pool.indexOf(i)<0) limitMuted.delete(i); });
+    limit.max=Math.max(1,pool.length);
+    if(+limit.value>+limit.max) limit.value=limit.max;
+    showLimVal(pool); updateLimVisuals();
+  }
+  function applyLimit(L){ // randomly mute/unmute to hit exactly L audible tracks
+    const pool=poolIndices();
+    const target=Math.min(L, pool.length);
+    let aud=pool.filter(i=>!limitMuted.has(i));
+    let mut=pool.filter(i=>limitMuted.has(i));
+    if(aud.length>target){ shuffle(aud); for(let k=0;k<aud.length-target;k++) limitMuted.add(aud[k]); }
+    else if(aud.length<target){ shuffle(mut); const need=target-aud.length; for(let k=0;k<need&&k<mut.length;k++) limitMuted.delete(mut[k]); }
+    [...limitMuted].forEach(i=>{ if(pool.indexOf(i)<0) limitMuted.delete(i); });
+    showLimVal(pool); updateLimVisuals();
+  }
+  function resetLimit(){ // all playing tracks audible; slider to max
+    limitMuted.clear();
+    const pool=poolIndices();
+    limit.max=Math.max(1,pool.length);
+    limit.value=pool.length||1;
+    showLimVal(pool); updateLimVisuals();
+  }
+  limit.addEventListener('input',e=>applyLimit(+e.target.value));
 
   const bpm=document.getElementById('bpm'), bpmNum=document.getElementById('bpmNum');
   function setBpm(v){ v=Math.min(240,Math.max(40,v||110)); state.bpm=v; bpm.value=v; bpmNum.value=v; }
@@ -409,6 +532,7 @@
     STEPS=+b.dataset.steps;
     if(state.playing){ currentStep=0; }
     buildGrid();
+    resetLimit();
   });
 
   // keyboard
@@ -444,6 +568,7 @@
       (pt.steps||[]).forEach((v,s)=>state.tracks[i].steps[s]=!!v);
     });
     buildGrid();
+    resetLimit();
   }
   document.getElementById('savePreset').addEventListener('click',()=>{
     const name=prompt('Preset name:'); if(!name)return;
@@ -494,6 +619,7 @@
   setSteps('Mid Hit B',[4,12]);
   setSteps('Lt Sticks A',[2,6,10,14]);
   syncCells();
+  resetLimit();
 })();
 </script>
 </body>
