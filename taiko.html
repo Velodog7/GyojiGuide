@@ -41,6 +41,8 @@
   .play:hover{background:var(--red2);border-color:var(--red2)}
   .play.playing{background:var(--gold);border-color:var(--gold);color:#141017}
   #song.on,#radio.on,#libBtn.on{background:var(--gold);border-color:var(--gold);color:#141017;font-weight:600}
+  .nowsec{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);min-width:52px}
+  .nowsec:not(:empty){padding:4px 9px;border:1px solid var(--gold);border-radius:7px}
 
   /* Library dialog */
   #libDlg{max-width:940px;width:94%}
@@ -147,6 +149,7 @@
       <button id="radio" title="Plays one auto song after another, forever">Radio Mode</button>
       <button id="saveSong" title="Save the current song so it replays identically">Save Song…</button>
       <button id="libBtn" title="Open the song library & playlists">♫ Library</button>
+      <span id="nowSec" class="nowsec"></span>
     </div>
     <div class="grp">
       <label>Tempo</label>
@@ -595,70 +598,43 @@
   const rnd=document.getElementById('rnd'), rndVal=document.getElementById('rndVal');
   rnd.addEventListener('input',e=>{ rndVal.textContent=e.target.value+'%'; });
 
-  // ---------- Songs: deterministic arc playback ----------
+  // ---------- Songs: structured, deterministic playback ----------
   const songBtn=document.getElementById('song'), radioBtn=document.getElementById('radio');
-  const RAISE_MS=120000;   // 2 min: 1 -> 16 live tracks
-  const FADE_MS=30000;     // 30 s: 16 -> 0 live tracks
-  const PEAK=16, GAP_MS=4000, TICK=250;
-  let songTimer=null, songT0=0, autoMode=null;      // 'song' | 'radio' | 'playlist'
+  const nowSec=document.getElementById('nowSec');
+  const GAP_MS=4000, TICK=250;
+  const RAISE_MS=120000, FADE_MS=30000, PEAK=16;   // legacy arc (older saved songs)
+  let songTimers=[], songT0=0, autoMode=null;      // 'song' | 'radio' | 'playlist'
   let currentOrder=null, currentSong=null;
   let plQueue=[], plIndex=0;
 
-  function clearSongTimer(){ if(songTimer){ clearTimeout(songTimer); songTimer=null; } }
+  function clearSongTimer(){ songTimers.forEach(t=>clearTimeout(t)); songTimers=[]; }
   function badges(){
     songBtn.classList.toggle('on', autoMode==='song');
     radioBtn.classList.toggle('on', autoMode==='radio');
     const lb=document.getElementById('libBtn'); if(lb) lb.classList.toggle('on', autoMode==='playlist');
+    if(nowSec && !autoMode) nowSec.textContent='';
   }
   function cancelAuto(){ autoMode=null; plQueue=[]; plIndex=0; clearSongTimer(); badges(); if(state.playing) stop(); }
 
-  // arc position (ms) -> how many tracks should sound
-  function arcLive(t){
-    const total=RAISE_MS+FADE_MS;
-    if(t<RAISE_MS) return 1+Math.round((t/RAISE_MS)*(PEAK-1));       // 1 -> 16
-    if(t<total){ const f=(t-RAISE_MS)/FADE_MS; return Math.round(PEAK*(1-f)); } // 16 -> 0
-    return 0;
-  }
-  // deterministically keep the first L tracks of the saved order audible
-  function setAudibleByOrder(order,L){
+  // keep an explicit set of tracks audible (everything else muted in the loop)
+  function setAudibleBySet(set){
     const pool=new Set(poolIndices());
-    const keep=new Set((order||[]).slice(0,L).filter(i=>pool.has(i)));
-    limitMuted=new Set([...pool].filter(i=>!keep.has(i)));
+    limitMuted=new Set([...pool].filter(i=>!set.has(i)));
     updateLimVisuals();
     const aud=[...pool].filter(i=>!limitMuted.has(i)).length;
     limitVal.textContent=aud+' / '+pool.size;
+    limit.value=Math.min(aud, +limit.max);
   }
-  function arcTick(){
-    const t=performance.now()-songT0, total=RAISE_MS+FADE_MS;
-    let L=Math.max(0, Math.min(arcLive(t), PEAK, currentOrder?currentOrder.length:0));
-    setAudibleByOrder(currentOrder, L);
-    limit.value=Math.min(L, +limit.max);
-    if(t>=total){ onSongEnd(); return; }
-    songTimer=setTimeout(arcTick, TICK);
-  }
+
   function onSongEnd(){
-    stop();
-    if(autoMode==='radio'){ songTimer=setTimeout(()=>{ if(autoMode==='radio') playSongObject(generateSong()); }, GAP_MS); }
+    stop(); if(nowSec) nowSec.textContent='';
+    if(autoMode==='radio'){ songTimers.push(setTimeout(()=>{ if(autoMode==='radio') playSongObject(generateSong()); }, GAP_MS)); }
     else if(autoMode==='playlist'){
       plIndex++;
-      if(plIndex<plQueue.length){ songTimer=setTimeout(()=>{ if(autoMode==='playlist') playSongObject(plQueue[plIndex]); }, GAP_MS); }
+      if(plIndex<plQueue.length){ songTimers.push(setTimeout(()=>{ if(autoMode==='playlist') playSongObject(plQueue[plIndex]); }, GAP_MS)); }
       else { autoMode=null; badges(); }
     } else { autoMode=null; badges(); }
   }
-
-  // entrance order for the current pattern: anchors (backbone/drum) first, so they
-  // arrive first and — because the fade-out reuses the same order — leave last.
-  function buildOrder(){
-    const prio={backbone:0,drum:1,mid:2,sticks:3,light:4,quick:5,crash:6};
-    return poolIndices()
-      .map(i=>({i, k:(prio[roleOf(state.tracks[i].name)]??3), r:Math.random()}))
-      .sort((a,b)=> a.k-b.k || a.r-b.r)
-      .map(o=>o.i);
-  }
-  function songFromCurrent(){
-    return { p:encodePattern(currentPattern()), order:buildOrder(), raise:RAISE_MS, fade:FADE_MS, peak:PEAK };
-  }
-  function generateSong(){ randomizeMusical(); const s=songFromCurrent(); currentSong=s; return s; }
 
   function applySongPattern(dp){
     STEPS=dp.steps||16;
@@ -670,13 +646,93 @@
     limitMuted=new Set();
     buildGrid();
   }
+
+  // ---- structured song generation ----
+  // Heavy drums (backbone + a couple steady drums) form the CORE and play the whole
+  // song. Sticks / light sticks / mids / crashes are LAYERS that change per section.
+  function generateStructuredSong(){
+    randomizeMusical();                 // fresh 20-piece ensemble; keeps tempo/steps/randomness
+    const pool=poolIndices();
+    const byRole=r=>pool.filter(i=>roleOf(state.tracks[i].name)===r);
+    const pick=(arr,n)=>{ const a=arr.slice(); shuffle(a); return a.slice(0,Math.max(0,Math.min(n,a.length))); };
+    const backbone=byRole('backbone'), drums=byRole('drum'), mids=byRole('mid'),
+          sticks=byRole('sticks'), lights=byRole('light'), quicks=byRole('quick'), crashes=byRole('crash');
+    shuffle(drums);
+    const coreDrums=drums.slice(0,Math.min(2,drums.length));
+    const core=[...backbone, ...coreDrums];             // constant beat
+    const extraDrums=drums.slice(coreDrums.length);
+    const crashIdx = crashes.length ? crashes[0] : null;
+
+    // Chorus: fuller and UNIFORM (same layers every time it returns)
+    const chorus=[...pick(sticks,2), ...pick(mids,1), ...pick(lights,1), ...pick(extraDrums,1)];
+    // Verses: two distinct, lighter variants
+    const verseA=[...pick(sticks,1), ...pick(mids,1)];
+    const verseB=[...pick(lights,1), ...pick(sticks,1)];
+    // Intro builds from almost nothing; Bridge is sparse + transitional; Outro thins out
+    const intro=[...pick(lights,1)];
+    const bridge=[...pick(lights,1), ...pick(quicks,1)];
+    const outro=[...pick(sticks,1)];
+    const vb=()=>6+((Math.random()*3)|0);              // 6-8 bar verses/choruses vary a touch
+    const sections=[
+      {type:'Intro',  bars:4,    layers:intro,  crash:false},
+      {type:'Verse',  bars:vb(), layers:verseA, crash:false},
+      {type:'Chorus', bars:8,    layers:chorus, crash:true},
+      {type:'Verse',  bars:vb(), layers:verseB, crash:false},
+      {type:'Chorus', bars:8,    layers:chorus, crash:true},
+      {type:'Bridge', bars:3,    layers:bridge, crash:false},
+      {type:'Chorus', bars:8,    layers:chorus, crash:true},
+      {type:'Outro',  bars:4,    layers:outro,  crash:false}
+    ];
+    const song={ v:2, p:encodePattern(currentPattern()), core, crashIdx, sections };
+    currentSong=song;
+    return song;
+  }
+  const generateSong=generateStructuredSong;
+
+  function applySection(song, si){
+    const sec=song.sections[si];
+    const set=new Set(song.core); (sec.layers||[]).forEach(i=>set.add(i));
+    setAudibleBySet(set);
+    if(sec.crash && song.crashIdx!=null){ ensureAudio(); if(AC.state==='suspended')AC.resume(); playSample(song.crashIdx,0,0.9); }
+    if(nowSec) nowSec.textContent=sec.type;
+  }
+  function scheduleStructured(song){
+    clearSongTimer();
+    const barDur=240000/(state.bpm||110);   // ms for one 16-step (4-beat) bar
+    let bar=0;
+    song.sections.forEach((sec,si)=>{
+      const at=bar*barDur;
+      if(si===0) applySection(song,0);
+      else songTimers.push(setTimeout(()=>{ if(autoMode) applySection(song,si); }, at));
+      bar+=sec.bars;
+    });
+    songTimers.push(setTimeout(()=>{ if(autoMode) onSongEnd(); }, bar*barDur));
+  }
+
+  // ---- legacy arc playback (songs saved before structure existed) ----
+  function buildOrder(){
+    const prio={backbone:0,drum:1,mid:2,sticks:3,light:4,quick:5,crash:6};
+    return poolIndices().map(i=>({i,k:(prio[roleOf(state.tracks[i].name)]??3),r:Math.random()}))
+      .sort((a,b)=>a.k-b.k||a.r-b.r).map(o=>o.i);
+  }
+  function arcLive(t){ const total=RAISE_MS+FADE_MS;
+    if(t<RAISE_MS) return 1+Math.round((t/RAISE_MS)*(PEAK-1));
+    if(t<total){ const f=(t-RAISE_MS)/FADE_MS; return Math.round(PEAK*(1-f)); } return 0; }
+  function arcTick(){
+    const t=performance.now()-songT0, total=RAISE_MS+FADE_MS;
+    const L=Math.max(0,Math.min(arcLive(t),PEAK,currentOrder?currentOrder.length:0));
+    setAudibleBySet(new Set((currentOrder||[]).slice(0,L)));
+    if(t>=total){ onSongEnd(); return; }
+    songTimers.push(setTimeout(arcTick,TICK));
+  }
+
   function playSongObject(song){
     currentSong=song;
     applySongPattern(decodePattern(song.p));
-    currentOrder=(song.order && song.order.length ? song.order : buildOrder()).slice();
     if(!state.playing) start();
     songT0=performance.now();
-    arcTick();
+    if(song.sections && song.sections.length){ scheduleStructured(song); }
+    else { currentOrder=(song.order&&song.order.length?song.order:buildOrder()).slice(); arcTick(); }
   }
 
   songBtn.addEventListener('click',()=>{
