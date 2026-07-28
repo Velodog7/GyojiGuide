@@ -204,9 +204,9 @@
       <span class="val" id="limitVal">–</span>
     </div>
     <div class="grp">
-      <label title="How loose the next Randomize is: 0% = clean repeating pattern, 200% = wild">Randomness</label>
-      <input type="range" id="rnd" min="0" max="200" value="50">
-      <span class="val" id="rndVal">50%</span>
+      <label title="How loose the next Randomize is: 0% = clean repeating pattern, 150% = wild">Randomness</label>
+      <input type="range" id="rnd" min="0" max="150" value="100">
+      <span class="val" id="rndVal">100%</span>
     </div>
   </div>
 
@@ -634,7 +634,15 @@
   const RAISE_MS=120000, FADE_MS=30000, PEAK=16;   // legacy arc (older saved songs)
   let songTimers=[], songT0=0, autoMode=null;      // 'song' | 'radio' | 'playlist'
   let currentOrder=null, currentSong=null;
-  let plQueue=[], plIndex=0;
+  let plQueue=[], plIndex=0, radioIndex=0;
+
+  // Radio: fresh tempo 83-112 each song; every other song a non-4/4 meter.
+  function nextRadioSong(){
+    const bpm = 83 + Math.round(Math.random()*(112-83));
+    const sig = (radioIndex%2===1) ? _pick(['2/4','6/8','3/4','7/8']) : '4/4';
+    radioIndex++;
+    playSongObject(generateSong({bpm, sig}));
+  }
 
   function clearSongTimer(){ songTimers.forEach(t=>clearTimeout(t)); songTimers=[]; }
   function badges(){
@@ -657,7 +665,7 @@
 
   function onSongEnd(){
     stop(); hideTimeline();
-    if(autoMode==='radio'){ songTimers.push(setTimeout(()=>{ if(autoMode==='radio') playSongObject(generateSong()); }, GAP_MS)); }
+    if(autoMode==='radio'){ songTimers.push(setTimeout(()=>{ if(autoMode==='radio') nextRadioSong(); }, GAP_MS)); }
     else if(autoMode==='playlist'){
       plIndex++;
       if(plIndex<plQueue.length){ songTimers.push(setTimeout(()=>{ if(autoMode==='playlist') playSongObject(plQueue[plIndex]); }, GAP_MS)); }
@@ -730,9 +738,11 @@
   // ---- structured song generation ----
   // Heavy drums (backbone + a couple steady drums) = CORE, constant all song.
   // Section lengths are whole MEASURES, so every part change lands on a downbeat.
-  function generateStructuredSong(){
+  function generateStructuredSong(opts){
+    opts=opts||{};
+    if(opts.bpm) setBpm(opts.bpm);
     const r=(+rnd.value)/100;
-    const sigKey=chooseSig();
+    const sigKey=opts.sig || chooseSig();
     const meta=composeMeterPattern(sigKey, r);
     const pool=poolIndices();
     const byRole=r2=>pool.filter(i=>roleOf(state.tracks[i].name)===r2);
@@ -885,7 +895,7 @@
   });
   radioBtn.addEventListener('click',()=>{
     if(autoMode==='radio'){ cancelAuto(); return; }
-    cancelAuto(); autoMode='radio'; badges(); playSongObject(generateSong());
+    cancelAuto(); autoMode='radio'; radioIndex=0; badges(); nextRadioSong();
   });
 
   const bpm=document.getElementById('bpm'), bpmNum=document.getElementById('bpmNum');
