@@ -19,16 +19,16 @@ function encodePattern(p){
     rows.push({idx:idx, vol:Math.round((t.vol==null?0.85:t.vol)*100), mask:mask});
   });
   var buf=new Uint8Array(5+rows.length*(2+nb));
-  buf[0]=1; buf[1]=Math.min(255,p.bpm||110); buf[2]=p.swing||0;
-  buf[3]=(_STEPMAP[steps]==null?1:_STEPMAP[steps]); buf[4]=rows.length;
+  buf[0]=2; buf[1]=Math.min(255,p.bpm||110); buf[2]=p.swing||0;
+  buf[3]=Math.min(255,steps); buf[4]=rows.length;
   var o=5;
   rows.forEach(function(r){ buf[o++]=r.idx; buf[o++]=r.vol; for(var i=0;i<nb;i++) buf[o++]=r.mask[i]; });
   return _b64u(buf);
 }
 function decodePattern(str){
   var buf=_unb64u(str);
-  if(buf[0]!==1) throw new Error('unsupported pattern');
-  var bpm=buf[1], swing=buf[2], steps=_STEPINV[buf[3]]||16, n=buf[4], nb=Math.ceil(steps/8);
+  var ver=buf[0]; if(ver!==1 && ver!==2) throw new Error('unsupported pattern');
+  var bpm=buf[1], swing=buf[2], steps=(ver>=2? buf[3] : (_STEPINV[buf[3]]||16)), n=buf[4], nb=Math.ceil(steps/8);
   var tracks=[], o=5;
   for(var k=0;k<n;k++){
     var idx=buf[o++], vol=buf[o++]/100, arr=new Array(steps).fill(false);

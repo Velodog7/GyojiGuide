@@ -41,8 +41,20 @@
   .play:hover{background:var(--red2);border-color:var(--red2)}
   .play.playing{background:var(--gold);border-color:var(--gold);color:#141017}
   #song.on,#radio.on,#libBtn.on{background:var(--gold);border-color:var(--gold);color:#141017;font-weight:600}
-  .nowsec{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);min-width:52px}
+  .nowsec{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);min-width:52px}
   .nowsec:not(:empty){padding:4px 9px;border:1px solid var(--gold);border-radius:7px}
+
+  /* Song timeline */
+  .songbar{display:none;margin:12px 0 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel);box-shadow:0 4px 16px rgba(0,0,0,.3)}
+  .songbar.show{display:block}
+  .sb-track{position:relative;display:flex;height:36px;width:100%}
+  .sb-seg{position:relative;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--line);
+    font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);
+    background:var(--panel2);overflow:hidden;white-space:nowrap;min-width:0;transition:background .15s,color .15s}
+  .sb-seg:last-child{border-right:0}
+  .sb-seg.done{color:var(--ink);background:#20242f}
+  .sb-seg.cur{color:#141017;background:var(--gold);font-weight:600}
+  .sb-play{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--red2);left:0;pointer-events:none;box-shadow:0 0 6px var(--red2)}
 
   /* Library dialog */
   #libDlg{max-width:940px;width:94%}
@@ -167,6 +179,17 @@
       </div>
     </div>
     <div class="grp">
+      <label title="Time signature for auto-composed songs; part changes always land on a full measure">Time Sig</label>
+      <select id="timesig" class="presetsel">
+        <option value="4/4">4/4</option>
+        <option value="2/4">2/4</option>
+        <option value="6/8">6/8</option>
+        <option value="3/4">3/4</option>
+        <option value="7/8">7/8</option>
+        <option value="any">Any (mix)</option>
+      </select>
+    </div>
+    <div class="grp">
       <label>Swing</label>
       <input type="range" id="swing" min="0" max="60" value="0">
       <span class="val" id="swingVal">0%</span>
@@ -185,6 +208,10 @@
       <input type="range" id="rnd" min="0" max="100" value="25">
       <span class="val" id="rndVal">25%</span>
     </div>
+  </div>
+
+  <div id="songBar" class="songbar">
+    <div class="sb-track" id="sbTrack"></div>
   </div>
 
   <div class="board scroller">
@@ -249,6 +276,7 @@
   "use strict";
   const NUM_TRACKS = SAMPLES.length;
   let STEPS = 16;
+  let BEAT_EVERY = 4;   // steps per beat (drives the beat markers); set by time signature
   const state = {
     bpm: 110, swing: 0, master: 0.85, playing: false,
     tracks: SAMPLES.map(s => ({name:s.name, vol:0.85, mute:false, solo:false,
@@ -355,9 +383,9 @@
     head.appendChild(corner);
     for(let s=0;s<STEPS;s++){
       const td=document.createElement('td');
-      td.className='snum'+(s%4===0?' beat':'');
+      td.className='snum'+(s%BEAT_EVERY===0?' beat':'');
       td.style.minWidth=cw+'px';
-      td.textContent = cw<18 ? (s%4===0?(s+1):'') : (s+1);
+      td.textContent = cw<18 ? (s%BEAT_EVERY===0?(s+1):'') : (s+1);
       head.appendChild(td);
     }
     grid.appendChild(head);
@@ -390,7 +418,7 @@
         td.className='cellwrap';
         td.style.minWidth=cw+'px';
         const cell=document.createElement('div');
-        cell.className='cell'+(s%4===0?' beat':'')+(trk.steps[s]?' on':'');
+        cell.className='cell'+(s%BEAT_EVERY===0?' beat':'')+(trk.steps[s]?' on':'');
         cell.dataset.t=ti; cell.dataset.s=s;
         td.appendChild(cell);
         tr.appendChild(td);
@@ -504,6 +532,7 @@
     // Keep the current tempo and step count; only recompose the ensemble.
     // Motifs are one 16-step bar; if the loop isn't a whole number of bars we still
     // tile from the start and clip to STEPS.
+    BEAT_EVERY=4;
     const bars=Math.max(1,Math.ceil(STEPS/16));
 
     // clear every track
@@ -614,7 +643,7 @@
     const lb=document.getElementById('libBtn'); if(lb) lb.classList.toggle('on', autoMode==='playlist');
     if(nowSec && !autoMode) nowSec.textContent='';
   }
-  function cancelAuto(){ autoMode=null; plQueue=[]; plIndex=0; clearSongTimer(); badges(); if(state.playing) stop(); }
+  function cancelAuto(){ autoMode=null; plQueue=[]; plIndex=0; clearSongTimer(); hideTimeline(); badges(); if(state.playing) stop(); }
 
   // keep an explicit set of tracks audible (everything else muted in the loop)
   function setAudibleBySet(set){
@@ -627,7 +656,7 @@
   }
 
   function onSongEnd(){
-    stop(); if(nowSec) nowSec.textContent='';
+    stop(); hideTimeline();
     if(autoMode==='radio'){ songTimers.push(setTimeout(()=>{ if(autoMode==='radio') playSongObject(generateSong()); }, GAP_MS)); }
     else if(autoMode==='playlist'){
       plIndex++;
@@ -647,43 +676,96 @@
     buildGrid();
   }
 
+  // ---- time signatures (most common for taiko) ----
+  const TIME_SIGS={
+    '4/4':{beats:4,sub:4},   // ji-uchi base; by far the most common
+    '2/4':{beats:2,sub:4},   // matsuri / festival feel
+    '6/8':{beats:6,sub:2},   // compound, flowing
+    '3/4':{beats:3,sub:4},
+    '7/8':{beats:7,sub:2}    // odd meter, modern kumi-daiko
+  };
+  function chooseSig(){
+    const sel=document.getElementById('timesig'); const v=sel?sel.value:'4/4';
+    if(v && v!=='any' && TIME_SIGS[v]) return v;
+    return _pick(['4/4','4/4','4/4','2/4','2/4','6/8','3/4','7/8']);  // weighted toward 4/4
+  }
+  // one measure's motif for a role, on the chosen meter's beat grid
+  function meterMotif(role, beats, sub, spm, r){
+    const half=Math.max(1,Math.floor(sub/2));
+    const beatPos=[]; for(let b=0;b<beats;b++) beatPos.push(b*sub);
+    const eighths=[]; for(let s=0;s<spm;s+=half) eighths.push(s);
+    const offs=beatPos.map(b=>b+half).filter(s=>s<spm);
+    const set=new Set(); const addAll=a=>a.forEach(s=>set.add(s));
+    if(role==='backbone'){ set.add(0); const mid=beatPos[Math.floor(beats/2)];
+      if(beats>=3 && mid && _chance(0.7)) set.add(mid); if(_chance(0.25)) addAll(beatPos); }
+    else if(role==='drum'){ if(_chance(0.6)) addAll(eighths); else addAll(beatPos); }
+    else if(role==='mid'){ if(offs.length){ set.add(offs[offs.length-1]); if(offs.length>1 && _chance(0.5)) set.add(offs[0]); } }
+    else if(role==='sticks'){ const c=_pick(['offs','eighths','front']);
+      if(c==='offs') addAll(offs); else if(c==='eighths') addAll(eighths);
+      else for(let s=0;s<Math.min(spm,half*4);s++) set.add(s); }
+    else if(role==='light'){ for(let s=half;s<spm;s+=sub) set.add(s); }
+    else if(role==='quick'){ set.add(spm-1); if(_chance(0.5)) set.add(Math.max(0,spm-1-sub)); }
+    else if(role==='crash'){ set.add(0); }
+    else addAll(beatPos);
+    let arr=[...set].filter(s=> s===0 || !_chance(r*0.18));           // loosen: drop non-downbeats
+    const extra=Math.round(r*(role==='light'||role==='sticks'?3:role==='drum'?2:1.2));
+    for(let k=0;k<extra;k++) arr.push((Math.random()*spm)|0);         // loosen: add-ins
+    return arr;
+  }
+  // build a fresh ensemble on a time signature; loop = 2 measures. Returns meter meta.
+  function composeMeterPattern(sigKey, r){
+    const {beats,sub}=TIME_SIGS[sigKey]; const spm=beats*sub, loopM=2;
+    STEPS=spm*loopM; BEAT_EVERY=sub;
+    document.querySelectorAll('#stepsSeg button').forEach(x=>x.classList.remove('active'));
+    state.tracks.forEach(t=>{ t.steps=new Array(128).fill(false); t.mute=false; t.solo=false; });
+    const chosen=chooseEnsemble();
+    chosen.forEach(({idx,role})=>{
+      const t=state.tracks[idx]; t.vol=_rng(VOL[role]);
+      for(let m=0;m<loopM;m++){ meterMotif(role,beats,sub,spm,r).forEach(s=>{ const g=m*spm+s; if(g<STEPS) t.steps[g]=true; }); }
+    });
+    buildGrid(); resetLimit();
+    return {spm,sub,beats,loopM};
+  }
+
   // ---- structured song generation ----
-  // Heavy drums (backbone + a couple steady drums) form the CORE and play the whole
-  // song. Sticks / light sticks / mids / crashes are LAYERS that change per section.
+  // Heavy drums (backbone + a couple steady drums) = CORE, constant all song.
+  // Section lengths are whole MEASURES, so every part change lands on a downbeat.
   function generateStructuredSong(){
-    randomizeMusical();                 // fresh 20-piece ensemble; keeps tempo/steps/randomness
+    const r=(+rnd.value)/100;
+    const sigKey=chooseSig();
+    const meta=composeMeterPattern(sigKey, r);
     const pool=poolIndices();
-    const byRole=r=>pool.filter(i=>roleOf(state.tracks[i].name)===r);
+    const byRole=r2=>pool.filter(i=>roleOf(state.tracks[i].name)===r2);
     const pick=(arr,n)=>{ const a=arr.slice(); shuffle(a); return a.slice(0,Math.max(0,Math.min(n,a.length))); };
     const backbone=byRole('backbone'), drums=byRole('drum'), mids=byRole('mid'),
           sticks=byRole('sticks'), lights=byRole('light'), quicks=byRole('quick'), crashes=byRole('crash');
     shuffle(drums);
     const coreDrums=drums.slice(0,Math.min(2,drums.length));
-    const core=[...backbone, ...coreDrums];             // constant beat
+    const core=[...backbone, ...coreDrums];
     const extraDrums=drums.slice(coreDrums.length);
     const crashIdx = crashes.length ? crashes[0] : null;
 
-    // Chorus: fuller and UNIFORM (same layers every time it returns)
     const chorus=[...pick(sticks,2), ...pick(mids,1), ...pick(lights,1), ...pick(extraDrums,1)];
-    // Verses: two distinct, lighter variants
     const verseA=[...pick(sticks,1), ...pick(mids,1)];
     const verseB=[...pick(lights,1), ...pick(sticks,1)];
-    // Intro builds from almost nothing; Bridge is sparse + transitional; Outro thins out
     const intro=[...pick(lights,1)];
     const bridge=[...pick(lights,1), ...pick(quicks,1)];
     const outro=[...pick(sticks,1)];
-    const vb=()=>6+((Math.random()*3)|0);              // 6-8 bar verses/choruses vary a touch
+    const startDrum = coreDrums.length ? coreDrums[0] : (backbone.length ? backbone[0] : core[0]);
+    const restCore = core.filter(i=>i!==startDrum); shuffle(restCore);
+    const introBuild=[startDrum, ...restCore, ...intro];
+    const vm=()=>4+2*((Math.random()*2)|0);            // 4 or 6 measures
     const sections=[
-      {type:'Intro',  bars:4,    layers:intro,  crash:false},
-      {type:'Verse',  bars:vb(), layers:verseA, crash:false},
+      {type:'Intro',  bars:4,    layers:intro,  crash:false, build:introBuild},
+      {type:'Verse',  bars:vm(), layers:verseA, crash:false},
       {type:'Chorus', bars:8,    layers:chorus, crash:true},
-      {type:'Verse',  bars:vb(), layers:verseB, crash:false},
+      {type:'Verse',  bars:vm(), layers:verseB, crash:false},
       {type:'Chorus', bars:8,    layers:chorus, crash:true},
-      {type:'Bridge', bars:3,    layers:bridge, crash:false},
+      {type:'Bridge', bars:2+((Math.random()*2)|0), layers:bridge, crash:false},
       {type:'Chorus', bars:8,    layers:chorus, crash:true},
       {type:'Outro',  bars:4,    layers:outro,  crash:false}
     ];
-    const song={ v:2, p:encodePattern(currentPattern()), core, crashIdx, sections };
+    const song={ v:3, p:encodePattern(currentPattern()), core, crashIdx, sections, spm:meta.spm, sub:meta.sub, sig:sigKey };
     currentSong=song;
     return song;
   }
@@ -694,20 +776,67 @@
     const set=new Set(song.core); (sec.layers||[]).forEach(i=>set.add(i));
     setAudibleBySet(set);
     if(sec.crash && song.crashIdx!=null){ ensureAudio(); if(AC.state==='suspended')AC.resume(); playSample(song.crashIdx,0,0.9); }
-    if(nowSec) nowSec.textContent=sec.type;
   }
   function scheduleStructured(song){
     clearSongTimer();
-    const barDur=240000/(state.bpm||110);   // ms for one 16-step (4-beat) bar
+    const barDur=(song.spm||16)*15000/(state.bpm||110);   // ms for one measure of this meter
     let bar=0;
     song.sections.forEach((sec,si)=>{
       const at=bar*barDur;
-      if(si===0) applySection(song,0);
-      else songTimers.push(setTimeout(()=>{ if(autoMode) applySection(song,si); }, at));
+      if(sec.build && sec.build.length){         // gradual build-up (intro): one drum -> full core
+        const secMs=sec.bars*barDur, seq=sec.build, N=seq.length;
+        for(let k=0;k<N;k++){
+          const set=new Set(seq.slice(0,k+1));
+          const when=at + secMs*(k/N);
+          if(si===0 && k===0) setAudibleBySet(set);            // open on a single drum
+          else songTimers.push(setTimeout(()=>{ if(autoMode) setAudibleBySet(set); }, when));
+        }
+      } else {
+        if(si===0) applySection(song,0);
+        else songTimers.push(setTimeout(()=>{ if(autoMode) applySection(song,si); }, at));
+      }
       bar+=sec.bars;
     });
     songTimers.push(setTimeout(()=>{ if(autoMode) onSongEnd(); }, bar*barDur));
+    buildTimeline(song, barDur, bar*barDur);
   }
+
+  // ---- timeline indicator ----
+  const songBar=document.getElementById('songBar'), sbTrack=document.getElementById('sbTrack');
+  let sbSegs=[], songTotalMs=0, rafId=null;
+  function fmt(ms){ ms=Math.max(0,ms); const s=Math.round(ms/1000); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+  function buildTimeline(song, barDur, totalMs){
+    sbTrack.innerHTML=''; sbSegs=[]; songTotalMs=totalMs;
+    let cum=0;
+    song.sections.forEach(sec=>{
+      const el=document.createElement('div');
+      el.className='sb-seg'; el.style.flexGrow=sec.bars; el.style.flexBasis='0';
+      el.textContent=sec.type; el.title=sec.type+' · '+sec.bars+' bars';
+      sbTrack.appendChild(el);
+      sbSegs.push({type:sec.type, startMs:cum*barDur, endMs:(cum+sec.bars)*barDur, el});
+      cum+=sec.bars;
+    });
+    const play=document.createElement('div'); play.className='sb-play'; play.id='sbPlay'; sbTrack.appendChild(play);
+    songBar.classList.add('show');
+    cancelAnimationFrame(rafId); rafId=requestAnimationFrame(timelineTick);
+  }
+  function timelineTick(){
+    if(!autoMode || !songTotalMs){ return; }
+    const t=performance.now()-songT0;
+    const frac=Math.max(0, Math.min(1, t/songTotalMs));
+    const play=document.getElementById('sbPlay'); if(play) play.style.left=(frac*100)+'%';
+    let cur='';
+    sbSegs.forEach(s=>{
+      const isCur = t>=s.startMs && t<s.endMs;
+      s.el.classList.toggle('cur', isCur);
+      s.el.classList.toggle('done', t>=s.endMs);
+      if(isCur) cur=s.type;
+    });
+    const sig = (currentSong && currentSong.sig) ? currentSong.sig+' · ' : '';
+    if(nowSec) nowSec.textContent = sig + (cur?cur+'  ':'') + fmt(t) + ' / ' + fmt(songTotalMs);
+    rafId=requestAnimationFrame(timelineTick);
+  }
+  function hideTimeline(){ cancelAnimationFrame(rafId); rafId=null; songBar.classList.remove('show'); songTotalMs=0; sbSegs=[]; if(nowSec) nowSec.textContent=''; }
 
   // ---- legacy arc playback (songs saved before structure existed) ----
   function buildOrder(){
@@ -728,6 +857,7 @@
 
   function playSongObject(song){
     currentSong=song;
+    BEAT_EVERY = song.sub || 4;                 // match the beat grid to the song's meter
     applySongPattern(decodePattern(song.p));
     if(!state.playing) start();
     songT0=performance.now();
