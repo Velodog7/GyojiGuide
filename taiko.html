@@ -131,6 +131,11 @@
       <input type="range" id="limit" min="0" max="60" value="60">
       <span class="val" id="limitVal">–</span>
     </div>
+    <div class="grp">
+      <label title="How loose the next Randomize is: 0% = clean repeating pattern, 100% = wild">Randomness</label>
+      <input type="range" id="rnd" min="0" max="100" value="25">
+      <span class="val" id="rndVal">25%</span>
+    </div>
   </div>
 
   <div class="board scroller">
@@ -424,15 +429,16 @@
   }
 
   function randomizeMusical(){
-    // 1) time-signature length: whole bars of 16 sixteenth-notes
-    STEPS=_pick([16,32,32,64]);
-    document.querySelectorAll('#stepsSeg button').forEach(x=>x.classList.toggle('active',+x.dataset.steps===STEPS));
-    const bars=Math.max(1,Math.round(STEPS/16));
+    // Keep the current tempo and step count; only recompose the ensemble.
+    // Motifs are one 16-step bar; if the loop isn't a whole number of bars we still
+    // tile from the start and clip to STEPS.
+    const bars=Math.max(1,Math.ceil(STEPS/16));
 
-    // 2) clear every track
+    // clear every track
     state.tracks.forEach(t=>{ t.steps=new Array(128).fill(false); });
 
-    // 3) balanced ensemble, each part a bar-aligned motif tiled across the loop
+    // balanced ensemble, each part a bar-aligned motif tiled across the loop
+    const r=(+rnd.value)/100;   // 0 = clean repeating pattern, 1 = loose & varied
     const chosen=chooseEnsemble();
     let leadFilled=false;
     chosen.forEach(({idx,role})=>{
@@ -442,22 +448,26 @@
       if(role==='crash'){
         arr[0]=true;
         if(STEPS>=32 && _chance(0.5)) arr[(STEPS/2)|0]=true;
-      }else{
-        const motif=_pick(MOTIFS[role]);
-        for(let b=0;b<bars;b++) motif.forEach(m=>{ const s=b*16+m; if(s<STEPS) arr[s]=true; });
-        if(!leadFilled && (role==='backbone'||role==='drum') && bars>1 && _chance(0.7)){
-          leadFilled=true; const base=(bars-1)*16;              // small fill in the last bar
-          [10,12,13,14,15].forEach(m=>{ if(_chance(0.6)) arr[base+m]=true; });
-        }
+        return;
+      }
+      let motif=_pick(MOTIFS[role]);
+      for(let b=0;b<bars;b++){
+        if(b>0 && _chance(r*0.4)) motif=_pick(MOTIFS[role]);      // vary phrasing when loose
+        motif.forEach(m=>{
+          const s=b*16+m; if(s>=STEPS) return;
+          if(m!==0 && _chance(r*0.18)) return;                    // sometimes drop non-downbeats
+          arr[s]=true;
+        });
+        const extra=Math.round(r*(role==='light'||role==='sticks'?3:role==='drum'?2:1.2));
+        for(let k=0;k<extra;k++){ const s=b*16+((Math.random()*16)|0); if(s<STEPS) arr[s]=true; }  // add-ins
+      }
+      if(!leadFilled && (role==='backbone'||role==='drum') && bars>1 && _chance(0.7*r)){
+        leadFilled=true; const base=(bars-1)*16;                  // last-bar fill (scales with randomness)
+        [10,12,13,14,15].forEach(m=>{ if(_chance(0.6)) arr[base+m]=true; });
       }
     });
 
-    // 4) tempo + feel
-    setBpm(88+(Math.random()*62|0));
-    state.swing=_chance(0.3)?(6+(Math.random()*12|0)):0;
-    swing.value=state.swing; swingVal.textContent=state.swing+'%';
-
-    // 5) render and reset the live-tracks limiter to the full ensemble
+    // render and reset the live-tracks limiter to the full ensemble
     buildGrid();
     resetLimit();
   }
@@ -513,6 +523,8 @@
     showLimVal(pool); updateLimVisuals();
   }
   limit.addEventListener('input',e=>applyLimit(+e.target.value));
+  const rnd=document.getElementById('rnd'), rndVal=document.getElementById('rndVal');
+  rnd.addEventListener('input',e=>{ rndVal.textContent=e.target.value+'%'; });
 
   const bpm=document.getElementById('bpm'), bpmNum=document.getElementById('bpmNum');
   function setBpm(v){ v=Math.min(240,Math.max(40,v||110)); state.bpm=v; bpm.value=v; bpmNum.value=v; }
