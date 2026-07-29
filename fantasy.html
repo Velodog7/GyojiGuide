@@ -213,6 +213,75 @@
   .empty-lb{ color:var(--muted); padding:30px 0; text-align:center }
 
   .foot{ color:var(--faint); font-size:.78rem; line-height:1.6; margin:34px 0 0; padding-top:18px; border-top:1px solid var(--line) }
+  /* ---- top-right auth actions ---- */
+  .auth-actions{ margin-left:auto; display:flex; gap:8px; align-items:center }
+  .authbtn{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:.86rem; cursor:pointer;
+        padding:8px 15px; border-radius:9px; border:0; color:#0d0f15;
+        background:linear-gradient(180deg,#f0d590,var(--sun)) }
+  .authbtn.ghost{ background:none; color:var(--dim); border:1px solid var(--line2) }
+  .authbtn.ghost:hover{ border-color:var(--sun); color:var(--ink) }
+  .authbtn:hover{ filter:brightness(1.05) }
+  .acctchip{ display:inline-flex; align-items:center; gap:8px; background:var(--surface-2); color:var(--ink); border:1px solid var(--line2) }
+  .acctchip:hover{ border-color:var(--sun) }
+  .acctchip__ava{ width:22px; height:22px; border-radius:50%; display:grid; place-items:center;
+        font-family:"Zen Kaku Gothic New",serif; font-weight:900; font-size:12px; color:#0d0f15; background:var(--sun); overflow:hidden }
+  .acctchip__ava svg,.acctchip__ava img{ width:100%; height:100%; object-fit:cover }
+  .acct-badge svg,.acct-badge img{ width:100%; height:100%; object-fit:cover; border-radius:50% }
+
+  .signin-cta{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; justify-content:space-between;
+        border:1px dashed var(--line2); border-radius:var(--radius-sm); padding:14px 16px; margin:0 0 18px; color:var(--dim) }
+  .signin-cta__btns{ display:flex; gap:8px }
+
+  /* ---- auth modal ---- */
+  .authmodal{ position:fixed; inset:0; background:rgba(0,0,0,.72); backdrop-filter:blur(4px);
+        display:none; align-items:center; justify-content:center; z-index:1000; padding:20px }
+  .authmodal.open{ display:flex }
+  .authmodal__panel{ position:relative; width:min(420px,100%); background:var(--surface);
+        border:1px solid var(--line2); border-radius:16px; padding:26px 24px 24px;
+        box-shadow:0 30px 80px rgba(0,0,0,.6) }
+  .authmodal__close{ position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:8px;
+        border:1px solid var(--line2); background:none; color:var(--dim); cursor:pointer; font-size:15px }
+  .authmodal__close:hover{ border-color:var(--sun); color:var(--ink) }
+  .authmodal__title{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1.3rem; margin:0 0 16px }
+  .authform,.acctview{ display:flex; flex-direction:column; gap:12px }
+  .afl{ display:flex; flex-direction:column; gap:5px; font-size:.8rem; color:var(--dim); font-weight:600 }
+  .afl input{ background:var(--surface-2); border:1px solid var(--line); border-radius:9px;
+        color:var(--ink); font:inherit; font-size:.95rem; padding:10px 12px }
+  .afl input:focus{ outline:none; border-color:var(--sun) }
+  .afl__hint{ font-size:.74rem; color:var(--faint); line-height:1.45 }
+  .authform .btn,.acctview .btn{ width:100%; margin-top:4px }
+  .authswitch{ text-align:center; font-size:.84rem; color:var(--dim) }
+  .authswitch a{ color:var(--sun); cursor:pointer; text-decoration:underline }
+  .status{ font-size:.82rem; color:var(--muted); min-height:1em; text-align:center }
+  .status.ok{ color:#43c08a } .status.err{ color:var(--tangerine) }
+  .acctview__head{ display:flex; align-items:center; gap:12px; margin-bottom:4px }
+  .acct-badge.lg{ width:46px; height:46px; font-size:20px }
+  .acctview__name{ font-weight:700; font-size:1.05rem } .acctview__handle{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.8rem }
+  .acctview__row{ display:flex; gap:8px } .acctview__row .btn{ margin-top:0 }
+
+  /* ---- leaderboard search + pins ---- */
+  .lb-search{ display:flex; align-items:center; gap:10px; margin:10px 0 6px }
+  .lb-search input{ flex:1; background:var(--surface); border:1px solid var(--line); border-radius:10px;
+        color:var(--ink); font:inherit; font-size:.92rem; padding:9px 13px }
+  .lb-search input:focus{ outline:none; border-color:var(--sun) }
+  .lb-search__hint{ font-size:.72rem; color:var(--faint); white-space:nowrap }
+  .lb-pinned{ border:1px solid rgba(var(--sun-rgb),.35); background:rgba(var(--sun-rgb),.05);
+        border-radius:12px; padding:10px 12px; margin:0 0 14px }
+  .lb-pinned h4{ margin:0 0 8px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun) }
+  .lb-star{ background:none; border:0; cursor:pointer; color:var(--faint); font-size:15px; line-height:1; padding:2px 4px }
+  .lb-star.on{ color:var(--sun) }
+  .lb-star:hover{ color:var(--sun) }
+  .lb-diff{ font-family:"IBM Plex Mono",monospace; font-size:.78rem; color:var(--muted) }
+  .lb-diff.lead{ color:var(--sun) }
+  td.lb-pincol{ width:26px; text-align:center }
+
+  /* ---- full wrestler cards inside an expanded leaderboard row ---- */
+  .expand-cards{ padding:12px 14px 16px; display:grid;
+        grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px }
+  .expand-cards .ecard{ display:flex; flex-direction:column; gap:6px }
+  .expand-cards .pcard{ aspect-ratio:5/7 }
+  .expand-cards .ec-pts{ font-family:"IBM Plex Mono",monospace; font-size:.76rem; color:var(--dim); text-align:center }
+  .expand-cards .ec-pts b{ color:var(--sun) }
 </style>
 <script src="gg-config.js"></script><script src="gg-account.js"></script></head>
 <body>
@@ -223,6 +292,11 @@
     <div class="brandline">
       <a class="back" href="index.html">‹ Gyoji Guide</a>
       <a class="back" id="toDohyo" href="dohyo.html">Enter the Dohyō →</a>
+      <div class="auth-actions" id="authActions">
+        <button class="authbtn ghost" id="openLogin">Log in</button>
+        <button class="authbtn" id="openSignup">Sign up</button>
+        <button class="authbtn acctchip" id="openAccount" hidden><span class="acctchip__ava" id="acctAva">力</span><span id="acctChipName">Account</span></button>
+      </div>
     </div>
     <h1 class="title">Fantasy <span>Sumo</span></h1>
     <p class="sub">A prediction game for the upcoming <b>Aki basho</b>. Draft seven rikishi — one per rank band — before it starts; no swaps once the tournament is underway, so pick wrestlers you trust to stay healthy. Points come from wins over the 15 days, with bonus points for upsets over sanyaku, plus Sanshō and the Makuuchi yūshō.</p>
@@ -237,34 +311,17 @@
   <section class="view on" id="v-team">
     <div class="banner warn" id="apiBanner" hidden></div>
 
-    <div id="acctOut">
-      <div class="signup">
-        <div class="field">
-          <label for="handle">Handle (unique)</label>
-          <input id="handle" maxlength="40" placeholder="e.g. tachiai_tom" autocomplete="username" spellcheck="false">
-          <div class="hint">Your permanent ID on the leaderboard. Lowercase, no spaces works best.</div>
-        </div>
-        <div class="field">
-          <label for="dname">Display name</label>
-          <input id="dname" maxlength="60" placeholder="e.g. Tom from Osaka" autocomplete="off">
-          <div class="hint">Shown on the leaderboard. Defaults to your handle.</div>
-        </div>
-        <div class="field">
-          <label for="pin">PIN</label>
-          <input id="pin" type="password" maxlength="24" placeholder="4+ characters" autocomplete="current-password">
-          <div class="hint">Locks your team so only you can edit it. It's hashed before it leaves this page — but treat it like a game PIN, not a bank password.</div>
-        </div>
-      </div>
-      <div class="acct-btns">
-        <button class="btn" id="registerBtn">Create account</button>
-        <button class="btn ghost" id="loginBtn">Sign in</button>
-        <span class="status" id="acctStatus"></span>
-      </div>
-    </div>
     <div class="acct-in" id="acctIn" hidden>
-      <span class="acct-badge">力</span>
+      <span class="acct-badge" id="acctBadge">力</span>
       <span>Signed in as <b id="acctWho"></b> <em id="acctHandle"></em></span>
       <button class="btn ghost" id="logoutBtn">Sign out</button>
+    </div>
+    <div class="signin-cta" id="signinCta">
+      <span>Create an account or log in to draft a team, save it, and join the leaderboard.</span>
+      <div class="signin-cta__btns">
+        <button class="btn" id="ctaSignup">Sign up</button>
+        <button class="btn ghost" id="ctaLogin">Log in</button>
+      </div>
     </div>
 
     <div class="slots" id="slots"></div>
@@ -297,9 +354,56 @@
       <button class="btn ghost" id="refreshBtn">Refresh</button>
     </div>
     <div class="lb-day" id="lbDays"></div>
+    <div class="lb-search">
+      <input id="lbSearch" type="search" placeholder="Search players by name or @handle…" autocomplete="off" spellcheck="false">
+      <span class="lb-search__hint">Tap ☆ to pin friends</span>
+    </div>
+    <div id="lbPinned" class="lb-pinned" hidden></div>
     <div id="lbBody"></div>
     <p class="foot" id="lbFoot"></p>
   </section>
+</div>
+
+<!-- auth modal (sign up / log in / account) -->
+<div class="authmodal" id="authModal" role="dialog" aria-modal="true" aria-label="Account">
+  <div class="authmodal__panel">
+    <button class="authmodal__close" id="authClose" aria-label="Close">✕</button>
+    <div class="authmodal__title" id="authTitle">Sign up</div>
+
+    <div class="authform" id="authForm">
+      <label class="afl" id="afHandleWrap">Handle (unique)
+        <input id="m_handle" maxlength="40" placeholder="e.g. tachiai_tom" autocomplete="username" spellcheck="false">
+      </label>
+      <label class="afl" id="afNameWrap">Display name
+        <input id="m_dname" maxlength="60" placeholder="e.g. Tom from Osaka" autocomplete="off">
+      </label>
+      <label class="afl">PIN
+        <input id="m_pin" type="password" maxlength="24" placeholder="4+ characters" autocomplete="current-password">
+      </label>
+      <div class="afl__hint" id="afHint">Your PIN locks your team so only you can edit it — it's hashed before it leaves this page.</div>
+      <button class="btn" id="authSubmit">Create account</button>
+      <div class="authswitch" id="authSwitch"></div>
+      <span class="status" id="authStatus"></span>
+    </div>
+
+    <div class="acctview" id="acctView" hidden>
+      <div class="acctview__head">
+        <span class="acct-badge lg" id="acctViewAva">力</span>
+        <div>
+          <div class="acctview__name" id="acctViewName">—</div>
+          <div class="acctview__handle" id="acctViewHandle">—</div>
+        </div>
+      </div>
+      <label class="afl">Display name
+        <input id="e_dname" maxlength="60" placeholder="Display name">
+      </label>
+      <div class="acctview__row">
+        <button class="btn" id="acctSave">Save changes</button>
+        <button class="btn ghost" id="acctLogout">Log out</button>
+      </div>
+      <span class="status" id="acctViewStatus"></span>
+    </div>
+  </div>
 </div>
 
 <!-- picker modal -->
@@ -480,11 +584,15 @@ async function apiPost(payload){
 }
 
 /* ---------- accounts ---------- */
+function avatarHTML(a){ return (a && a.name ? a.name : a && a.handle || "力").slice(0,1).toUpperCase(); }
 function acctUI(){
   const on = !!acct;
-  $("acctOut").hidden = on;
-  $("acctIn").hidden = !on;
-  if (on) { $("acctWho").textContent = acct.name || acct.handle; $("acctHandle").textContent = "@" + acct.handle; }
+  // top-right buttons
+  $("openLogin").hidden = on; $("openSignup").hidden = on; $("openAccount").hidden = !on;
+  if (on){ $("acctChipName").textContent = acct.name || acct.handle; $("acctAva").textContent = avatarHTML(acct); $("acctBadge").textContent = avatarHTML(acct); }
+  // my-team strip
+  $("acctIn").hidden = !on; $("signinCta").hidden = on;
+  if (on){ $("acctWho").textContent = acct.name || acct.handle; $("acctHandle").textContent = "@" + acct.handle; }
   syncTeam();
 }
 function setAcct(a){
@@ -492,57 +600,109 @@ function setAcct(a){
   handle = a ? a.handle : ""; dname = a ? (a.name || a.handle) : "";
   saveLocal(); acctUI();
 }
-function acctMsg(msg, cls){ const s = $("acctStatus"); s.textContent = msg; s.className = "status" + (cls ? " " + cls : ""); }
-function readForm(){
-  return { h: $("handle").value.trim(), n: $("dname").value.trim(), p: $("pin").value };
-}
-function validForm(f, needPin){
-  if (!/^[A-Za-z0-9_.-]{2,40}$/.test(f.h)) { acctMsg("Handle: 2–40 letters, digits, _ . -", "err"); return false; }
-  if (needPin && f.p.length < 4) { acctMsg("PIN needs at least 4 characters.", "err"); return false; }
-  return true;
+function validForm(h, p, needPin){
+  if (!/^[A-Za-z0-9_.-]{2,40}$/.test(h)) return "Handle: 2–40 letters, digits, _ . -";
+  if (needPin && p.length < 4) return "PIN needs at least 4 characters.";
+  return null;
 }
 
-$("registerBtn").onclick = async () => {
-  const f = readForm(); if (!validForm(f, true)) return;
-  acctMsg("Creating account…");
-  const auth = await pinAuth(f.h, f.p);
-  const name = f.n || f.h;
-  if (!hasAPI()) {                                   // local-only account on this device
-    const prev = localStorage.getItem("fantasy.acct.local." + f.h.toLowerCase());
-    if (prev) { acctMsg("That handle already exists on this device — sign in instead.", "err"); return; }
-    try { localStorage.setItem("fantasy.acct.local." + f.h.toLowerCase(), auth); } catch {}
-    setAcct({ handle: f.h, name, auth });
-    acctMsg("Account created on this device ✓", "ok"); return;
+/* ---- modal control ---- */
+const authModal = $("authModal");
+let authMode = "signup";   // 'signup' | 'login'
+function openAuth(mode){
+  authMode = mode;
+  const acc = !!acct;
+  $("authForm").hidden = acc; $("acctView").hidden = !acc;
+  if (acc){
+    // account view
+    $("acctViewName").textContent = acct.name || acct.handle;
+    $("acctViewHandle").textContent = "@" + acct.handle;
+    $("acctViewAva").textContent = avatarHTML(acct);
+    $("e_dname").value = acct.name || "";
+    $("authTitle").textContent = "Your account";
+    authStatus("");
+  } else {
+    $("authTitle").textContent = mode==="signup" ? "Sign up" : "Log in";
+    $("afHandleWrap").style.display = "";
+    $("afNameWrap").style.display = mode==="signup" ? "" : "none";
+    $("afHint").style.display = mode==="signup" ? "" : "none";
+    $("authSubmit").textContent = mode==="signup" ? "Create account" : "Log in";
+    $("authSwitch").innerHTML = mode==="signup"
+      ? `Already have an account? <a id="toLogin">Log in</a>`
+      : `New here? <a id="toSignup">Sign up</a>`;
+    const sw = $("authSwitch").querySelector("a");
+    if (sw) sw.onclick = () => openAuth(mode==="signup"?"login":"signup");
+    authStatus("");
+    $("m_pin").value = "";
   }
-  try {
-    const res = await apiPost({ action:"register", handle:f.h, name, auth });
-    if (res && res.ok) { setAcct({ handle:f.h, name, auth }); acctMsg("Account created ✓", "ok"); }
-    else acctMsg(res && res.error ? res.error : "Couldn't create the account.", "err");
-  } catch (e) { acctMsg("Network error — try again.", "err"); }
+  authModal.classList.add("open"); document.body.style.overflow="hidden";
+}
+function closeAuth(){ authModal.classList.remove("open"); document.body.style.overflow=""; }
+function authStatus(msg, cls){ const s=$("authStatus"); s.textContent=msg; s.className="status"+(cls?" "+cls:""); }
+function acctViewStatus(msg, cls){ const s=$("acctViewStatus"); s.textContent=msg; s.className="status"+(cls?" "+cls:""); }
+
+$("openSignup").onclick = () => openAuth("signup");
+$("openLogin").onclick  = () => openAuth("login");
+$("openAccount").onclick= () => openAuth("account");
+$("ctaSignup").onclick  = () => openAuth("signup");
+$("ctaLogin").onclick   = () => openAuth("login");
+$("authClose").onclick  = closeAuth;
+authModal.onclick = e => { if (e.target===authModal) closeAuth(); };
+document.addEventListener("keydown", e => { if (e.key==="Escape" && authModal.classList.contains("open")) closeAuth(); });
+
+$("authSubmit").onclick = async () => {
+  const h = $("m_handle").value.trim(), n = $("m_dname").value.trim(), p = $("m_pin").value;
+  const err = validForm(h, p, true);
+  if (err) { authStatus(err, "err"); return; }
+  const auth = await pinAuth(h, p);
+  if (authMode === "signup") {
+    const name = n || h;
+    authStatus("Creating account…");
+    if (!hasAPI()) {
+      const key = "fantasy.acct.local." + h.toLowerCase();
+      if (localStorage.getItem(key)) { authStatus("That handle already exists on this device — log in instead.", "err"); return; }
+      try { localStorage.setItem(key, auth); } catch {}
+      setAcct({ handle:h, name, auth }); authStatus("Account created ✓", "ok"); setTimeout(closeAuth, 700); return;
+    }
+    try {
+      const res = await apiPost({ action:"register", handle:h, name, auth });
+      if (res && res.ok) { setAcct({ handle:h, name, auth }); authStatus("Account created ✓", "ok"); setTimeout(closeAuth, 700); }
+      else authStatus(res && res.error ? res.error : "Couldn't create the account.", "err");
+    } catch (e) { authStatus("Network error — try again.", "err"); }
+  } else {
+    authStatus("Logging in…");
+    if (!hasAPI()) {
+      const stored = localStorage.getItem("fantasy.acct.local." + h.toLowerCase());
+      if (!stored) { authStatus("No account with that handle on this device — sign up.", "err"); return; }
+      if (stored !== auth) { authStatus("Wrong PIN.", "err"); return; }
+      setAcct({ handle:h, name:h, auth }); authStatus("Logged in ✓", "ok"); setTimeout(closeAuth, 700); return;
+    }
+    try {
+      const res = await apiPost({ action:"login", handle:h, auth });
+      if (res && res.ok) {
+        setAcct({ handle: res.handle || h, name: res.name || h, auth });
+        if (res.team && Object.keys(res.team).length) { team = res.team; saveLocal(); paintSlots(); }
+        authStatus("Logged in ✓", "ok"); setTimeout(closeAuth, 700);
+      } else authStatus(res && res.error ? res.error : "Couldn't log in.", "err");
+    } catch (e) { authStatus("Network error — try again.", "err"); }
+  }
 };
 
-$("loginBtn").onclick = async () => {
-  const f = readForm(); if (!validForm(f, true)) return;
-  acctMsg("Signing in…");
-  const auth = await pinAuth(f.h, f.p);
-  if (!hasAPI()) {
-    const stored = localStorage.getItem("fantasy.acct.local." + f.h.toLowerCase());
-    if (!stored) { acctMsg("No account with that handle on this device — create one.", "err"); return; }
-    if (stored !== auth) { acctMsg("Wrong PIN.", "err"); return; }
-    setAcct({ handle: f.h, name: f.n || f.h, auth });
-    acctMsg("Signed in ✓", "ok"); return;
+$("acctSave").onclick = async () => {
+  if (!acct) return;
+  const n = $("e_dname").value.trim() || acct.handle;
+  acctViewStatus("Saving…");
+  if (hasAPI()) {
+    try {
+      const res = await apiPost({ action:"save", handle:acct.handle, name:n, auth:acct.auth, team });
+      if (!(res && res.ok)) { acctViewStatus(res && res.error ? res.error : "Couldn't save.", "err"); return; }
+    } catch (e) { acctViewStatus("Network error — saved on this device.", "err"); }
   }
-  try {
-    const res = await apiPost({ action:"login", handle:f.h, auth });
-    if (res && res.ok) {
-      setAcct({ handle: res.handle || f.h, name: res.name || f.n || f.h, auth });
-      if (res.team && Object.keys(res.team).length) { team = res.team; saveLocal(); paintSlots(); }  // picks follow you across devices
-      acctMsg("Signed in ✓", "ok");
-    } else acctMsg(res && res.error ? res.error : "Couldn't sign in.", "err");
-  } catch (e) { acctMsg("Network error — try again.", "err"); }
+  setAcct({ ...acct, name:n });
+  acctViewStatus("Saved ✓", "ok");
 };
-
-$("logoutBtn").onclick = () => { setAcct(null); acctMsg("Signed out. Your picks stay on this device."); };
+$("acctLogout").onclick = () => { setAcct(null); closeAuth(); };
+$("logoutBtn").onclick = () => { setAcct(null); };
 
 /* ---------- save flow ---------- */
 $("saveBtn").onclick = async () => {
@@ -570,12 +730,23 @@ const teamScore  = (t,m) => GyojiGuide.teamScore(t,m);
 
 /* ---------- leaderboard ---------- */
 let cache = { users:[], results:[], meta:{} };
+let lbQuery = "";
+let pinned = [];
+try { pinned = JSON.parse(localStorage.getItem("fantasy.pins") || "[]"); } catch {}
+const savePins = () => { try { localStorage.setItem("fantasy.pins", JSON.stringify(pinned)); } catch {} };
+const isPinned = h => pinned.map(x=>x.toLowerCase()).includes(String(h).toLowerCase());
+function togglePin(h){
+  const k = String(h);
+  if (isPinned(k)) pinned = pinned.filter(x => x.toLowerCase() !== k.toLowerCase());
+  else pinned = [...pinned, k];
+  savePins(); renderBoard();
+}
+
 async function loadBoard(){
   $("lbBody").innerHTML = `<p class="empty-lb">Loading…</p>`;
   let data = null;
   try { data = await apiGet(); } catch (e) {}
   if (!data || !data.ok){
-    // device mode (no shared API): show just your own team
     const users = [];
     if (acct && teamCount()===7) users.push({ handle:acct.handle, name:acct.name||acct.handle, team });
     cache = { users, results:[], meta:{ basho:"Aki 2026", lastDay:0 } };
@@ -584,6 +755,20 @@ async function loadBoard(){
   }
   renderBoard();
 }
+
+// full wrestler cards for an expanded row (same look as My Team)
+function expandCards(userTeam, scoreRows){
+  const ptsByName = {}; (scoreRows||[]).forEach(x => ptsByName[x.name] = x);
+  return `<div class="expand-cards">` + BANDS.map(band=>{
+    const n = userTeam[band.id];
+    if (!n || !RK[n]) return "";
+    const sc = ptsByName[n];
+    const line = sc ? `${sc.w}W${sc.bonus?" +"+sc.bonus:""}${sc.sansho?" · 賞":""}${sc.yusho?" · 優":""} · <b>${sc.pts}</b> pts` : "—";
+    return `<div class="ecard"><div class="pcard filled r-${RK[n].code[0]}">${pcardInner(n, band.label, false)}</div>` +
+           `<div class="ec-pts">${line}</div></div>`;
+  }).join("") + `</div>`;
+}
+
 function renderBoard(){
   const model = scoreModel({ results: cache.results, meta: cache.meta });
   const lastDay = model.lastDay;
@@ -592,40 +777,75 @@ function renderBoard(){
   $("lbN").textContent = cache.users.length;
   $("lbDays").innerHTML = Array.from({length:15}, (_,i)=>{ const d=i+1; return `<i class="${d<=lastDay?"done":""}">${d}</i>`; }).join("");
 
-  const rows = cache.users.map(u=>{ const s=teamScore(u.team||{}, model); return { ...u, ...s }; })
+  // rank everyone
+  const ranked = cache.users.map(u=>{ const s=teamScore(u.team||{}, model); return { ...u, ...s }; })
     .sort((a,b)=> b.pts-a.pts || (a.name||"").localeCompare(b.name||""));
+  ranked.forEach((r,i)=> r.rank = i+1);
 
-  if (!rows.length){
+  // ----- pinned strip (differential vs the top pinned player) -----
+  const pins = ranked.filter(r => isPinned(r.handle));
+  if (pins.length){
+    const lead = Math.max(...pins.map(r=>r.pts));
+    $("lbPinned").hidden = false;
+    $("lbPinned").innerHTML = `<h4>★ Pinned — gap to leader</h4>` +
+      `<table class="lb"><tbody>` + pins.map(r=>{
+        const d = r.pts - lead;
+        const diff = d===0 ? `<span class="lb-diff lead">▲ leader</span>` : `<span class="lb-diff">${d} pts</span>`;
+        return `<tr class="lb-row" data-h="${esc(r.handle)}">
+          <td class="lb-pincol"><button class="lb-star on" data-pin="${esc(r.handle)}" title="Unpin">★</button></td>
+          <td class="lb-rank">#${r.rank}</td>
+          <td class="lb-name"><b>${esc(r.name||r.handle)}</b><span>@${esc(r.handle)}</span></td>
+          <td class="lb-score">${r.pts}</td>
+          <td style="text-align:right">${diff}</td></tr>`;
+      }).join("") + `</tbody></table>`;
+  } else {
+    $("lbPinned").hidden = true; $("lbPinned").innerHTML = "";
+  }
+
+  // ----- main list (filtered by search) -----
+  const q = lbQuery.trim().toLowerCase();
+  const rows = q ? ranked.filter(r => (r.name||"").toLowerCase().includes(q) || (r.handle||"").toLowerCase().includes(q)) : ranked;
+
+  if (!ranked.length){
     $("lbBody").innerHTML = `<p class="empty-lb">${hasAPI()
       ? "No teams yet — create an account, draft your seven, and save to enter."
       : "Device mode — sign in and save to see your team here. Connect the Sheet API for a shared board."}</p>`;
-    $("lbFoot").textContent = "";
-    return;
+    $("lbFoot").textContent = ""; return;
   }
+  if (!rows.length){ $("lbBody").innerHTML = `<p class="empty-lb">No players match “${esc(lbQuery)}”.</p>`; $("lbFoot").textContent=""; return; }
+
   const me = (acct?acct.handle:"").toLowerCase();
-  let html = `<table class="lb"><thead><tr><th>#</th><th>Player</th><th style="text-align:right">Wins</th><th style="text-align:right">Score</th></tr></thead><tbody>`;
-  rows.forEach((r,i)=>{
+  let html = `<table class="lb"><thead><tr><th></th><th>#</th><th>Player</th><th style="text-align:right">Wins</th><th style="text-align:right">Score</th></tr></thead><tbody>`;
+  rows.forEach((r)=>{
     const totW = r.rows.reduce((s,x)=>s+x.w,0);
     const mine = String(r.handle||"").toLowerCase()===me;
-    html += `<tr class="lb-row" data-i="${i}">
-      <td class="lb-rank ${i===0?"p1":""}">${i+1}</td>
+    const pin = isPinned(r.handle);
+    html += `<tr class="lb-row" data-h="${esc(r.handle)}">
+      <td class="lb-pincol"><button class="lb-star ${pin?"on":""}" data-pin="${esc(r.handle)}" title="${pin?"Unpin":"Pin"}">${pin?"★":"☆"}</button></td>
+      <td class="lb-rank ${r.rank===1?"p1":""}">${r.rank}</td>
       <td class="lb-name"><b>${esc(r.name||r.handle)}</b>${mine?`<span class="lb-you">You</span>`:""}<span>@${esc(r.handle)}</span></td>
       <td class="lb-w">${totW}</td>
       <td class="lb-score">${r.pts}</td></tr>
-      <tr class="expand" data-x="${i}" hidden><td colspan="4"><div class="expand-in">${
-        r.rows.map(x=>`<div class="exline"><span>${esc(x.name)}</span><span class="w">${x.w}W${x.bonus?" +"+x.bonus:""}${x.sansho?" · 賞":""}${x.yusho?" · 優":""} · <b>${x.pts}</b></span></div>`).join("")
-      }</div></td></tr>`;
+      <tr class="expand" data-h="${esc(r.handle)}" hidden><td colspan="5">${expandCards(r.team||{}, r.rows)}</td></tr>`;
   });
   html += `</tbody></table>`;
   $("lbBody").innerHTML = html;
+
+  // pin buttons (both strips)
+  document.querySelectorAll("[data-pin]").forEach(btn=>{
+    btn.onclick = e => { e.stopPropagation(); togglePin(btn.dataset.pin); };
+  });
+  // expand on row click (main list only)
   $("lbBody").querySelectorAll(".lb-row").forEach(tr=>{
     tr.style.cursor="pointer";
-    tr.onclick = ()=>{ const x=$("lbBody").querySelector(`.expand[data-x="${tr.dataset.i}"]`); if (x) x.hidden=!x.hidden; };
+    tr.onclick = ()=>{ const x=$("lbBody").querySelector(`.expand[data-h="${CSS.escape(tr.dataset.h)}"]`); if (x) x.hidden=!x.hidden; };
   });
+
   $("lbFoot").textContent = model.started
-    ? "Scores update from the Results sheet as each day's bouts come in. Tap a row to see the seven and their points."
-    : "Drafts are open. Once Aki begins, wins + sanyaku-upset bonuses tally here live. Tap a row to see a team.";
+    ? "Scores update from the Results sheet as each day's bouts come in. Tap a row for full cards; tap ☆ to pin friends."
+    : "Drafts are open. Once Aki begins, scores tally here live. Tap a row for full cards; tap ☆ to pin friends.";
 }
+$("lbSearch").addEventListener("input", e => { lbQuery = e.target.value; renderBoard(); });
 const esc = s => String(s).replace(/[&<>"]/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
 
 /* ---------- tabs ---------- */
