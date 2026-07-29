@@ -112,7 +112,7 @@
   /* paper laid OVER everything (figures included) and multiplied in, so the
      photos pick up the fibre and read as printed on the same sheet */
   +'.ggb::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:7;'
-    +'background:url('+PAPER+') center/cover no-repeat;mix-blend-mode:multiply;opacity:.55}'
+    +'background:url('+PAPER+') center/cover no-repeat;mix-blend-mode:multiply;opacity:.8}'
   /* a soft inner frame so the crowd sits in the sheet rather than floating */
   +'.ggb::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:8;'
     +'box-shadow:inset 0 0 60px rgba(120,104,74,.35),inset 0 -30px 50px rgba(120,104,74,.25)}'
@@ -124,7 +124,7 @@
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{display:flex;flex-direction:column;justify-content:flex-start;padding:0 10px;overflow:hidden}'
   +'.ggb-row{display:flex;justify-content:space-evenly;width:100%;margin-top:-12px}.ggb-row:first-child{margin-top:2px}'
-  +'.ggb-fig{margin:0;width:var(--fw,50px);text-align:center;position:relative;filter:drop-shadow(0 3px 3px rgba(90,74,48,.45))}'
+  +'.ggb-fig{margin:0;width:var(--fw,50px);text-align:center;position:relative}'
   +'.ggb-fig img{width:100%;height:auto;display:block}'
   +'.ggb-fig figcaption{position:absolute;left:50%;bottom:1px;transform:translateX(-50%);'
     +'font-size:8px;font-weight:700;color:#2a1a0e;background:rgba(244,236,216,.9);'
@@ -137,8 +137,7 @@
   +'.ggb-logo{width:100%;filter:drop-shadow(0 2px 6px rgba(0,0,0,.55))}'
   +'.ggb-logo svg{width:100%;height:auto;display:block}'
   +'.ggb-officials{display:flex;align-items:flex-end;justify-content:center;gap:8px;margin-top:8px}'
-  +'.ggb-off{margin:0;display:flex;flex-direction:column;align-items:center;width:clamp(48px,6vw,72px);'
-    +'filter:drop-shadow(0 3px 3px rgba(90,74,48,.5))}'
+  +'.ggb-off{margin:0;display:flex;flex-direction:column;align-items:center;width:clamp(48px,6vw,72px)}'
   +'.ggb-off img{width:100%;height:auto;display:block}'
   +'.ggb-off figcaption{font-size:10px;font-weight:800;color:#3a2c12;margin-top:1px}'
   +'@media(max-width:760px){.ggb-fig{--fw:34px;margin-left:-13px}.ggb-big{--fw:46px}.ggb-row{margin-top:-20px}.ggb-fig figcaption{font-size:7px}'
