@@ -125,8 +125,8 @@
     var outro  = [].concat(pick(sticks,1));
     var d1 = coreDrums[0], d2 = coreDrums[1]!=null?coreDrums[1]:d1, d3 = coreDrums[2]!=null?coreDrums[2]:d2;
     var introStick = sticks.length ? sticks[0] : (lights.length ? lights[0] : d1);
-    // A spare, unhurried opening — one drum, then a second. The full kit waits for the verse.
-    var introBuild = [ {at:0,set:[d1]}, {at:8,set:[d1,d2]} ];
+    // A spare opening — one drum, a second, then the sticks come in before the verse.
+    var introBuild = [ {at:0,set:[d1]}, {at:4,set:[d1,d2]}, {at:8,set:[d1,d2,introStick]} ];
     var vm = function () { return 4 + 2*((Math.random()*2)|0); };
     var sections = [
       { type:"Intro",  bars:16,   layers:[d1], crash:false, build:introBuild },
