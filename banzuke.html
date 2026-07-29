@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Banzuke · Gyoji Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700;900&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#000; --ink:#f1f2f6; --muted:#878da0; --gold:#d8b25a; }
+  *{ box-sizing:border-box }
+  html,body{ margin:0 }
+  body{ background:var(--bg); color:var(--ink); font-family:"Space Grotesk",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased; min-height:100vh; display:flex; flex-direction:column }
+  .bz-intro{ text-align:center; padding:18px 16px 6px }
+  .bz-intro h1{ margin:0; font-family:"Zen Kaku Gothic New",serif; font-weight:900; font-size:clamp(1.4rem,3vw,2.1rem);
+        letter-spacing:.02em }
+  .bz-intro h1 .jp{ color:var(--gold); margin-right:.4em }
+  .bz-intro p{ margin:6px auto 0; max-width:640px; color:var(--muted); font-size:.9rem; line-height:1.5 }
+  /* full-page stage the header lives on */
+  .bz-stage{ position:relative; width:100%; flex:1 1 auto;
+        height:calc(100vh - 200px); min-height:460px; margin-top:10px }
+  #ggBanzuke{ position:absolute; inset:0 }
+  footer{ text-align:center; color:var(--muted); font-family:"IBM Plex Mono",monospace;
+        font-size:.72rem; letter-spacing:.12em; padding:14px }
+  footer a{ color:var(--gold); text-decoration:none }
+</style>
+<script src="gg-config.js"></script>
+</head>
+<body>
+<script src="gg-nav.js"></script>
+
+<div class="bz-intro">
+  <h1><span class="jp">番付</span>The Banzuke</h1>
+  <p>The full Makuuchi &amp; Jūryō ranking, rendered as an Edo <i>banzuke-e</i> crowd — sanyaku up top, East and West snaking down toward the gyōji and yobidashi in the centre.</p>
+</div>
+
+<div class="bz-stage"><div id="ggBanzuke" aria-hidden="true"></div></div>
+
+<footer>GYOJI GUIDE · <a href="index.html">Back to the Guide</a></footer>
+
+<script src="gg-banzuke.js" defer></script>
+<script src="taiko-radio.js" defer></script>
+</body>
+</html>

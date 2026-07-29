@@ -123,6 +123,7 @@
     host.innerHTML =
       '<div class="ggb">'
       + '<div class="ggb-water" aria-hidden="true"></div>'
+      + '<div class="ggb-sep" aria-hidden="true"></div>'
       + '<div class="ggb-top">'
       +   '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
       +   '<div class="ggb-sanyaku">'
@@ -134,8 +135,6 @@
       + '<div class="ggb-body">'
       +   '<div class="ggb-col ggb-colW">'+zigzag(westFile, false)+'</div>'
       +   '<div class="ggb-center">'
-      +     '<div class="ggb-sep ggb-sep-l" aria-hidden="true"></div>'
-      +     '<div class="ggb-sep ggb-sep-r" aria-hidden="true"></div>'
       +     '<div class="ggb-logo" role="img" aria-label="Gyoji Guide">'+LOGO_SVG+'</div>'
       +     officials()
       +   '</div>'
@@ -187,10 +186,11 @@
   +'.ggb-tS figcaption{background:#e6b8a2}.ggb-tK figcaption{background:#e6c2b0}'
   +'.ggb-center{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;'
     +'width:clamp(200px,26vw,340px);padding:2px 4px 0;position:relative;z-index:6}'
-  /* brush-stroke rules dividing East from West, integrated via multiply */
-  +'.ggb-sep{position:absolute;top:-40%;bottom:-6%;width:40px;pointer-events:none;z-index:5;'
-    +'background:url('+BRUSH+') center/100% 100% no-repeat;mix-blend-mode:multiply;opacity:.9}'
-  +'.ggb-sep-l{left:-26px}.ggb-sep-r{right:-26px;transform:scaleX(-1)}'
+  /* one big brush-stroke rule down the centre, dividing East from West and
+     running beyond the top/bottom of the frame; integrated via multiply */
+  +'.ggb-sep{position:absolute;left:50%;top:-16%;height:132%;width:clamp(150px,18vw,300px);'
+    +'transform:translateX(-50%);background:url('+BRUSH+') center/100% 100% no-repeat;'
+    +'mix-blend-mode:multiply;opacity:.9;z-index:4;pointer-events:none}'
   +'.ggb-logo{width:100%;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45));position:relative;z-index:6}'
   +'.ggb-logo svg{width:100%;height:auto;display:block}'
   +'.ggb-officials{display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:6px;position:relative;z-index:6}'
