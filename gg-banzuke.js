@@ -79,8 +79,8 @@
   }
   function zigzag(list, isEast){
     var n = list.length; if (!n) return "";
-    var APEX = 0.15, OUT = 7, SPAN = 62;    // % from the outer edge → toward centre
-    var TOP = 9, BOT = 78;                  // vertical band (%) — raised so all figures clear the bottom
+    var APEX = 0.09, OUT = 7, SPAN = 62;    // % from the outer edge → toward centre
+    var TOP = 1, BOT = 72;                  // vertical band (%) — raised into the space freed above
     var W = 540, H = 470;                   // approx px, only to weight arc-length evenly
     // dense samples of the path, with cumulative arc length
     var S = 400, xs = [], ys = [], cl = [0];
@@ -168,7 +168,7 @@
   +'.ggb-side-h em{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.16em;color:#7a6a4a;margin-top:2px}'
   +'.ggb-sanyaku{display:flex;justify-content:center;gap:44px}'
   +'.ggb-san{display:flex}'
-  +'.ggb-san .ggb-fig{margin-left:-30px}.ggb-san .ggb-fig:first-child{margin-left:0}'
+  +'.ggb-san .ggb-fig{margin-left:-46px}.ggb-san .ggb-fig:first-child{margin-left:0}'
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{position:relative;overflow:visible}'
   +'.ggb-fig{position:relative;width:var(--fw,60px);text-align:center}'
