@@ -2733,7 +2733,7 @@ function banzukeRows(divName){
   }
   return rows;
 }
-function recordThrough(name, upto){
+function recordStr(name, upto){
   const r = RESULTS[name] || {};
   let win = 0, loss = 0;
   for (let d = 1; d <= upto; d++) { if (r[d] === "w") win++; else if (r[d] === "l") loss++; }
@@ -2744,7 +2744,7 @@ function bzCell(name, side, upto){
   const res = RESULTS[name]?.[String(upto)];               // this day's result
   const cls = res === "w" ? "won" : res === "l" ? "lost" : "";
   const nm  = `<span class="nm">${name}</span>`;
-  const rec = `<span class="rec">${recordThrough(name, upto)}</span>`;
+  const rec = `<span class="rec">${recordStr(name, upto)}</span>`;
   return `<div class="bz__side bz__${side} ${cls}">${side === "e" ? rec + nm : nm + rec}</div>`;
 }
 function buildDayModal(){
