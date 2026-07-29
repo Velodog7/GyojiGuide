@@ -77,15 +77,27 @@
     return 0;
   }
   function zigzag(list, isEast){
-    var n = list.length, APEX = 0.15, out = "";
-    var OUT = 7, SPAN = 62;                 // % from the outer edge → toward centre
-    var TOP = 6, BOT = 94;                  // vertical band (% of the column)
+    var n = list.length; if (!n) return "";
+    var APEX = 0.15, OUT = 7, SPAN = 62;    // % from the outer edge → toward centre
+    var TOP = 9, BOT = 78;                  // vertical band (%) — raised so all figures clear the bottom
+    var W = 540, H = 470;                   // approx px, only to weight arc-length evenly
+    // dense samples of the path, with cumulative arc length
+    var S = 400, xs = [], ys = [], cl = [0];
+    for (var s=0;s<=S;s++){
+      var t = s/S;
+      xs.push(OUT + xfrac(t, APEX) * SPAN);
+      ys.push(TOP + t * (BOT - TOP));
+      if (s>0){ var dx=(xs[s]-xs[s-1])/100*W, dy=(ys[s]-ys[s-1])/100*H; cl.push(cl[s-1]+Math.sqrt(dx*dx+dy*dy)); }
+    }
+    var total = cl[S], out = "";
     for (var i=0;i<n;i++){
-      var p = n>1 ? i/(n-1) : 0;
-      var edgePct = OUT + xfrac(p, APEX) * SPAN;
-      var top = TOP + p * (BOT - TOP);
-      var pos = isEast ? ("right:"+edgePct.toFixed(2)+"%") : ("left:"+edgePct.toFixed(2)+"%");
-      var style = "position:absolute;"+pos+";top:"+top.toFixed(2)+"%;transform:translate("+(isEast?"50%":"-50%")+",-50%);z-index:"+(10+i);
+      var target = n>1 ? i/(n-1)*total : 0;   // equal arc-length steps → equidistant figures
+      var k=1; while (k<=S && cl[k]<target) k++; if (k>S) k=S;
+      var seg = (cl[k]-cl[k-1]) || 1, f = (target-cl[k-1])/seg;
+      var xp = xs[k-1] + f*(xs[k]-xs[k-1]);
+      var yp = ys[k-1] + f*(ys[k]-ys[k-1]);
+      var pos = isEast ? ("right:"+xp.toFixed(2)+"%") : ("left:"+xp.toFixed(2)+"%");
+      var style = "position:absolute;"+pos+";top:"+yp.toFixed(2)+"%;transform:translate("+(isEast?"50%":"-50%")+",-50%);z-index:"+(10+i);
       out += fig(list[i], false, style);
     }
     return out;
@@ -130,19 +142,27 @@
   '#ggBanzuke{position:absolute;inset:0;z-index:1;overflow:hidden}'
   +'.ggb{position:absolute;inset:0;display:flex;flex-direction:column;'
     +'background:#e9e1d0 url('+PAPER+') center/cover no-repeat;'
+    +'filter:sepia(.32) saturate(.82) contrast(.93) brightness(1.04);'   /* faded old-print colour */
     +'font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN",system-ui,sans-serif}'
   /* paper laid OVER everything (figures included) and multiplied in, so the
      photos pick up the fibre and read as printed on the same sheet */
   +'.ggb::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:7;'
-    +'background:url('+PAPER+') center/cover no-repeat;mix-blend-mode:multiply;opacity:.8}'
-  /* a soft inner frame so the crowd sits in the sheet rather than floating */
-  +'.ggb::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:8;'
-    +'box-shadow:inset 0 0 60px rgba(120,104,74,.35),inset 0 -30px 50px rgba(120,104,74,.25)}'
+    +'background:url('+PAPER+') center/cover no-repeat;mix-blend-mode:multiply;opacity:.85}'
+  /* aged wash: warm foxing/vignette darkening toward the edges, like a print
+     that has yellowed and been handled at the corners */
+  +'.ggb::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:8;mix-blend-mode:multiply;'
+    +'background:'
+      +'radial-gradient(130% 105% at 50% 32%, rgba(255,250,236,.10) 0, rgba(120,92,44,0) 46%, rgba(74,52,22,.5) 100%),'
+      +'radial-gradient(60% 45% at 12% 88%, rgba(96,70,30,.32), rgba(96,70,30,0) 60%),'
+      +'radial-gradient(55% 40% at 90% 12%, rgba(96,70,30,.28), rgba(96,70,30,0) 60%),'
+      +'linear-gradient(0deg, rgba(70,50,22,.30), rgba(70,50,22,0) 24%);'
+    +'box-shadow:inset 0 0 72px rgba(70,50,22,.5),inset 0 -30px 56px rgba(70,50,22,.34)}'
   +'.ggb-top{display:grid;grid-template-columns:auto 1fr auto;align-items:flex-end;gap:6px;padding:8px 12px 0;position:relative;z-index:6}'
   +'.ggb-side-h{font-size:22px;font-weight:900;color:#2a2018;text-shadow:0 1px 0 rgba(255,255,255,.35);line-height:1;text-align:center}'
   +'.ggb-side-h em{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.16em;color:#7a6a4a;margin-top:2px}'
-  +'.ggb-sanyaku{display:flex;justify-content:center;gap:26px}'
-  +'.ggb-san{display:flex;gap:6px}'
+  +'.ggb-sanyaku{display:flex;justify-content:center;gap:44px}'
+  +'.ggb-san{display:flex}'
+  +'.ggb-san .ggb-fig{margin-left:-30px}.ggb-san .ggb-fig:first-child{margin-left:0}'
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{position:relative;overflow:visible}'
   +'.ggb-fig{position:relative;width:var(--fw,60px);text-align:center}'
