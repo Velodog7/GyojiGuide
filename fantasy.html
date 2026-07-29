@@ -238,7 +238,15 @@
   .authmodal.open{ display:flex }
   .authmodal__panel{ position:relative; width:min(420px,100%); background:var(--surface);
         border:1px solid var(--line2); border-radius:16px; padding:26px 24px 24px;
-        box-shadow:0 30px 80px rgba(0,0,0,.6) }
+        box-shadow:0 30px 80px rgba(0,0,0,.6); transition:width .15s ease;
+        max-height:min(720px,90vh); overflow-y:auto }
+  .authmodal__panel.wide{ width:min(520px,100%) }
+  .mwd-step{ display:flex; flex-direction:column; gap:12px }
+  .mwd-intro{ margin:0; font-size:.86rem; color:var(--dim); line-height:1.5 }
+  .mwd-intro b{ color:var(--sun) }
+  .mwd-stepfoot{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:2px }
+  .mwd-stepfoot a{ color:var(--faint); font-size:.8rem; text-decoration:underline; cursor:pointer }
+  .mwd-stepfoot a:hover{ color:var(--dim) }
   .authmodal__close{ position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:8px;
         border:1px solid var(--line2); background:none; color:var(--dim); cursor:pointer; font-size:15px }
   .authmodal__close:hover{ border-color:var(--sun); color:var(--ink) }
@@ -282,8 +290,50 @@
   .expand-cards .pcard{ aspect-ratio:5/7 }
   .expand-cards .ec-pts{ font-family:"IBM Plex Mono",monospace; font-size:.76rem; color:var(--dim); text-align:center }
   .expand-cards .ec-pts b{ color:var(--sun) }
+
+  /* ---- My Leagues ---- */
+  .btn.sm{ font-size:.85rem; padding:8px 14px }
+  .lg-bar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:4px 0 16px }
+  .lg-switch{ display:flex; gap:6px; flex-wrap:wrap; flex:1 }
+  .lg-pill{ font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:.86rem; cursor:pointer;
+        padding:7px 14px; border-radius:99px; border:1px solid var(--line2); background:var(--surface); color:var(--dim) }
+  .lg-pill.on{ background:rgba(var(--sun-rgb),.14); border-color:var(--sun); color:var(--ink) }
+  .lg-pill:hover{ border-color:var(--sun) }
+  .lg-empty{ color:var(--muted); border:1px dashed var(--line2); border-radius:var(--radius-sm); padding:18px; text-align:center }
+  .lg-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin:0 0 14px }
+  .lg-head h3{ margin:0; font-size:1.3rem }
+  .lg-sub{ color:var(--faint); font-size:.82rem; margin-top:3px }
+  .lg-cols{ display:grid; grid-template-columns:minmax(180px,240px) 1fr; gap:18px }
+  @media(max-width:640px){ .lg-cols{ grid-template-columns:1fr } }
+  .lg-members h4,.lg-board h4{ margin:0 0 8px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun) }
+  .lg-mem{ display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--line) }
+  .lg-mem .mem-ava{ width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-weight:800;
+        font-size:12px; color:#0d0f15; background:var(--sun); flex:none }
+  .lg-mem .mem-name{ font-weight:600; font-size:.9rem } .lg-mem .mem-name b{ color:var(--ink) }
+  .lg-mem .mem-h{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.72rem }
+  .lg-mem .mem-tag{ font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--sun); margin-left:4px }
+  .lg-mem .mem-kick{ margin-left:auto; background:none; border:0; color:var(--faint); cursor:pointer; font-size:14px }
+  .lg-mem .mem-kick:hover{ color:var(--tangerine) }
+  .lg-leave{ margin-top:12px; background:none; border:1px solid var(--line2); color:var(--muted);
+        border-radius:8px; padding:7px 12px; font:inherit; font-size:.82rem; cursor:pointer }
+  .lg-leave:hover{ border-color:var(--tangerine); color:var(--tangerine) }
+  .lg-post{ display:flex; gap:8px; margin:0 0 14px }
+  .lg-post textarea{ flex:1; background:var(--surface); border:1px solid var(--line); border-radius:10px;
+        color:var(--ink); font:inherit; font-size:.9rem; padding:9px 12px; resize:vertical }
+  .lg-post textarea:focus{ outline:none; border-color:var(--sun) }
+  .lg-msgs{ display:flex; flex-direction:column; gap:12px }
+  .lg-msg{ border:1px solid var(--line); border-radius:12px; padding:11px 13px; background:var(--surface) }
+  .lg-msg__head{ display:flex; align-items:baseline; gap:8px; margin-bottom:4px }
+  .lg-msg__who{ font-weight:700; font-size:.9rem } .lg-msg__h{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.7rem }
+  .lg-msg__when{ margin-left:auto; color:var(--faint); font-size:.7rem }
+  .lg-msg__body{ font-size:.92rem; color:var(--dim); white-space:pre-wrap; word-break:break-word }
+  .lg-msg__reply{ background:none; border:0; color:var(--sun); cursor:pointer; font-size:.78rem; margin-top:6px; padding:0 }
+  .lg-replies{ margin:10px 0 0 14px; border-left:2px solid var(--line); padding-left:12px; display:flex; flex-direction:column; gap:10px }
+  .lg-replybox{ display:flex; gap:8px; margin-top:8px }
+  .lg-replybox input{ flex:1; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--ink); font:inherit; font-size:.85rem; padding:7px 10px }
+  .lg-replybox input:focus{ outline:none; border-color:var(--sun) }
 </style>
-<script src="gg-config.js"></script><script src="gg-account.js"></script></head>
+<script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-mawashi.js"></script></head>
 <body>
 <script src="gg-nav.js"></script>
 
@@ -305,6 +355,7 @@
   <nav class="tabs" role="tablist">
     <button class="tab" id="tab-team" role="tab" aria-selected="true" onclick="setView('team')">My Team <span class="n" id="pickN">0/7</span></button>
     <button class="tab" id="tab-board" role="tab" aria-selected="false" onclick="setView('board')">Leaderboard <span class="n" id="lbN">0</span></button>
+    <button class="tab" id="tab-leagues" role="tab" aria-selected="false" onclick="setView('leagues')">My Leagues <span class="n" id="lgN">0</span></button>
   </nav>
 
   <!-- MY TEAM -->
@@ -362,6 +413,69 @@
     <div id="lbBody"></div>
     <p class="foot" id="lbFoot"></p>
   </section>
+
+  <!-- MY LEAGUES -->
+  <section class="view" id="v-leagues">
+    <div id="lgLocked" class="signin-cta" hidden>
+      <span>Log in to create leagues, invite friends, and post to your league board.</span>
+      <div class="signin-cta__btns"><button class="btn" id="lgCtaLogin">Log in</button></div>
+    </div>
+
+    <div id="lgMain" hidden>
+      <div class="lg-bar">
+        <div class="lg-switch" id="lgSwitch"></div>
+        <button class="btn ghost sm" id="lgNewBtn">+ New league</button>
+      </div>
+
+      <div id="lgEmpty" class="lg-empty" hidden>
+        <p>You're not in any leagues yet. Create one and share the invite link, or ask a friend for theirs.</p>
+      </div>
+
+      <div id="lgPanel" hidden>
+        <div class="lg-head">
+          <div>
+            <h3 id="lgName">—</h3>
+            <div class="lg-sub"><span id="lgRole"></span> · <span id="lgCount"></span></div>
+          </div>
+          <button class="btn ghost sm" id="lgInvite">Copy invite link</button>
+        </div>
+
+        <div class="lg-cols">
+          <div class="lg-members">
+            <h4>Members</h4>
+            <div id="lgMembers"></div>
+            <button class="lg-leave" id="lgLeave">Leave this league</button>
+          </div>
+
+          <div class="lg-board">
+            <h4>League board</h4>
+            <div class="lg-post">
+              <textarea id="lgMsgInput" rows="2" maxlength="2000" placeholder="Post to the league…"></textarea>
+              <button class="btn sm" id="lgMsgSend">Post</button>
+            </div>
+            <div id="lgMsgs" class="lg-msgs"></div>
+          </div>
+        </div>
+      </div>
+      <span class="status" id="lgStatus"></span>
+    </div>
+  </section>
+</div>
+
+<!-- new-league modal -->
+<div class="authmodal" id="lgModal" role="dialog" aria-modal="true" aria-label="Create a league">
+  <div class="authmodal__panel">
+    <button class="authmodal__close" id="lgModalClose" aria-label="Close">✕</button>
+    <div class="authmodal__title">Create a league</div>
+    <div class="authform">
+      <label class="afl">League name
+        <input id="lgNameInput" maxlength="60" placeholder="e.g. Osaka Office Basho">
+      </label>
+      <div class="afl__hint">You'll be the commissioner — you can remove members and share an invite link so friends can join.</div>
+      <button class="btn" id="lgCreate">Create league</button>
+      <span class="status" id="lgCreateStatus"></span>
+    </div>
+  </div>
 </div>
 
 <!-- auth modal (sign up / log in / account) -->
@@ -398,10 +512,22 @@
         <input id="e_dname" maxlength="60" placeholder="Display name">
       </label>
       <div class="acctview__row">
+        <button class="btn ghost" id="acctEditAvatar">Edit mawashi avatar</button>
+      </div>
+      <div class="acctview__row">
         <button class="btn" id="acctSave">Save changes</button>
         <button class="btn ghost" id="acctLogout">Log out</button>
       </div>
       <span class="status" id="acctViewStatus"></span>
+    </div>
+
+    <div class="mwd-step" id="mwdStep" hidden>
+      <p class="mwd-intro" id="mwdIntro">Design your team's <b>kashō mawashi</b> — this becomes your avatar around the site.</p>
+      <div id="mwdMount"></div>
+      <div class="mwd-stepfoot">
+        <a href="#" id="mwdSkip">Skip for now</a>
+        <span class="status" id="mwdStatus"></span>
+      </div>
     </div>
   </div>
 </div>
@@ -584,21 +710,29 @@ async function apiPost(payload){
 }
 
 /* ---------- accounts ---------- */
-function avatarHTML(a){ return (a && a.name ? a.name : a && a.handle || "力").slice(0,1).toUpperCase(); }
+function avatarHTML(a){
+  if (a && a.avatar) { try { return MawashiDesigner.renderSVG(a.avatar, { variant:"chip", size:40 }); } catch(e){} }
+  return (a && a.name ? a.name : a && a.handle || "力").slice(0,1).toUpperCase();
+}
 function acctUI(){
   const on = !!acct;
   // top-right buttons
   $("openLogin").hidden = on; $("openSignup").hidden = on; $("openAccount").hidden = !on;
-  if (on){ $("acctChipName").textContent = acct.name || acct.handle; $("acctAva").textContent = avatarHTML(acct); $("acctBadge").textContent = avatarHTML(acct); }
+  if (on){ $("acctChipName").textContent = acct.name || acct.handle; $("acctAva").innerHTML = avatarHTML(acct); $("acctBadge").innerHTML = avatarHTML(acct); }
   // my-team strip
   $("acctIn").hidden = !on; $("signinCta").hidden = on;
   if (on){ $("acctWho").textContent = acct.name || acct.handle; $("acctHandle").textContent = "@" + acct.handle; }
   syncTeam();
 }
 function setAcct(a){
+  const wasOut = !acct;
   acct = a;
   handle = a ? a.handle : ""; dname = a ? (a.name || a.handle) : "";
   saveLocal(); acctUI();
+  // keep the leagues tab in sync with sign-in/out
+  if (typeof loadLeagues === "function" && $("tab-leagues").getAttribute("aria-selected")==="true") loadLeagues();
+  // a just-signed-in user with a pending invite link should auto-join
+  if (a && wasOut && typeof handlePendingJoin === "function" && pendingJoin) handlePendingJoin();
 }
 function validForm(h, p, needPin){
   if (!/^[A-Za-z0-9_.-]{2,40}$/.test(h)) return "Handle: 2–40 letters, digits, _ . -";
@@ -612,12 +746,14 @@ let authMode = "signup";   // 'signup' | 'login'
 function openAuth(mode){
   authMode = mode;
   const acc = !!acct;
+  $("mwdStep").hidden = true;
+  authModal.querySelector(".authmodal__panel").classList.remove("wide");
   $("authForm").hidden = acc; $("acctView").hidden = !acc;
   if (acc){
     // account view
     $("acctViewName").textContent = acct.name || acct.handle;
     $("acctViewHandle").textContent = "@" + acct.handle;
-    $("acctViewAva").textContent = avatarHTML(acct);
+    $("acctViewAva").innerHTML = avatarHTML(acct);
     $("e_dname").value = acct.name || "";
     $("authTitle").textContent = "Your account";
     authStatus("");
@@ -662,11 +798,11 @@ $("authSubmit").onclick = async () => {
       const key = "fantasy.acct.local." + h.toLowerCase();
       if (localStorage.getItem(key)) { authStatus("That handle already exists on this device — log in instead.", "err"); return; }
       try { localStorage.setItem(key, auth); } catch {}
-      setAcct({ handle:h, name, auth }); authStatus("Account created ✓", "ok"); setTimeout(closeAuth, 700); return;
+      setAcct({ handle:h, name, auth }); authStatus("Account created ✓", "ok"); openMawashiStep("signup"); return;
     }
     try {
       const res = await apiPost({ action:"register", handle:h, name, auth });
-      if (res && res.ok) { setAcct({ handle:h, name, auth }); authStatus("Account created ✓", "ok"); setTimeout(closeAuth, 700); }
+      if (res && res.ok) { setAcct({ handle:h, name, auth }); authStatus("Account created ✓", "ok"); openMawashiStep("signup"); }
       else authStatus(res && res.error ? res.error : "Couldn't create the account.", "err");
     } catch (e) { authStatus("Network error — try again.", "err"); }
   } else {
@@ -680,13 +816,43 @@ $("authSubmit").onclick = async () => {
     try {
       const res = await apiPost({ action:"login", handle:h, auth });
       if (res && res.ok) {
-        setAcct({ handle: res.handle || h, name: res.name || h, auth });
+        let avatar = null; try { avatar = res.avatar ? JSON.parse(res.avatar) : null; } catch (x) {}
+        setAcct({ handle: res.handle || h, name: res.name || h, auth, avatar });
         if (res.team && Object.keys(res.team).length) { team = res.team; saveLocal(); paintSlots(); }
         authStatus("Logged in ✓", "ok"); setTimeout(closeAuth, 700);
       } else authStatus(res && res.error ? res.error : "Couldn't log in.", "err");
     } catch (e) { authStatus("Network error — try again.", "err"); }
   }
 };
+
+/* ---- mawashi avatar designer step (shown right after signup, or from Account) ---- */
+let mwdHandle = null;
+function openMawashiStep(mode){
+  $("authForm").hidden = true; $("acctView").hidden = true; $("mwdStep").hidden = false;
+  authModal.querySelector(".authmodal__panel").classList.add("wide");
+  $("authTitle").textContent = mode === "signup" ? "Design your mawashi" : "Edit your mawashi";
+  $("mwdIntro").style.display = mode === "signup" ? "" : "none";
+  $("mwdSkip").textContent = mode === "signup" ? "Skip for now" : "Cancel";
+  const initial = (acct && acct.avatar) || MawashiDesigner.DEFAULT;
+  mwdHandle = MawashiDesigner.mount($("mwdMount"), {
+    initial,
+    saveLabel: "Save avatar",
+    onSave: async (design) => {
+      const status = $("mwdStatus"); status.textContent = "Saving…"; status.className = "status";
+      if (hasAPI() && acct) {
+        try {
+          const res = await apiPost({ action:"saveAvatar", handle:acct.handle, auth:acct.auth, avatar: JSON.stringify(design) });
+          if (!(res && res.ok)) { status.textContent = (res && res.error) || "Couldn't save."; status.className = "status err"; return; }
+        } catch (e) { status.textContent = "Network error — saved on this device."; status.className = "status err"; }
+      }
+      setAcct({ ...acct, avatar: design });
+      status.textContent = "Saved ✓"; status.className = "status ok";
+      setTimeout(() => { if (mode === "signup") closeAuth(); else openAuth("account"); }, 600);
+    }
+  });
+  $("mwdSkip").onclick = (e) => { e.preventDefault(); if (mode === "signup") closeAuth(); else openAuth("account"); };
+}
+$("acctEditAvatar").onclick = () => openMawashiStep("edit");
 
 $("acctSave").onclick = async () => {
   if (!acct) return;
@@ -848,6 +1014,139 @@ function renderBoard(){
 $("lbSearch").addEventListener("input", e => { lbQuery = e.target.value; renderBoard(); });
 const esc = s => String(s).replace(/[&<>"]/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
 
+/* ============================================================
+   MY LEAGUES
+   ============================================================ */
+let leaguesCache = [];
+let curLeagueId = null;
+const initials = s => (s||"力").trim().slice(0,1).toUpperCase();
+const timeAgo = iso => {
+  if (!iso) return "";
+  const d = (Date.now() - new Date(iso).getTime())/1000;
+  if (d < 60) return "just now";
+  if (d < 3600) return Math.floor(d/60)+"m ago";
+  if (d < 86400) return Math.floor(d/3600)+"h ago";
+  return Math.floor(d/86400)+"d ago";
+};
+function lgStatus(msg, cls){ const s=$("lgStatus"); if(s){ s.textContent=msg||""; s.className="status"+(cls?" "+cls:""); } }
+
+async function loadLeagues(preferId){
+  if (!acct){ $("lgLocked").hidden=false; $("lgMain").hidden=true; $("lgN").textContent="0"; return; }
+  $("lgLocked").hidden=true; $("lgMain").hidden=false;
+  if (!hasAPI()){ $("lgEmpty").hidden=false; $("lgEmpty").innerHTML="<p>Leagues need the shared Sheet API. Deploy the Apps Script and set <code>API_URL</code> to enable leagues, invites, and the message board.</p>"; $("lgPanel").hidden=true; $("lgSwitch").innerHTML=""; $("lgN").textContent="0"; return; }
+  lgStatus("Loading…");
+  let res=null; try{ res=await GyojiGuide.leagues(acct.handle); }catch(e){}
+  leaguesCache = (res && res.leagues) || [];
+  $("lgN").textContent = leaguesCache.length;
+  lgStatus("");
+  if (!leaguesCache.length){ $("lgEmpty").hidden=false; $("lgPanel").hidden=true; $("lgSwitch").innerHTML=""; return; }
+  $("lgEmpty").hidden=true;
+  if (preferId && leaguesCache.some(l=>l.id===preferId)) curLeagueId=preferId;
+  if (!curLeagueId || !leaguesCache.some(l=>l.id===curLeagueId)) curLeagueId=leaguesCache[0].id;
+  renderSwitch();
+  renderLeague();
+}
+function renderSwitch(){
+  $("lgSwitch").innerHTML = leaguesCache.map(l =>
+    `<button class="lg-pill ${l.id===curLeagueId?"on":""}" data-lg="${esc(l.id)}">${esc(l.name)}</button>`).join("");
+  $("lgSwitch").querySelectorAll("[data-lg]").forEach(b=>{
+    b.onclick = ()=>{ curLeagueId=b.dataset.lg; renderSwitch(); renderLeague(); };
+  });
+}
+function renderLeague(){
+  const lg = leaguesCache.find(l=>l.id===curLeagueId);
+  if (!lg){ $("lgPanel").hidden=true; return; }
+  $("lgPanel").hidden=false;
+  const meCommish = acct && lg.commissioner.toLowerCase()===acct.handle.toLowerCase();
+  $("lgName").textContent = lg.name;
+  $("lgRole").textContent = meCommish ? "You're the commissioner" : "Member";
+  const members = lg.members || [];
+  $("lgCount").textContent = members.length + (members.length===1?" member":" members");
+  $("lgMembers").innerHTML = members.map(m=>{
+    const isComm = m.handle.toLowerCase()===lg.commissioner.toLowerCase();
+    const kick = (meCommish && !isComm) ? `<button class="mem-kick" data-kick="${esc(m.handle)}" title="Remove ${esc(m.handle)}">✕</button>` : "";
+    return `<div class="lg-mem"><span class="mem-ava">${esc(initials(m.name))}</span>
+      <span class="mem-name"><b>${esc(m.name)}</b> <span class="mem-h">@${esc(m.handle)}</span>${isComm?`<span class="mem-tag">commish</span>`:""}</span>${kick}</div>`;
+  }).join("");
+  $("lgMembers").querySelectorAll("[data-kick]").forEach(b=>{
+    b.onclick = async ()=>{ if(!confirm("Remove @"+b.dataset.kick+" from the league?")) return;
+      lgStatus("Removing…"); const r=await GyojiGuide.leagueKick(lg.id, b.dataset.kick);
+      if (r&&r.ok){ lgStatus("Removed.","ok"); loadLeagues(lg.id); } else lgStatus((r&&r.error)||"Couldn't remove.","err"); };
+  });
+  $("lgLeave").style.display = meCommish ? "none" : "";
+  renderMessages(lg.messages || []);
+}
+function threadHTML(msgs, parentId){
+  return msgs.filter(m=>(m.parentId||"")===parentId).map(m=>{
+    const replies = msgs.some(x=>x.parentId===m.id) ? `<div class="lg-replies">${threadHTML(msgs, m.id)}</div>` : "";
+    const replyUI = !parentId ? `<button class="lg-msg__reply" data-reply="${esc(m.id)}">Reply</button>` : "";
+    return `<div class="lg-msg" data-mid="${esc(m.id)}">
+      <div class="lg-msg__head"><span class="lg-msg__who">${esc(m.name)}</span><span class="lg-msg__h">@${esc(m.handle)}</span><span class="lg-msg__when">${esc(timeAgo(m.created))}</span></div>
+      <div class="lg-msg__body">${esc(m.body)}</div>${replyUI}${replies}</div>`;
+  }).join("");
+}
+function renderMessages(msgs){
+  const box = $("lgMsgs");
+  if (!msgs.length){ box.innerHTML = `<p style="color:var(--faint);font-size:.85rem">No posts yet — say hello to your league.</p>`; return; }
+  box.innerHTML = threadHTML(msgs, "");
+  box.querySelectorAll("[data-reply]").forEach(btn=>{
+    btn.onclick = ()=>{
+      box.querySelectorAll(".lg-replybox").forEach(x=>x.remove());
+      const wrap = document.createElement("div"); wrap.className="lg-replybox";
+      wrap.innerHTML = `<input maxlength="2000" placeholder="Reply…"><button class="btn sm">Send</button>`;
+      btn.after(wrap);
+      const inp=wrap.querySelector("input"), snd=wrap.querySelector("button");
+      inp.focus();
+      snd.onclick = async ()=>{ const t=inp.value.trim(); if(!t) return; snd.disabled=true;
+        const r=await GyojiGuide.msgPost(curLeagueId, t, btn.dataset.reply);
+        if (r&&r.ok){ const d=await GyojiGuide.leagueDetail(curLeagueId); const lg=leaguesCache.find(l=>l.id===curLeagueId); if(lg&&d&&d.league) lg.messages=d.messages; renderLeague(); }
+        else { snd.disabled=false; alert((r&&r.error)||"Couldn't post."); } };
+    };
+  });
+}
+
+$("lgNewBtn").onclick = ()=>{ $("lgNameInput").value=""; $("lgCreateStatus").textContent=""; $("lgModal").classList.add("open"); document.body.style.overflow="hidden"; };
+$("lgModalClose").onclick = ()=>{ $("lgModal").classList.remove("open"); document.body.style.overflow=""; };
+$("lgModal").onclick = e=>{ if(e.target===$("lgModal")){ $("lgModal").classList.remove("open"); document.body.style.overflow=""; } };
+$("lgCreate").onclick = async ()=>{
+  const name=$("lgNameInput").value.trim();
+  if (name.length<2){ $("lgCreateStatus").textContent="Give it a name (2+ characters)."; $("lgCreateStatus").className="status err"; return; }
+  $("lgCreateStatus").textContent="Creating…"; $("lgCreateStatus").className="status";
+  const r=await GyojiGuide.leagueCreate(name);
+  if (r&&r.ok){ $("lgModal").classList.remove("open"); document.body.style.overflow=""; loadLeagues(r.id); }
+  else { $("lgCreateStatus").textContent=(r&&r.error)||"Couldn't create."; $("lgCreateStatus").className="status err"; }
+};
+$("lgMsgSend").onclick = async ()=>{
+  const t=$("lgMsgInput").value.trim(); if(!t||!curLeagueId) return;
+  $("lgMsgSend").disabled=true;
+  const r=await GyojiGuide.msgPost(curLeagueId, t);
+  $("lgMsgSend").disabled=false;
+  if (r&&r.ok){ $("lgMsgInput").value=""; const d=await GyojiGuide.leagueDetail(curLeagueId); const lg=leaguesCache.find(l=>l.id===curLeagueId); if(lg&&d&&d.league) lg.messages=d.messages; renderLeague(); }
+  else lgStatus((r&&r.error)||"Couldn't post.","err");
+};
+$("lgInvite").onclick = async ()=>{
+  const link = location.origin + location.pathname + "?join=" + encodeURIComponent(curLeagueId);
+  try { await navigator.clipboard.writeText(link); lgStatus("Invite link copied ✓","ok"); }
+  catch(e){ prompt("Copy this invite link:", link); }
+};
+$("lgLeave").onclick = async ()=>{
+  if (!curLeagueId || !confirm("Leave this league?")) return;
+  const r=await GyojiGuide.leagueLeave(curLeagueId);
+  if (r&&r.ok){ curLeagueId=null; loadLeagues(); }
+};
+$("lgCtaLogin").onclick = ()=> openAuth("login");
+
+// invite link: ?join=<leagueId> — join after (or trigger) sign-in
+let pendingJoin = new URLSearchParams(location.search).get("join") || null;
+async function handlePendingJoin(){
+  if (!pendingJoin) return;
+  if (!acct){ openAuth("signup"); return; }
+  if (!hasAPI()){ pendingJoin=null; return; }
+  const r = await GyojiGuide.leagueJoin(pendingJoin);
+  const jid = pendingJoin; pendingJoin=null;
+  if (r && r.ok){ setView("leagues"); loadLeagues(jid); }
+}
+
 /* ---------- tabs ---------- */
 function setView(v){
   document.querySelectorAll(".view").forEach(s=>s.classList.remove("on"));
@@ -855,6 +1154,7 @@ function setView(v){
   $("v-"+v).classList.add("on");
   $("tab-"+v).setAttribute("aria-selected","true");
   if (v==="board") loadBoard();
+  if (v==="leagues") loadLeagues();
 }
 $("refreshBtn").onclick = loadBoard;
 
@@ -879,6 +1179,7 @@ if (!hasAPI()){
 acctUI();
 paintSlots();
 syncTeam();
+handlePendingJoin();   // if arriving via an invite link (?join=…)
 </script>
 <script src="taiko-radio.js" defer></script>
 </body>

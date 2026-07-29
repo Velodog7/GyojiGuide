@@ -41,6 +41,9 @@
 var SHEET_USERS   = 'Users';
 var SHEET_RESULTS = 'Results';
 var SHEET_META    = 'Meta';
+var SHEET_LEAGUES  = 'Leagues';
+var SHEET_MEMBERS  = 'LeagueMembers';
+var SHEET_MESSAGES = 'Messages';
 
 // Label for the current tournament (shown in the app).
 var BASHO_LABEL   = 'Aki 2026';
@@ -48,9 +51,13 @@ var BASHO_LABEL   = 'Aki 2026';
 /* ---------- one-time: build the tabs ---------- */
 function setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var users = ensureSheet(ss, SHEET_USERS, ['handle', 'name', 'auth', 'team', 'updated']);
+  var users = ensureSheet(ss, SHEET_USERS, ['handle', 'name', 'auth', 'team', 'updated', 'avatar']);
   migrateUsersV1(users);                       // upgrades a v1 sheet (no auth column) in place
+  migrateUsersV2(users);                       // upgrades a v1/v2 sheet (no avatar column) in place
   ensureSheet(ss, SHEET_RESULTS, ['day', 'division', 'east', 'west', 'winner', 'kimarite']);
+  ensureSheet(ss, SHEET_LEAGUES, ['id', 'name', 'commissioner', 'created', 'inviteCode']);
+  ensureSheet(ss, SHEET_MEMBERS, ['leagueId', 'handle', 'joined']);
+  ensureSheet(ss, SHEET_MESSAGES, ['id', 'leagueId', 'handle', 'name', 'body', 'parentId', 'created']);
   var meta = ensureSheet(ss, SHEET_META, ['key', 'value']);
   if (meta.getLastRow() < 2) {
     meta.appendRow(['basho', BASHO_LABEL]);
@@ -78,12 +85,25 @@ function migrateUsersV1(sh) {
   }
 }
 
+// v1/v2 sheets had no 'avatar' column (mawashi design, stored as JSON).
+// Append it as column 6 if missing, so existing rows just get a blank cell.
+function migrateUsersV2(sh) {
+  var lastCol = Math.max(5, sh.getLastColumn());
+  var head = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  if (String(head[5] || '').toLowerCase() !== 'avatar') {
+    sh.getRange(1, 6).setValue('avatar');
+  }
+}
+
 /* ---------- GET: hand back leaderboard data ---------- */
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'data';
   try {
     if (action === 'list')    return json({ ok: true, users: readUsers() });
     if (action === 'results') return json({ ok: true, results: readResults() });
+    if (action === 'leagues') return json(myLeagues(e.parameter.handle));
+    if (action === 'league')  return json(leagueDetail(e.parameter.id, e.parameter.handle));
+    if (action === 'invite')  return json(leagueByInvite(e.parameter.code));
     return json({ ok: true, users: readUsers(), results: readResults(), meta: readMeta() });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -97,6 +117,14 @@ function doPost(e) {
     if (body.action === 'register') return json(register(body));
     if (body.action === 'login')    return json(login(body));
     if (body.action === 'save')     return json(saveTeam(body));
+    if (body.action === 'saveAvatar') return json(saveAvatar(body));
+    if (body.action === 'createLeague') return json(createLeague(body));
+    if (body.action === 'joinLeague')   return json(joinLeague(body));
+    if (body.action === 'leaveLeague')  return json(leaveLeague(body));
+    if (body.action === 'removeMember') return json(removeMember(body));
+    if (body.action === 'renameLeague') return json(renameLeague(body));
+    if (body.action === 'postMessage')  return json(postMessage(body));
+    if (body.action === 'deleteMessage')return json(deleteMessage(body));
     return json({ ok: false, error: 'unknown action' });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -116,6 +144,7 @@ function register(body) {
   var auth = String(body.auth || '').slice(0, 80);
   if (!auth) return { ok: false, error: 'missing auth' };
   var name = String(body.name || handle).trim().slice(0, 60);
+  var avatar = String(body.avatar || '').slice(0, 4000);
   var when = new Date().toISOString();
 
   var lock = LockService.getScriptLock();
@@ -127,13 +156,13 @@ function register(body) {
     for (var r = 1; r < v.length; r++) {
       if (String(v[r][0]).trim().toLowerCase() === key) {
         if (String(v[r][2] || '') === '') {          // unclaimed v1 account — claim it
-          sh.getRange(r + 1, 1, 1, 5).setValues([[handle, name, auth, v[r][3] || '{}', when]]);
+          sh.getRange(r + 1, 1, 1, 6).setValues([[handle, name, auth, v[r][3] || '{}', when, avatar || v[r][5] || '']]);
           return { ok: true, claimed: true, handle: handle };
         }
         return { ok: false, error: 'That handle is taken \u2014 sign in instead.' };
       }
     }
-    sh.appendRow([handle, name, auth, '{}', when]);
+    sh.appendRow([handle, name, auth, '{}', when, avatar]);
     return { ok: true, created: true, handle: handle };
   } finally {
     lock.releaseLock();
@@ -151,7 +180,7 @@ function login(body) {
   if (row.auth !== auth) return { ok: false, error: 'Wrong PIN.' };
   var team = {};
   try { team = JSON.parse(row.team || '{}'); } catch (x) {}
-  return { ok: true, handle: row.handle, name: row.name, team: team };
+  return { ok: true, handle: row.handle, name: row.name, team: team, avatar: row.avatar || '' };
 }
 
 /* save a team: only with the account's own hash */
@@ -178,6 +207,30 @@ function saveTeam(body) {
   }
 }
 
+/* save just the mawashi avatar design (doesn't touch the team) */
+function saveAvatar(body) {
+  var handle = cleanHandle(body.handle);
+  var auth = String(body.auth || '');
+  var avatar = String(body.avatar || '').slice(0, 4000);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
+    var v = sh.getDataRange().getValues();
+    var key = handle.toLowerCase();
+    for (var r = 1; r < v.length; r++) {
+      if (String(v[r][0]).trim().toLowerCase() === key) {
+        if (String(v[r][2] || '') !== auth) return { ok: false, error: 'Not authorised for this handle.' };
+        sh.getRange(r + 1, 6).setValue(avatar);
+        return { ok: true, updated: true, handle: handle };
+      }
+    }
+    return { ok: false, error: 'No account with that handle \u2014 create one first.' };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /* ---------- readers (auth hashes never leave the sheet) ---------- */
 function findUser(handle) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
@@ -185,7 +238,7 @@ function findUser(handle) {
   var key = String(handle || '').toLowerCase();
   for (var r = 1; r < v.length; r++) {
     if (String(v[r][0]).trim().toLowerCase() === key) {
-      return { handle: String(v[r][0]), name: String(v[r][1] || v[r][0]), auth: String(v[r][2] || ''), team: v[r][3], updated: String(v[r][4] || '') };
+      return { handle: String(v[r][0]), name: String(v[r][1] || v[r][0]), auth: String(v[r][2] || ''), team: v[r][3], updated: String(v[r][4] || ''), avatar: String(v[r][5] || '') };
     }
   }
   return null;
@@ -199,7 +252,7 @@ function readUsers() {
     if (!String(v[r][0]).trim()) continue;
     var team = {};
     try { team = JSON.parse(v[r][3] || '{}'); } catch (e) {}
-    out.push({ handle: String(v[r][0]), name: String(v[r][1] || v[r][0]), team: team, updated: String(v[r][4] || '') });
+    out.push({ handle: String(v[r][0]), name: String(v[r][1] || v[r][0]), team: team, updated: String(v[r][4] || ''), avatar: String(v[r][5] || '') });
   }
   return out;
 }
@@ -229,6 +282,180 @@ function readMeta() {
   var m = { basho: BASHO_LABEL, lastDay: 0 };
   for (var r = 1; r < v.length; r++) m[String(v[r][0])] = v[r][1];
   return m;
+}
+
+/* ============================================================
+   LEAGUES · MEMBERS · MESSAGE BOARD
+   All writes are authenticated with the same salted PIN hash the
+   accounts use: the caller sends { handle, auth } and we verify it
+   against the Users sheet before touching anything.
+   ============================================================ */
+
+function verifyAuth(handle, auth) {
+  var u = findUser(handle);
+  if (!u) return null;
+  if (String(u.auth || '') === '' || String(u.auth) !== String(auth || '')) return null;
+  return u;
+}
+function sh_(name){ return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name); }
+function newId(prefix){ return prefix + Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36); }
+function inviteCode(){
+  var a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s='';
+  for (var i=0;i<7;i++) s += a.charAt(Math.floor(Math.random()*a.length));
+  return s;
+}
+
+function leagueRow(id){
+  var v = sh_(SHEET_LEAGUES).getDataRange().getValues();
+  for (var r=1;r<v.length;r++) if (String(v[r][0])===String(id)) return { row:r+1, id:String(v[r][0]), name:String(v[r][1]), commissioner:String(v[r][2]), created:String(v[r][3]), inviteCode:String(v[r][4]||'') };
+  return null;
+}
+function membersOf(id){
+  var v = sh_(SHEET_MEMBERS).getDataRange().getValues(), out=[];
+  for (var r=1;r<v.length;r++) if (String(v[r][0])===String(id) && String(v[r][1]).trim()) out.push(String(v[r][1]));
+  return out;
+}
+function isMember(id, handle){
+  var k=String(handle||'').toLowerCase();
+  return membersOf(id).some(function(h){ return h.toLowerCase()===k; });
+}
+
+function myLeagues(handle){
+  handle = cleanHandle(handle);
+  if (!handle) return { ok:false, error:'bad handle' };
+  var mem = sh_(SHEET_MEMBERS).getDataRange().getValues();
+  var mine = {}, k=handle.toLowerCase();
+  for (var r=1;r<mem.length;r++) if (String(mem[r][1]).toLowerCase()===k) mine[String(mem[r][0])]=true;
+  var lv = sh_(SHEET_LEAGUES).getDataRange().getValues(), out=[];
+  for (var i=1;i<lv.length;i++){
+    var id=String(lv[i][0]); if (!mine[id]) continue;
+    out.push({ id:id, name:String(lv[i][1]), commissioner:String(lv[i][2]),
+      inviteCode:String(lv[i][4]||''), members:membersOf(id).length,
+      isCommissioner: String(lv[i][2]).toLowerCase()===k });
+  }
+  return { ok:true, leagues:out };
+}
+
+function leagueDetail(id, handle){
+  var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
+  handle = cleanHandle(handle);
+  var members = membersOf(id);
+  // hydrate member display names from Users
+  var users = readUsers(), byh={};
+  users.forEach(function(u){ byh[u.handle.toLowerCase()] = u.name; });
+  var mem = members.map(function(h){ return { handle:h, name: byh[h.toLowerCase()] || h }; });
+  var msgs = messagesOf(id);
+  return { ok:true, league:{ id:L.id, name:L.name, commissioner:L.commissioner, inviteCode:L.inviteCode,
+    isCommissioner: handle && L.commissioner.toLowerCase()===handle.toLowerCase(),
+    isMember: handle ? isMember(id, handle) : false },
+    members:mem, messages:msgs };
+}
+
+function leagueByInvite(code){
+  code = String(code||'').trim().toUpperCase();
+  if (!code) return { ok:false, error:'No invite code.' };
+  var v = sh_(SHEET_LEAGUES).getDataRange().getValues();
+  for (var r=1;r<v.length;r++) if (String(v[r][4]||'').toUpperCase()===code)
+    return { ok:true, league:{ id:String(v[r][0]), name:String(v[r][1]), commissioner:String(v[r][2]), members:membersOf(String(v[r][0])).length } };
+  return { ok:false, error:'That invite code doesn\u2019t match any league.' };
+}
+
+function createLeague(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var name = String(body.name||'').trim().slice(0,60); if (!name) return { ok:false, error:'Name your league first.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var id = newId('lg_'), code = inviteCode(), when = new Date().toISOString();
+    sh_(SHEET_LEAGUES).appendRow([id, name, u.handle, when, code]);
+    sh_(SHEET_MEMBERS).appendRow([id, u.handle, when]);
+    return { ok:true, id:id, inviteCode:code };
+  } finally { lock.releaseLock(); }
+}
+
+function joinLeague(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var L = null;
+    if (body.id) L = leagueRow(body.id);
+    else if (body.code){ var r = leagueByInvite(body.code); if (r.ok) L = leagueRow(r.league.id); }
+    if (!L) return { ok:false, error:'League not found.' };
+    if (isMember(L.id, u.handle)) return { ok:true, id:L.id, already:true };
+    sh_(SHEET_MEMBERS).appendRow([L.id, u.handle, new Date().toISOString()]);
+    return { ok:true, id:L.id, name:L.name };
+  } finally { lock.releaseLock(); }
+}
+
+function leaveLeague(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase()===u.handle.toLowerCase()) return { ok:false, error:'The commissioner can\u2019t leave — delete the league or hand it off.' };
+  return removeMemberRow(L.id, u.handle);
+}
+
+function removeMember(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase()!==u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can remove members.' };
+  var target = cleanHandle(body.member);
+  if (target.toLowerCase()===L.commissioner.toLowerCase()) return { ok:false, error:'The commissioner can\u2019t be removed.' };
+  return removeMemberRow(L.id, target);
+}
+
+function removeMemberRow(id, handle){
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = sh_(SHEET_MEMBERS), v = sh.getDataRange().getValues(), k=String(handle).toLowerCase();
+    for (var r=v.length-1;r>=1;r--) if (String(v[r][0])===String(id) && String(v[r][1]).toLowerCase()===k) sh.deleteRow(r+1);
+    return { ok:true };
+  } finally { lock.releaseLock(); }
+}
+
+function renameLeague(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase()!==u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can rename the league.' };
+  var name = String(body.name||'').trim().slice(0,60); if (!name) return { ok:false, error:'Name can\u2019t be empty.' };
+  sh_(SHEET_LEAGUES).getRange(L.row,2).setValue(name);
+  return { ok:true };
+}
+
+/* ---- message board ---- */
+function messagesOf(id){
+  var v = sh_(SHEET_MESSAGES).getDataRange().getValues(), out=[];
+  for (var r=1;r<v.length;r++){
+    if (String(v[r][1])!==String(id)) continue;
+    out.push({ id:String(v[r][0]), handle:String(v[r][2]), name:String(v[r][3]||v[r][2]),
+      body:String(v[r][4]||''), parentId:String(v[r][5]||''), created:String(v[r][6]||'') });
+  }
+  return out;
+}
+function postMessage(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (!isMember(L.id, u.handle)) return { ok:false, error:'Join the league to post.' };
+  var text = String(body.body||'').trim().slice(0,2000); if (!text) return { ok:false, error:'Empty message.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var mid = newId('m_');
+    sh_(SHEET_MESSAGES).appendRow([mid, L.id, u.handle, u.name, text, String(body.parentId||''), new Date().toISOString()]);
+    return { ok:true, id:mid };
+  } finally { lock.releaseLock(); }
+}
+function deleteMessage(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var sh = sh_(SHEET_MESSAGES), v = sh.getDataRange().getValues();
+  for (var r=1;r<v.length;r++){
+    if (String(v[r][0])===String(body.msgId)){
+      var L = leagueRow(String(v[r][1]));
+      var owner = String(v[r][2]).toLowerCase()===u.handle.toLowerCase();
+      var commish = L && L.commissioner.toLowerCase()===u.handle.toLowerCase();
+      if (!owner && !commish) return { ok:false, error:'You can only delete your own posts.' };
+      sh.deleteRow(r+1);
+      return { ok:true };
+    }
+  }
+  return { ok:false, error:'Message not found.' };
 }
 
 /* ---------- JSON helper ----------

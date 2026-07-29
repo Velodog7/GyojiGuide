@@ -147,4 +147,31 @@
     if (!a) return { ok: false, error: "Sign in first." };
     return GG.apiPost({ action: "save", handle: a.handle, name: a.name, auth: a.auth, team: team || {} });
   };
+  GG.saveAvatar = async function (design) {
+    var a = GG.account.get();
+    if (!a) return { ok: false, error: "Sign in first." };
+    return GG.apiPost({ action: "saveAvatar", handle: a.handle, auth: a.auth, avatar: JSON.stringify(design || {}) });
+  };
+
+  /* ---- leagues + message board (all bundle the signed-in auth) ---- */
+  function authed(extra){
+    var a = GG.account.get() || {};
+    var o = { handle: a.handle, auth: a.auth };
+    if (extra) for (var k in extra) o[k] = extra[k];
+    return o;
+  }
+  GG.leagues       = function (handle){ return GG.apiGetQ("leagues", { handle: handle || (GG.account.get()||{}).handle || "" }); };
+  GG.leagueDetail  = function (id){ return GG.apiGetQ("league", { id: id, handle: (GG.account.get()||{}).handle || "" }); };
+  GG.leagueByInvite= function (code){ return GG.apiGetQ("invite", { code: code }); };
+  GG.leagueCreate  = function (name){ return GG.apiPost(authed({ action:"createLeague", name: name })); };
+  GG.leagueJoin    = function (idOrCode){
+    // a 7-char uppercase token is an invite code; anything else is a league id
+    var isCode = /^[A-Z0-9]{5,10}$/.test(String(idOrCode||"")) && String(idOrCode).indexOf("lg_")!==0;
+    return GG.apiPost(authed(isCode ? { action:"joinLeague", code:idOrCode } : { action:"joinLeague", id:idOrCode }));
+  };
+  GG.leagueLeave   = function (id){ return GG.apiPost(authed({ action:"leaveLeague", id: id })); };
+  GG.leagueKick    = function (id, member){ return GG.apiPost(authed({ action:"removeMember", id: id, member: member })); };
+  GG.leagueRename  = function (id, name){ return GG.apiPost(authed({ action:"renameLeague", id: id, name: name })); };
+  GG.msgPost       = function (id, body, parentId){ return GG.apiPost(authed({ action:"postMessage", id: id, body: body, parentId: parentId || "" })); };
+  GG.msgDelete     = function (msgId){ return GG.apiPost(authed({ action:"deleteMessage", msgId: msgId })); };
 })();
