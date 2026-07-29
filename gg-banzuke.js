@@ -48,9 +48,9 @@
   var eastFile = group(rankfile,"E");
 
   /* ---- figure tile ---- */
-  function fig(n, big){
+  function fig(n, big, style){
     var t = tier(n);
-    return '<figure class="ggb-fig'+(big?" ggb-big":"")+' ggb-t'+t+'" title="'+esc(rankLabel(n))+' — '+esc(n)+'">'
+    return '<figure class="ggb-fig'+(big?" ggb-big":"")+' ggb-t'+t+'"'+(style?' style="'+style+'"':'')+' title="'+esc(rankLabel(n))+' — '+esc(n)+'">'
       + '<img src="'+RIK[n].src+'" alt="'+esc(n)+'" loading="lazy" decoding="async">'
       + '<figcaption>'+(RIK[n].k||n)+'</figcaption>'
       + '</figure>';
@@ -58,16 +58,22 @@
   function rankLabel(n){ var t=tier(n), no=num(n); return TIER_ROM[t]+(no?(" "+no):"")+(side(n)==="E"?" E":" W"); }
   function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c];}); }
 
-  // arrange a side's list into an overlapping boustrophedon "snake": each row
-  // overlaps the one above; alternate rows reverse direction so the crowd reads
-  // as a continuous S, like the banzuke-e print.
-  function snake(list, perRow){
-    var out = "";
-    for (var i=0;i<list.length;i+=perRow){
-      var row = list.slice(i, i+perRow);
-      var rev = (i/perRow) % 2 === 1;
-      if (rev) row = row.slice().reverse();
-      out += '<div class="ggb-row'+(rev?" rev":"")+'">'+row.map(function(n){return fig(n);}).join("")+'</div>';
+  // Lay a side's rikishi along a zig-zag path: x swings in a triangle wave as we
+  // descend, so West traces a sideways "W" and East its mirror "M", the apexes of
+  // both pointing at the centre column for symmetry.
+  function triangle(x){ x = x - Math.floor(x); return x < 0.5 ? x * 2 : (1 - x) * 2; }
+  function zigzag(list, isEast){
+    var n = list.length, CYCLES = 2, out = "";
+    var OUT = 7, SPAN = 62;                 // % from the outer edge → toward centre
+    var TOP = 6, BOT = 94;                  // vertical band (% of the column)
+    for (var i=0;i<n;i++){
+      var p = n>1 ? i/(n-1) : 0;
+      var tri = triangle(p * CYCLES);        // 0 at outer edge, 1 at the centre apex
+      var edgePct = OUT + tri * SPAN;        // distance in from the side's outer edge
+      var top = TOP + p * (BOT - TOP);
+      var pos = isEast ? ("right:"+edgePct.toFixed(2)+"%") : ("left:"+edgePct.toFixed(2)+"%");
+      var style = "position:absolute;"+pos+";top:"+top.toFixed(2)+"%;transform:translate("+(isEast?"50%":"-50%")+",-50%);z-index:"+(10+i);
+      out += fig(list[i], false, style);
     }
     return out;
   }
@@ -94,12 +100,12 @@
       +   '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
       + '</div>'
       + '<div class="ggb-body">'
-      +   '<div class="ggb-col ggb-colW">'+snake(westFile, 10)+'</div>'
+      +   '<div class="ggb-col ggb-colW">'+zigzag(westFile, false)+'</div>'
       +   '<div class="ggb-center">'
       +     '<div class="ggb-logo" role="img" aria-label="Gyoji Guide">'+LOGO_SVG+'</div>'
       +     officials()
       +   '</div>'
-      +   '<div class="ggb-col ggb-colE">'+snake(eastFile, 10)+'</div>'
+      +   '<div class="ggb-col ggb-colE">'+zigzag(eastFile, true)+'</div>'
       + '</div>'
       + '</div>';
   }
@@ -122,26 +128,25 @@
   +'.ggb-sanyaku{display:flex;justify-content:center;gap:26px}'
   +'.ggb-san{display:flex;gap:6px}'
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
-  +'.ggb-col{display:flex;flex-direction:column;justify-content:flex-start;padding:0 10px;overflow:hidden}'
-  +'.ggb-row{display:flex;justify-content:space-evenly;width:100%;margin-top:-12px}.ggb-row:first-child{margin-top:2px}'
-  +'.ggb-fig{margin:0;width:var(--fw,50px);text-align:center;position:relative}'
+  +'.ggb-col{position:relative;overflow:visible}'
+  +'.ggb-fig{position:absolute;width:var(--fw,46px);text-align:center}'
   +'.ggb-fig img{width:100%;height:auto;display:block}'
   +'.ggb-fig figcaption{position:absolute;left:50%;bottom:1px;transform:translateX(-50%);'
     +'font-size:8px;font-weight:700;color:#2a1a0e;background:rgba(244,236,216,.9);'
-    +'border-radius:2px;padding:0 3px;white-space:nowrap;max-width:150%;overflow:hidden;text-overflow:ellipsis;z-index:2}'
+    +'border-radius:2px;padding:0 3px;white-space:nowrap;max-width:160%;overflow:hidden;text-overflow:ellipsis;z-index:2}'
   +'.ggb-big{--fw:72px}.ggb-big figcaption{font-size:9px}'
   +'.ggb-tY figcaption{background:#e7d38f}.ggb-tO figcaption{background:#e9c98c}'
   +'.ggb-tS figcaption{background:#e6b8a2}.ggb-tK figcaption{background:#e6c2b0}'
   +'.ggb-center{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;'
-    +'width:clamp(120px,16vw,190px);padding:6px 4px 0;position:relative;z-index:6}'
+    +'width:clamp(220px,30vw,380px);padding:2px 4px 0;position:relative;z-index:6}'
   +'.ggb-logo{width:100%;filter:drop-shadow(0 2px 6px rgba(0,0,0,.55))}'
   +'.ggb-logo svg{width:100%;height:auto;display:block}'
   +'.ggb-officials{display:flex;align-items:flex-end;justify-content:center;gap:8px;margin-top:8px}'
   +'.ggb-off{margin:0;display:flex;flex-direction:column;align-items:center;width:clamp(48px,6vw,72px)}'
   +'.ggb-off img{width:100%;height:auto;display:block}'
   +'.ggb-off figcaption{font-size:10px;font-weight:800;color:#3a2c12;margin-top:1px}'
-  +'@media(max-width:760px){.ggb-fig{--fw:34px;margin-left:-13px}.ggb-big{--fw:46px}.ggb-row{margin-top:-20px}.ggb-fig figcaption{font-size:7px}'
-    +'.ggb-center{width:clamp(96px,20vw,150px)}}'
+  +'@media(max-width:760px){.ggb-fig{--fw:34px}.ggb-big{--fw:46px}.ggb-fig figcaption{font-size:7px}'
+    +'.ggb-center{width:clamp(150px,34vw,240px)}}'
   +'@media(max-width:520px){.ggb-fig figcaption{display:none}.ggb-off figcaption{display:none}}';
 
   function mount(){
