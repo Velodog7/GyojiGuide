@@ -8,6 +8,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
 <style>
+  /* many elements below set their own `display` (flex/grid/etc.) with equal CSS
+     specificity to the browser's built-in [hidden]{display:none} rule, which lets
+     author styles silently override hidden and show elements that JS toggled off.
+     This keeps the hidden attribute authoritative everywhere on the page. */
+  [hidden]{ display:none !important }
   :root{
     --bg:#000; --surface:#181a22; --surface-2:#20232e; --line:#2a2e3a; --line2:#3a4050;
     --ink:#f1f2f6; --dim:#a7adbe; --faint:#6b7180; --muted:#878da0;
@@ -55,13 +60,6 @@
   /* ── signup ─────────────────────────────────────────── */
   .signup{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px;
         align-items:end; margin:0 0 22px }
-  .acct-btns{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:-8px 0 22px }
-  .acct-in{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:0 0 22px;
-        padding:11px 14px; border:1px solid rgba(var(--sun-rgb),.4); border-radius:var(--radius-sm);
-        background:rgba(var(--sun-rgb),.07); font-size:.92rem }
-  .acct-in b{ color:var(--sun) }
-  .acct-in em{ font-style:normal; font-family:"IBM Plex Mono",monospace; font-size:.75rem; color:var(--faint) }
-  .acct-in .btn{ margin-left:auto; padding:8px 14px; font-size:.85rem }
   .acct-badge{ flex:none; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
         font-family:"Zen Kaku Gothic New",serif; font-weight:900; color:#0d0f15; background:var(--sun) }
   .field label{ display:block; font-family:"IBM Plex Mono",monospace; font-size:.62rem;
@@ -303,6 +301,30 @@
   .lg-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin:0 0 14px }
   .lg-head h3{ margin:0; font-size:1.3rem }
   .lg-sub{ color:var(--faint); font-size:.82rem; margin-top:3px }
+
+  .lg-myteam{ border:1px solid var(--line2); border-radius:var(--radius-sm); padding:16px 16px 14px; margin:0 0 22px; background:var(--surface) }
+  .lg-myteam h4{ margin:0 0 4px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun) }
+  .lg-myteam__hint{ margin:0 0 12px; font-size:.82rem; color:var(--dim) }
+  .lg-myteam__hint b{ color:var(--ink) }
+  .lg-slots{ margin:0 0 14px }
+
+  .lg-teams{ margin:0 0 22px }
+  .lg-teams h4{ margin:0 0 10px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun);
+        display:flex; align-items:center; gap:8px }
+  .lg-teams h4 .n{ background:var(--surface-2); color:var(--dim); border-radius:999px; padding:1px 8px; font-size:.7rem; font-family:"IBM Plex Mono",monospace }
+  .lg-team-row{ border:1px solid var(--line); border-radius:12px; padding:11px 14px; margin-bottom:8px; background:var(--surface); cursor:pointer }
+  .lg-team-row:hover{ border-color:var(--sun) }
+  .lg-team-row__top{ display:flex; align-items:center; gap:10px }
+  .lg-team-row__ava{ width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-weight:800;
+        font-size:12px; color:#0d0f15; background:var(--sun); flex:none; overflow:hidden }
+  .lg-team-row__ava svg,.lg-team-row__ava img{ width:100%; height:100%; object-fit:cover }
+  .lg-team-row__name{ font-weight:700; font-size:.9rem }
+  .lg-team-row__you{ font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; color:var(--sun); margin-left:6px }
+  .lg-team-row__h{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.72rem; margin-left:6px }
+  .lg-team-row__score{ margin-left:auto; font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--ink) }
+  .lg-team-row__empty{ color:var(--faint); font-size:.82rem; font-style:italic }
+  .lg-team-expand{ margin-top:10px }
+
   .lg-cols{ display:grid; grid-template-columns:minmax(180px,240px) 1fr; gap:18px }
   @media(max-width:640px){ .lg-cols{ grid-template-columns:1fr } }
   .lg-members h4,.lg-board h4{ margin:0 0 8px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun) }
@@ -362,11 +384,6 @@
   <section class="view on" id="v-team">
     <div class="banner warn" id="apiBanner" hidden></div>
 
-    <div class="acct-in" id="acctIn" hidden>
-      <span class="acct-badge" id="acctBadge">力</span>
-      <span>Signed in as <b id="acctWho"></b> <em id="acctHandle"></em></span>
-      <button class="btn ghost" id="logoutBtn">Sign out</button>
-    </div>
     <div class="signin-cta" id="signinCta">
       <span>Create an account or log in to draft a team, save it, and join the leaderboard.</span>
       <div class="signin-cta__btns">
@@ -438,6 +455,22 @@
             <div class="lg-sub"><span id="lgRole"></span> · <span id="lgCount"></span></div>
           </div>
           <button class="btn ghost sm" id="lgInvite">Copy invite link</button>
+        </div>
+
+        <div class="lg-myteam">
+          <h4>My team in this league</h4>
+          <p class="lg-myteam__hint">Your own roster for <b id="lgTeamLeagueName">this league</b> — separate from your team on other leagues or the main leaderboard.</p>
+          <div class="slots lg-slots" id="lgSlots"></div>
+          <div class="saverow">
+            <button class="btn" id="lgTeamSave">Save team for this league</button>
+            <button class="btn ghost" id="lgTeamClear">Clear picks</button>
+            <span class="status" id="lgTeamStatus"></span>
+          </div>
+        </div>
+
+        <div class="lg-teams">
+          <h4>Teams in this league <span class="n" id="lgTeamsN">0</span></h4>
+          <div id="lgTeamsBoard"></div>
         </div>
 
         <div class="lg-cols">
@@ -522,7 +555,7 @@
     </div>
 
     <div class="mwd-step" id="mwdStep" hidden>
-      <p class="mwd-intro" id="mwdIntro">Design your team's <b>kashō mawashi</b> — this becomes your avatar around the site.</p>
+      <p class="mwd-intro" id="mwdIntro">Design your team's <b>kashō mawashi</b> — your avatar around the site.</p>
       <div id="mwdMount"></div>
       <div class="mwd-stepfoot">
         <a href="#" id="mwdSkip">Skip for now</a>
@@ -667,9 +700,13 @@ function syncTeam(){
 /* ---------- picker modal ---------- */
 const pickModal = $("pickModal"), pickGrid = $("pickGrid");
 let flipT = [];
-function openPicker(bandId){
+function openPicker(bandId, ctx){
+  ctx = ctx || {};
+  const targetTeam = ctx.team || team;
+  const onPick = ctx.onPick || function(){ saveLocal(); closePicker(); paintSlots(); };
   const band = BANDS.find(b=>b.id===bandId);
-  const picked = myPicks(), cur = team[bandId] || "";
+  const picked = new Set(Object.values(targetTeam).filter(Boolean));
+  const cur = targetTeam[bandId] || "";
   const options = eligible(band).filter(n => n===cur || !picked.has(n));
   $("pickSub").textContent = band.label;
   pickGrid.innerHTML = options.map(n =>
@@ -679,7 +716,7 @@ function openPicker(bandId){
         <div class="flip__face flip__front"><div class="pcard filled r-${RK[n].code[0]}">${pcardInner(n,band.label,false)}</div></div>
       </div></button>`).join("");
   pickGrid.querySelectorAll(".flip").forEach(f=>{
-    f.onclick = () => { team[bandId] = f.dataset.name; saveLocal(); closePicker(); paintSlots(); };
+    f.onclick = () => { targetTeam[bandId] = f.dataset.name; closePicker(); onPick(); };
   });
   pickModal.classList.add("open"); document.body.style.overflow="hidden";
   flipT.forEach(clearTimeout); flipT=[];
@@ -716,12 +753,10 @@ function avatarHTML(a){
 }
 function acctUI(){
   const on = !!acct;
-  // top-right buttons
+  // the single account entry point: Sign up / Log in when out, Account chip when in
   $("openLogin").hidden = on; $("openSignup").hidden = on; $("openAccount").hidden = !on;
-  if (on){ $("acctChipName").textContent = acct.name || acct.handle; $("acctAva").innerHTML = avatarHTML(acct); $("acctBadge").innerHTML = avatarHTML(acct); }
-  // my-team strip
-  $("acctIn").hidden = !on; $("signinCta").hidden = on;
-  if (on){ $("acctWho").textContent = acct.name || acct.handle; $("acctHandle").textContent = "@" + acct.handle; }
+  if (on){ $("acctChipName").textContent = acct.name || acct.handle; $("acctAva").innerHTML = avatarHTML(acct); }
+  $("signinCta").hidden = on;
   syncTeam();
 }
 function setAcct(a){
@@ -798,11 +833,11 @@ $("authSubmit").onclick = async () => {
       const key = "fantasy.acct.local." + h.toLowerCase();
       if (localStorage.getItem(key)) { authStatus("That handle already exists on this device — log in instead.", "err"); return; }
       try { localStorage.setItem(key, auth); } catch {}
-      setAcct({ handle:h, name, auth }); authStatus("Account created ✓", "ok"); openMawashiStep("signup"); return;
+      setAcct({ handle:h, name, auth }); authStatus("Account created ✓", "ok"); setTimeout(closeAuth, 700); return;
     }
     try {
       const res = await apiPost({ action:"register", handle:h, name, auth });
-      if (res && res.ok) { setAcct({ handle:h, name, auth }); authStatus("Account created ✓", "ok"); openMawashiStep("signup"); }
+      if (res && res.ok) { setAcct({ handle:h, name, auth }); authStatus("Account created ✓", "ok"); setTimeout(closeAuth, 700); }
       else authStatus(res && res.error ? res.error : "Couldn't create the account.", "err");
     } catch (e) { authStatus("Network error — try again.", "err"); }
   } else {
@@ -825,14 +860,13 @@ $("authSubmit").onclick = async () => {
   }
 };
 
-/* ---- mawashi avatar designer step (shown right after signup, or from Account) ---- */
+/* ---- mawashi avatar designer — reachable only from Account → Edit mawashi avatar ---- */
 let mwdHandle = null;
-function openMawashiStep(mode){
+function openMawashiStep(){
   $("authForm").hidden = true; $("acctView").hidden = true; $("mwdStep").hidden = false;
   authModal.querySelector(".authmodal__panel").classList.add("wide");
-  $("authTitle").textContent = mode === "signup" ? "Design your mawashi" : "Edit your mawashi";
-  $("mwdIntro").style.display = mode === "signup" ? "" : "none";
-  $("mwdSkip").textContent = mode === "signup" ? "Skip for now" : "Cancel";
+  $("authTitle").textContent = "Edit your mawashi";
+  $("mwdSkip").textContent = "Cancel";
   const initial = (acct && acct.avatar) || MawashiDesigner.DEFAULT;
   mwdHandle = MawashiDesigner.mount($("mwdMount"), {
     initial,
@@ -847,12 +881,12 @@ function openMawashiStep(mode){
       }
       setAcct({ ...acct, avatar: design });
       status.textContent = "Saved ✓"; status.className = "status ok";
-      setTimeout(() => { if (mode === "signup") closeAuth(); else openAuth("account"); }, 600);
+      setTimeout(() => openAuth("account"), 600);
     }
   });
-  $("mwdSkip").onclick = (e) => { e.preventDefault(); if (mode === "signup") closeAuth(); else openAuth("account"); };
+  $("mwdSkip").onclick = (e) => { e.preventDefault(); openAuth("account"); };
 }
-$("acctEditAvatar").onclick = () => openMawashiStep("edit");
+$("acctEditAvatar").onclick = () => openMawashiStep();
 
 $("acctSave").onclick = async () => {
   if (!acct) return;
@@ -868,7 +902,6 @@ $("acctSave").onclick = async () => {
   acctViewStatus("Saved ✓", "ok");
 };
 $("acctLogout").onclick = () => { setAcct(null); closeAuth(); };
-$("logoutBtn").onclick = () => { setAcct(null); };
 
 /* ---------- save flow ---------- */
 $("saveBtn").onclick = async () => {
@@ -1034,6 +1067,7 @@ async function loadLeagues(preferId){
   if (!acct){ $("lgLocked").hidden=false; $("lgMain").hidden=true; $("lgN").textContent="0"; return; }
   $("lgLocked").hidden=true; $("lgMain").hidden=false;
   if (!hasAPI()){ $("lgEmpty").hidden=false; $("lgEmpty").innerHTML="<p>Leagues need the shared Sheet API. Deploy the Apps Script and set <code>API_URL</code> to enable leagues, invites, and the message board.</p>"; $("lgPanel").hidden=true; $("lgSwitch").innerHTML=""; $("lgN").textContent="0"; return; }
+  if (!cache.meta || !cache.meta.basho) loadBoard();   // fire off in parallel so league scores have results to work with
   lgStatus("Loading…");
   let res=null; try{ res=await GyojiGuide.leagues(acct.handle); }catch(e){}
   leaguesCache = (res && res.leagues) || [];
@@ -1053,12 +1087,23 @@ function renderSwitch(){
     b.onclick = ()=>{ curLeagueId=b.dataset.lg; renderSwitch(); renderLeague(); };
   });
 }
-function renderLeague(){
+let lgTeam = {};   // in-progress picks for the league currently open in the panel
+
+async function renderLeague(){
   const lg = leaguesCache.find(l=>l.id===curLeagueId);
   if (!lg){ $("lgPanel").hidden=true; return; }
+
+  lgStatus("Loading league…");
+  let d = null; try { d = await GyojiGuide.leagueDetail(lg.id); } catch(e){}
+  if (d && d.ok){ lg.members = d.members || []; lg.messages = d.messages || []; }
+  else { lg.members = Array.isArray(lg.members) ? lg.members : []; lg.messages = lg.messages || []; }
+  lgStatus("");
+
+  if (curLeagueId !== lg.id) return;   // the user switched leagues while this was loading
   $("lgPanel").hidden=false;
   const meCommish = acct && lg.commissioner.toLowerCase()===acct.handle.toLowerCase();
   $("lgName").textContent = lg.name;
+  $("lgTeamLeagueName").textContent = lg.name;
   $("lgRole").textContent = meCommish ? "You're the commissioner" : "Member";
   const members = lg.members || [];
   $("lgCount").textContent = members.length + (members.length===1?" member":" members");
@@ -1075,6 +1120,90 @@ function renderLeague(){
   });
   $("lgLeave").style.display = meCommish ? "none" : "";
   renderMessages(lg.messages || []);
+
+  // my team, scoped to this league
+  const mine = members.find(m => acct && m.handle.toLowerCase()===acct.handle.toLowerCase());
+  lgTeam = { ...(mine && mine.team ? mine.team : {}) };
+  renderLgTeamSlots();
+
+  // every member's team in this league, ranked
+  renderLgTeamsBoard(lg);
+}
+
+function lgTeamCount(){ return new Set(Object.values(lgTeam).filter(Boolean)).size; }
+
+function renderLgTeamSlots(){
+  $("lgSlots").innerHTML = BANDS.map(band=>{
+    const cur = lgTeam[band.id] || "";
+    if (!cur) return `<div class="pcard empty" data-band="${band.id}" role="button" tabindex="0">
+        <div class="pc-empty"><b>${band.label}</b>Empty<span class="cta">Tap to draft →</span></div></div>`;
+    return `<div class="pcard filled r-${RK[cur].code[0]}" data-band="${band.id}" role="button" tabindex="0">${pcardInner(cur,band.label)}</div>`;
+  }).join("");
+  $("lgSlots").querySelectorAll(".pcard").forEach(card=>{
+    const open = () => openPicker(card.dataset.band, { team: lgTeam, onPick: renderLgTeamSlots });
+    card.onclick = open;
+    card.onkeydown = e => { if (e.key==="Enter"||e.key===" ") { e.preventDefault(); open(); } };
+  });
+  $("lgSlots").querySelectorAll(".pc-x").forEach(x=>{
+    x.onclick = e => { e.stopPropagation(); delete lgTeam[x.closest(".pcard").dataset.band]; renderLgTeamSlots(); };
+  });
+  $("lgTeamSave").disabled = lgTeamCount() !== 7;
+  $("lgTeamSave").title = lgTeamCount()===7 ? "" : "Draft all seven bands first";
+}
+$("lgTeamClear").onclick = () => { if (confirm("Clear your picks for this league?")) { lgTeam = {}; renderLgTeamSlots(); } };
+$("lgTeamSave").onclick = async () => {
+  if (lgTeamCount() !== 7 || !curLeagueId) return;
+  lgStatus2("Saving…");
+  const r = await GyojiGuide.saveLeagueTeam(curLeagueId, lgTeam);
+  if (r && r.ok) {
+    lgStatus2("Saved ✓","ok");
+    const lg = leaguesCache.find(l=>l.id===curLeagueId);
+    if (lg){
+      const mine = (lg.members||[]).find(m=>acct && m.handle.toLowerCase()===acct.handle.toLowerCase());
+      if (mine) mine.team = { ...lgTeam };
+      renderLgTeamsBoard(lg);
+    }
+  } else lgStatus2((r&&r.error)||"Couldn't save.","err");
+};
+function lgStatus2(msg, cls){ const s=$("lgTeamStatus"); s.textContent=msg||""; s.className="status"+(cls?" "+cls:""); }
+
+function renderLgTeamsBoard(lg){
+  const members = lg.members || [];
+  const model = scoreModel({ results: cache.results, meta: cache.meta });
+  const withScore = members.map(m=>{
+    const t = m.team || {};
+    const drafted = Object.values(t).filter(Boolean).length === 7;
+    const s = drafted ? teamScore(t, model) : { pts:0, rows:[] };
+    return { ...m, drafted, ...s };
+  }).sort((a,b)=> (b.drafted?b.pts:-1) - (a.drafted?a.pts:-1));
+  $("lgTeamsN").textContent = members.length;
+  $("lgTeamsBoard").innerHTML = withScore.map(m=>{
+    const you = acct && m.handle.toLowerCase()===acct.handle.toLowerCase();
+    const ava = (you ? avatarHTML(acct) : (m.avatar ? avatarHTML(m) : esc(initials(m.name))));
+    if (!m.drafted) {
+      return `<div class="lg-team-row" data-h="${esc(m.handle)}">
+        <div class="lg-team-row__top">
+          <span class="lg-team-row__ava">${ava}</span>
+          <span class="lg-team-row__name">${esc(m.name)}${you?`<span class="lg-team-row__you">You</span>`:""}<span class="lg-team-row__h">@${esc(m.handle)}</span></span>
+        </div>
+        <div class="lg-team-row__empty">${you ? "Draft your seven above to join the standings." : "Hasn't drafted a team for this league yet."}</div>
+      </div>`;
+    }
+    return `<div class="lg-team-row" data-h="${esc(m.handle)}">
+      <div class="lg-team-row__top">
+        <span class="lg-team-row__ava">${ava}</span>
+        <span class="lg-team-row__name">${esc(m.name)}${you?`<span class="lg-team-row__you">You</span>`:""}<span class="lg-team-row__h">@${esc(m.handle)}</span></span>
+        <span class="lg-team-row__score">${m.pts} pts</span>
+      </div>
+      <div class="lg-team-expand" hidden>${expandCards(m.team||{}, m.rows)}</div>
+    </div>`;
+  }).join("") || `<p class="empty-lb">No members yet.</p>`;
+  $("lgTeamsBoard").querySelectorAll(".lg-team-row").forEach(row=>{
+    const ex = row.querySelector(".lg-team-expand");
+    if (!ex) return;
+    row.style.cursor = "pointer";
+    row.onclick = () => { ex.hidden = !ex.hidden; };
+  });
 }
 function threadHTML(msgs, parentId){
   return msgs.filter(m=>(m.parentId||"")===parentId).map(m=>{
@@ -1099,7 +1228,7 @@ function renderMessages(msgs){
       inp.focus();
       snd.onclick = async ()=>{ const t=inp.value.trim(); if(!t) return; snd.disabled=true;
         const r=await GyojiGuide.msgPost(curLeagueId, t, btn.dataset.reply);
-        if (r&&r.ok){ const d=await GyojiGuide.leagueDetail(curLeagueId); const lg=leaguesCache.find(l=>l.id===curLeagueId); if(lg&&d&&d.league) lg.messages=d.messages; renderLeague(); }
+        if (r&&r.ok){ renderLeague(); }
         else { snd.disabled=false; alert((r&&r.error)||"Couldn't post."); } };
     };
   });
@@ -1121,7 +1250,7 @@ $("lgMsgSend").onclick = async ()=>{
   $("lgMsgSend").disabled=true;
   const r=await GyojiGuide.msgPost(curLeagueId, t);
   $("lgMsgSend").disabled=false;
-  if (r&&r.ok){ $("lgMsgInput").value=""; const d=await GyojiGuide.leagueDetail(curLeagueId); const lg=leaguesCache.find(l=>l.id===curLeagueId); if(lg&&d&&d.league) lg.messages=d.messages; renderLeague(); }
+  if (r&&r.ok){ $("lgMsgInput").value=""; renderLeague(); }
   else lgStatus((r&&r.error)||"Couldn't post.","err");
 };
 $("lgInvite").onclick = async ()=>{
