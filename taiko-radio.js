@@ -32,6 +32,24 @@
   var THIS = document.currentScript;
   var SAMPLE_BASE = (THIS && THIS.dataset && THIS.dataset.samples) || "samples/";
 
+  // a fresh, silly title for whichever song is currently playing — one is
+  // picked at random each time a NEW song starts, and carried along with
+  // the saved progress so a song keeps its name if it continues onto the
+  // next page (see PROG_KEY below).
+  var SONG_TITLES = [
+    "There Shikos", "Nodowa bites the dust", "Dohyo inferno", "Chanko Boogie", "Heya Jude",
+    "Don't Worry, Be Abi", "Tsupari all the time", "Hotel Kotozakura", "Shishi's a Lady",
+    "Shishi's My Cherry Pie", "Call me Abi", "Surfin' JSA", "Abi Road", "Basho Man",
+    "Gyoji on my mind", "My Shikona", "Tachiai on the Wild Side", "Sweet Dreams (are Utcharis)",
+    "Hey Now, Ura Allstar", "Bey Ya", "Every Breath you Takayasu", "Papayasu don't preach",
+    "Don't Go Henka My Heart", "Rock the Basho", "Holding Out For A Yusho", "Walk Like an Ozeki",
+    "Onosato-day Night", "Oyakata said knock you out", "Pour Some Chanko On Me", "I'm too Seki(tori)",
+    "Makuuchi Girl", "Eye of the Tobizaru", "It's Raining Salt", "Gyoji Just Want To Have Fun",
+    "Oops!… I Henka'd Again", "Gyoji in a Bottle", "Dock of the Beya", "Harite Tonight",
+    "We Are The Shinpans", "Easy Like Sandanme Morning", "Welcome To The Chanko"
+  ];
+  function randomTitle(){ return SONG_TITLES[Math.floor(Math.random() * SONG_TITLES.length)]; }
+
   var SAMPLES = [{"name":"Deep Boom A","file":"samples/deep-boom-a.mp3"},{"name":"Deep Boom B","file":"samples/deep-boom-b.mp3"},{"name":"Deep Boom C","file":"samples/deep-boom-c.mp3"},{"name":"Deep Boom D","file":"samples/deep-boom-d.mp3"},{"name":"Big Hit A","file":"samples/big-hit-a.mp3"},{"name":"Big Hit B","file":"samples/big-hit-b.mp3"},{"name":"Big Hit C","file":"samples/big-hit-c.mp3"},{"name":"Big Hit D","file":"samples/big-hit-d.mp3"},{"name":"Big Hit E","file":"samples/big-hit-e.mp3"},{"name":"Big Hit F","file":"samples/big-hit-f.mp3"},{"name":"Big Hit G","file":"samples/big-hit-g.mp3"},{"name":"Big Hit H","file":"samples/big-hit-h.mp3"},{"name":"Big Hit I","file":"samples/big-hit-i.mp3"},{"name":"Mid Hit A","file":"samples/mid-hit-a.mp3"},{"name":"Mid Hit B","file":"samples/mid-hit-b.mp3"},{"name":"Mid Hit C","file":"samples/mid-hit-c.mp3"},{"name":"Mid Hit D","file":"samples/mid-hit-d.mp3"},{"name":"Mid Hit E","file":"samples/mid-hit-e.mp3"},{"name":"Mid Hit F","file":"samples/mid-hit-f.mp3"},{"name":"Mid Hit G","file":"samples/mid-hit-g.mp3"},{"name":"Mid Hit H","file":"samples/mid-hit-h.mp3"},{"name":"Drum 4a","file":"samples/drum-4a.mp3"},{"name":"Drum 4b","file":"samples/drum-4b.mp3"},{"name":"Drum 4c","file":"samples/drum-4c.mp3"},{"name":"Drum 4d","file":"samples/drum-4d.mp3"},{"name":"Drum 4e","file":"samples/drum-4e.mp3"},{"name":"Drum 5a","file":"samples/drum-5a.mp3"},{"name":"Drum 5b","file":"samples/drum-5b.mp3"},{"name":"Drum 5c","file":"samples/drum-5c.mp3"},{"name":"Drum 5d","file":"samples/drum-5d.mp3"},{"name":"Drum 6a","file":"samples/drum-6a.mp3"},{"name":"Drum 6b","file":"samples/drum-6b.mp3"},{"name":"Drum 6c","file":"samples/drum-6c.mp3"},{"name":"Drum 6d","file":"samples/drum-6d.mp3"},{"name":"Drum 6e","file":"samples/drum-6e.mp3"},{"name":"Taiko Forte 1","file":"samples/taiko-forte-1.mp3"},{"name":"Taiko Forte 2","file":"samples/taiko-forte-2.mp3"},{"name":"Taiko Mezzo","file":"samples/taiko-mezzo.mp3"},{"name":"Taiko Piano","file":"samples/taiko-piano.mp3"},{"name":"Taiko C5","file":"samples/taiko-c5.mp3"},{"name":"Quick Hit A","file":"samples/quick-hit-a.mp3"},{"name":"Quick Hit B","file":"samples/quick-hit-b.mp3"},{"name":"Quick Hit C","file":"samples/quick-hit-c.mp3"},{"name":"Crash A","file":"samples/crash-a.mp3"},{"name":"Crash B","file":"samples/crash-b.mp3"},{"name":"Crash C","file":"samples/crash-c.mp3"},{"name":"Crash D","file":"samples/crash-d.mp3"},{"name":"Crash E","file":"samples/crash-e.mp3"},{"name":"Sticks A","file":"samples/sticks-a.mp3"},{"name":"Sticks B","file":"samples/sticks-b.mp3"},{"name":"Sticks C","file":"samples/sticks-c.mp3"},{"name":"Sticks D","file":"samples/sticks-d.mp3"},{"name":"Sticks E","file":"samples/sticks-e.mp3"},{"name":"Sticks F","file":"samples/sticks-f.mp3"},{"name":"Sticks G","file":"samples/sticks-g.mp3"},{"name":"Lt Sticks A","file":"samples/lt-sticks-a.mp3"},{"name":"Lt Sticks B","file":"samples/lt-sticks-b.mp3"},{"name":"Lt Sticks C","file":"samples/lt-sticks-c.mp3"},{"name":"Lt Sticks D","file":"samples/lt-sticks-d.mp3"},{"name":"Lt Sticks E","file":"samples/lt-sticks-e.mp3"}];
   function sampleFile(idx) { return (SAMPLES[idx].file || "").replace(/^samples\//, SAMPLE_BASE); }
 
@@ -195,7 +213,7 @@
     var elapsedMs = playing ? (performance.now() - songT0) : (curElapsedMs || 0);
     try {
       localStorage.setItem(PROG_KEY, JSON.stringify({
-        song: song, radioIndex: radioIndex, elapsedMs: elapsedMs, savedAt: Date.now()
+        song: song, radioIndex: radioIndex, elapsedMs: elapsedMs, savedAt: Date.now(), songTitle: songTitle
       }));
     } catch (e) {}
   }
@@ -206,9 +224,10 @@
     if (!saved || !saved.song || !saved.song.sections || !saved.savedAt) return null;
     if (Date.now() - saved.savedAt > 30000) return null;          // stale — start fresh instead
     var carried = Date.now() - saved.savedAt;                     // keep the song moving through the gap itself
-    return { song: saved.song, radioIndex: saved.radioIndex || 0, resumeMs: Math.max(0, (saved.elapsedMs||0) + carried) };
+    return { song: saved.song, radioIndex: saved.radioIndex || 0, resumeMs: Math.max(0, (saved.elapsedMs||0) + carried), songTitle: saved.songTitle || randomTitle() };
   }
   var curElapsedMs = 0;                                            // last known position, kept fresh even while paused
+  var songTitle = "";                                              // this song's silly title, picked once when it starts
 
   function scheduleStep(s, time) {
     var beat = false;
@@ -263,11 +282,12 @@
     playing = true; setState("playing");
     stepIdx = 0; nextT = AC.currentTime + 0.08; songT0 = performance.now() - resumeMs;
     startEq(); scheduleSong(resumeMs); stepLoop();
+    if (nameEl) { nameEl.textContent = songTitle || "Taiko Radio"; nameEl.title = songTitle || "Taiko Radio"; }
     saveProgress();
   }
   function resumeSong(saved) {
     ensureCtx();
-    song = saved.song; radioIndex = saved.radioIndex;
+    song = saved.song; radioIndex = saved.radioIndex; songTitle = saved.songTitle || randomTitle();
     if (subEl) subEl.textContent = "loading…";
     var need = song.voices.map(function (v){ return v.idx; }).concat([song.crashIdx]);
     return loadBuffers(need).then(function () {
@@ -277,7 +297,7 @@
   }
   function nextSong() {
     ensureCtx();
-    song = generateSong(radioIndex++);
+    song = generateSong(radioIndex++); songTitle = randomTitle();
     if (subEl) subEl.textContent = "loading…";
     var need = song.voices.map(function (v){ return v.idx; }).concat([song.crashIdx]);
     return loadBuffers(need).then(function () {
@@ -365,7 +385,7 @@
       ".tkr-eq i{width:3px;background:#6b5a4c;border-radius:2px;height:5px;transition:height .1s ease,background .1s ease}" +
       ".tkr[data-state='playing'] .tkr-eq i{background:#ff6a4d}" +
       ".tkr-meta{min-width:0;display:flex;flex-direction:column;line-height:1.15;margin-right:2px}" +
-      ".tkr-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}" +
+      ".tkr-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px}" +
       ".tkr-sub{font-size:10px;color:#a8998c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}" +
       ".tkr-ico{flex:none;width:30px;height:30px;border-radius:50%;font-size:15px;color:#d8c8ba}" +
       ".tkr-ico:hover{background:rgba(255,255,255,.08);color:#fff}" +
@@ -374,7 +394,7 @@
       ".tkr-vol::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:#e6b453;cursor:pointer}" +
       ".tkr-make{flex:none;width:30px;height:30px;border-radius:50%;font-size:16px;color:#e6b453;text-decoration:none}" +
       ".tkr-make:hover{background:rgba(230,180,83,.16)}" +
-      "@media (max-width:640px){.tkr-vol{display:none}.tkr-name{max-width:100px}.tkr-sub{max-width:100px}}";
+      "@media (max-width:640px){.tkr-vol{display:none}.tkr-name{max-width:130px}.tkr-sub{max-width:100px}}";
     document.head.appendChild(css);
 
     bar = document.createElement("div");

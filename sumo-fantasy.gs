@@ -46,6 +46,9 @@ var SHEET_MEMBERS  = 'LeagueMembers';
 var SHEET_MESSAGES = 'Messages';
 var SHEET_LGTEAMS  = 'LeagueTeams';
 var SHEET_HISTORY   = 'TeamHistory';
+var SHEET_ROSTERS  = 'KeeperRosters';
+var SHEET_PICKS    = 'DraftPicks';
+var SHEET_TRADES   = 'Trades';
 
 // Label for the current tournament (shown in the app).
 var BASHO_LABEL   = 'Aki 2026';
@@ -57,11 +60,16 @@ function setup() {
   migrateUsersV1(users);                       // upgrades a v1 sheet (no auth column) in place
   migrateUsersV2(users);                       // upgrades a v1/v2 sheet (no avatar column) in place
   ensureSheet(ss, SHEET_RESULTS, ['day', 'division', 'east', 'west', 'winner', 'kimarite']);
-  ensureSheet(ss, SHEET_LEAGUES, ['id', 'name', 'commissioner', 'created', 'inviteCode']);
+  var leagues = ensureSheet(ss, SHEET_LEAGUES, ['id', 'name', 'commissioner', 'created', 'inviteCode',
+    'mode', 'rosterSize', 'draftStatus', 'draftOrder', 'draftPickIdx', 'draftPhase']);
+  migrateLeaguesV2(leagues);   // upgrades an older Leagues sheet (no keeper columns) in place
   ensureSheet(ss, SHEET_MEMBERS, ['leagueId', 'handle', 'joined']);
   ensureSheet(ss, SHEET_MESSAGES, ['id', 'leagueId', 'handle', 'name', 'body', 'parentId', 'created']);
   ensureSheet(ss, SHEET_LGTEAMS, ['leagueId', 'handle', 'team', 'updated']);
   ensureSheet(ss, SHEET_HISTORY, ['handle', 'basho', 'team', 'score', 'wins', 'rows', 'savedAt']);
+  ensureSheet(ss, SHEET_ROSTERS, ['leagueId', 'handle', 'rikishi', 'division', 'acquiredVia', 'acquiredAt']);
+  ensureSheet(ss, SHEET_PICKS, ['leagueId', 'pickIndex', 'round', 'phase', 'handle', 'rikishi', 'pickedAt']);
+  ensureSheet(ss, SHEET_TRADES, ['id', 'leagueId', 'fromHandle', 'toHandle', 'offer', 'request', 'status', 'createdAt', 'resolvedAt']);
   var meta = ensureSheet(ss, SHEET_META, ['key', 'value']);
   if (meta.getLastRow() < 2) {
     meta.appendRow(['basho', BASHO_LABEL]);
@@ -99,6 +107,17 @@ function migrateUsersV2(sh) {
   }
 }
 
+// pre-Keepers Leagues sheets had only [id,name,commissioner,created,inviteCode].
+// Append the draft/keeper columns if missing; existing (Classic) leagues just
+// get blank cells, which mode-aware code below treats as mode:'classic'.
+function migrateLeaguesV2(sh) {
+  var lastCol = Math.max(5, sh.getLastColumn());
+  var head = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  if (String(head[5] || '').toLowerCase() !== 'mode') {
+    sh.getRange(1, 6, 1, 6).setValues([['mode', 'rosterSize', 'draftStatus', 'draftOrder', 'draftPickIdx', 'draftPhase']]);
+  }
+}
+
 /* ---------- GET: hand back leaderboard data ---------- */
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'data';
@@ -109,6 +128,8 @@ function doGet(e) {
     if (action === 'league')  return json(leagueDetail(e.parameter.id, e.parameter.handle));
     if (action === 'invite')  return json(leagueByInvite(e.parameter.code));
     if (action === 'history') return json({ ok: true, history: myHistory(e.parameter.handle) });
+    if (action === 'draftState') return json(draftState(e.parameter.id));
+    if (action === 'trades')  return json({ ok: true, trades: myTrades(e.parameter.id, e.parameter.handle) });
     return json({ ok: true, users: readUsers(), results: readResults(), meta: readMeta() });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -129,6 +150,12 @@ function doPost(e) {
     if (body.action === 'removeMember') return json(removeMember(body));
     if (body.action === 'renameLeague') return json(renameLeague(body));
     if (body.action === 'postMessage')  return json(postMessage(body));
+    if (body.action === 'setLeagueMode') return json(setLeagueMode(body));
+    if (body.action === 'startDraft')    return json(startDraft(body));
+    if (body.action === 'makePick')      return json(makePick(body));
+    if (body.action === 'proposeTrade')  return json(proposeTrade(body));
+    if (body.action === 'respondTrade')  return json(respondTrade(body));
+    if (body.action === 'addDrop')       return json(addDrop(body));
     if (body.action === 'deleteMessage')return json(deleteMessage(body));
     if (body.action === 'saveLeagueTeam') return json(saveLeagueTeam(body));
     if (body.action === 'archiveTeam') return json(archiveTeam(body));
@@ -314,7 +341,15 @@ function inviteCode(){
 
 function leagueRow(id){
   var v = sh_(SHEET_LEAGUES).getDataRange().getValues();
-  for (var r=1;r<v.length;r++) if (String(v[r][0])===String(id)) return { row:r+1, id:String(v[r][0]), name:String(v[r][1]), commissioner:String(v[r][2]), created:String(v[r][3]), inviteCode:String(v[r][4]||'') };
+  for (var r=1;r<v.length;r++) if (String(v[r][0])===String(id)) return {
+    row:r+1, id:String(v[r][0]), name:String(v[r][1]), commissioner:String(v[r][2]), created:String(v[r][3]), inviteCode:String(v[r][4]||''),
+    mode: String(v[r][5]||'classic') || 'classic',
+    rosterSize: Number(v[r][6]||6) || 6,
+    draftStatus: String(v[r][7]||'none') || 'none',
+    draftOrder: (function(){ try { return JSON.parse(v[r][8]||'[]'); } catch(e){ return []; } })(),
+    draftPickIdx: Number(v[r][9]||0) || 0,
+    draftPhase: String(v[r][10]||'')
+  };
   return null;
 }
 function membersOf(id){
@@ -338,6 +373,7 @@ function myLeagues(handle){
     var id=String(lv[i][0]); if (!mine[id]) continue;
     out.push({ id:id, name:String(lv[i][1]), commissioner:String(lv[i][2]),
       inviteCode:String(lv[i][4]||''), members:membersOf(id).length,
+      mode:String(lv[i][5]||'classic') || 'classic', draftStatus:String(lv[i][7]||'none') || 'none',
       isCommissioner: String(lv[i][2]).toLowerCase()===k });
   }
   return { ok:true, leagues:out };
@@ -362,12 +398,16 @@ function leagueDetail(id, handle){
   var users = readUsers(), byh={};
   users.forEach(function(u){ byh[u.handle.toLowerCase()] = u.name; });
   var teams = leagueTeamsOf(id);
+  var rosters = L.mode === 'keepers' ? keeperRostersOf(id) : {};
   var mem = members.map(function(h){
     var t = teams[h.toLowerCase()];
-    return { handle:h, name: byh[h.toLowerCase()] || h, team: t ? t.team : {}, teamUpdated: t ? t.updated : '' };
+    var ros = rosters[h.toLowerCase()] || { makuuchi:[], juryo:[] };
+    return { handle:h, name: byh[h.toLowerCase()] || h, team: t ? t.team : {}, teamUpdated: t ? t.updated : '',
+      roster: ros };
   });
   var msgs = messagesOf(id);
   return { ok:true, league:{ id:L.id, name:L.name, commissioner:L.commissioner, inviteCode:L.inviteCode,
+    mode:L.mode, rosterSize:L.rosterSize, draftStatus:L.draftStatus,
     isCommissioner: handle && L.commissioner.toLowerCase()===handle.toLowerCase(),
     isMember: handle ? isMember(id, handle) : false },
     members:mem, messages:msgs };
@@ -498,6 +538,228 @@ function saveLeagueTeam(body){
     }
     sh.appendRow([L.id, u.handle, teamJson, new Date().toISOString()]);
     return { ok:true, created:true };
+  } finally { lock.releaseLock(); }
+}
+
+/* ============================================================
+   KEEPERS · SNAKE DRAFT · ROSTERS · TRADES · WAIVERS
+   ------------------------------------------------------------
+   A league is either 'classic' (repick from scratch each basho,
+   duplicates across players allowed — the original mode above) or
+   'keepers' (one persistent roster, kept basho after basho, built via
+   a one-time snake draft where every rikishi can only be owned by one
+   member of the league at a time).
+
+   Ownership is a flat ledger in KeeperRosters: one row per owned
+   rikishi. The draft itself is turn-based and stateless between
+   requests — whose turn it is is always recomputed from
+   (draftOrder, rosterSize, draftPickIdx), never trusted from the
+   client, so concurrent requests can't desync it.
+
+   NOTE ON VALIDATION: like the rest of this file, this is game-grade
+   protection for friends, not a hardened server — picks/trades/waivers
+   are checked for the things that actually matter (won't double-own a
+   rikishi, must be your turn, must own what you're trading away) but
+   the client — not this file — is trusted to only ever offer rikishi
+   from the correct division (Makuuchi vs Juryo) in its own UI.
+   ============================================================ */
+
+var MAKUUCHI_POOL = 42, JURYO_POOL = 28;   // approximate banzuke sizes, used only to cap roster size
+
+function tournamentActive(){
+  var meta = readMeta();
+  var results = readResults();
+  return results.length > 0 && Number(meta.lastDay || 0) < 15;
+}
+
+// whose turn is it, given the draft order, roster size (per division), and
+// a single pick counter that runs across BOTH phases (Makuuchi then Juryo)
+function draftTurn(order, rosterSize, pickIdx){
+  var N = order.length, R = Number(rosterSize) || 6;
+  var perPhase = N * R, total = perPhase * 2;
+  if (!N || pickIdx >= total) return { phase:'done', handle:null };
+  var phase = pickIdx < perPhase ? 'makuuchi' : 'juryo';
+  var local = pickIdx < perPhase ? pickIdx : pickIdx - perPhase;
+  var round = Math.floor(local / N), pos = local % N;
+  var handle = (round % 2 === 0) ? order[pos] : order[N - 1 - pos];
+  return { phase:phase, handle:handle, round:round+1, pickInRound:pos+1, perPhase:perPhase, total:total, pickIdx:pickIdx };
+}
+
+function setLeagueMode(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can change the league mode.' };
+  if (L.draftStatus === 'active' || L.draftStatus === 'complete') return { ok:false, error:'Mode is locked once a draft has started.' };
+  var mode = (body.mode === 'keepers') ? 'keepers' : 'classic';
+  var rosterSize = Math.max(5, Math.min(10, Number(body.rosterSize) || 6));
+  sh_(SHEET_LEAGUES).getRange(L.row, 6, 1, 2).setValues([[mode, rosterSize]]);
+  return { ok:true, mode:mode, rosterSize:rosterSize };
+}
+
+function startDraft(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can start the draft.' };
+  if (L.mode !== 'keepers') return { ok:false, error:'Switch the league to Keepers mode first.' };
+  if (L.draftStatus === 'active') return { ok:false, error:'The draft is already underway.' };
+  if (L.draftStatus === 'complete') return { ok:false, error:'This league has already drafted.' };
+  var members = membersOf(L.id);
+  if (members.length < 2) return { ok:false, error:'Need at least two members to draft.' };
+  var maxByPool = Math.floor(Math.min(MAKUUCHI_POOL, JURYO_POOL) / members.length);
+  var rosterSize = Math.max(5, Math.min(10, L.rosterSize || 6, maxByPool || 10));
+  var order = members.slice();
+  for (var i = order.length - 1; i > 0; i--) {           // Fisher–Yates shuffle
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = order[i]; order[i] = order[j]; order[j] = t;
+  }
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    sh_(SHEET_LEAGUES).getRange(L.row, 6, 1, 6).setValues([[
+      'keepers', rosterSize, 'active', JSON.stringify(order), 0, 'makuuchi'
+    ]]);
+    return { ok:true, order:order, rosterSize:rosterSize };
+  } finally { lock.releaseLock(); }
+}
+
+function draftPicksOf(id){
+  var v = sh_(SHEET_PICKS).getDataRange().getValues(), out = [];
+  for (var r=1;r<v.length;r++){
+    if (String(v[r][0]) !== String(id)) continue;
+    out.push({ pickIndex:Number(v[r][1]), round:Number(v[r][2]), phase:String(v[r][3]),
+      handle:String(v[r][4]), rikishi:String(v[r][5]), pickedAt:String(v[r][6]||'') });
+  }
+  out.sort(function(a,b){ return a.pickIndex - b.pickIndex; });
+  return out;
+}
+
+function draftState(id){
+  var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
+  var picks = draftPicksOf(L.id);
+  var turn = L.draftStatus === 'active' ? draftTurn(L.draftOrder, L.rosterSize, L.draftPickIdx) : { phase:L.draftStatus==='complete'?'done':'none' };
+  return { ok:true, league:{ id:L.id, mode:L.mode, rosterSize:L.rosterSize, draftStatus:L.draftStatus, draftOrder:L.draftOrder },
+    picks:picks, turn:turn, pickedNames:picks.map(function(p){ return p.rikishi; }) };
+}
+
+function makePick(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.draftStatus !== 'active') return { ok:false, error:'The draft isn\u2019t running.' };
+  if (!isMember(L.id, u.handle)) return { ok:false, error:'You\u2019re not in this league.' };
+  var rikishi = String(body.rikishi || '').trim();
+  if (!rikishi) return { ok:false, error:'No wrestler given.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    // re-read fresh inside the lock — another pick may have landed since the client last polled
+    L = leagueRow(body.id);
+    var turn = draftTurn(L.draftOrder, L.rosterSize, L.draftPickIdx);
+    if (turn.phase === 'done') return { ok:false, error:'The draft is already complete.' };
+    if (!turn.handle || turn.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'It\u2019s not your turn.' };
+    var already = draftPicksOf(L.id).some(function(p){ return p.rikishi.toLowerCase() === rikishi.toLowerCase(); });
+    if (already) return { ok:false, error: rikishi + ' has already been drafted in this league.' };
+
+    var now = new Date().toISOString();
+    sh_(SHEET_PICKS).appendRow([L.id, L.draftPickIdx, turn.round, turn.phase, u.handle, rikishi, now]);
+    sh_(SHEET_ROSTERS).appendRow([L.id, u.handle, rikishi, turn.phase, 'draft', now]);
+
+    var nextIdx = L.draftPickIdx + 1;
+    var nextTurn = draftTurn(L.draftOrder, L.rosterSize, nextIdx);
+    var status = nextTurn.phase === 'done' ? 'complete' : 'active';
+    sh_(SHEET_LEAGUES).getRange(L.row, 8, 1, 3).setValues([[status, nextIdx, nextTurn.phase]]);
+    return { ok:true, nextTurn:nextTurn, draftStatus:status };
+  } finally { lock.releaseLock(); }
+}
+
+function keeperRostersOf(id){
+  var v = sh_(SHEET_ROSTERS).getDataRange().getValues(), out = {};
+  for (var r=1;r<v.length;r++){
+    if (String(v[r][0]) !== String(id)) continue;
+    var h = String(v[r][1]||''); if (!h) continue;
+    var key = h.toLowerCase();
+    if (!out[key]) out[key] = { makuuchi:[], juryo:[] };
+    var div = String(v[r][3]||'').toLowerCase() === 'juryo' ? 'juryo' : 'makuuchi';
+    out[key][div].push(String(v[r][2]));
+  }
+  return out;
+}
+function whoOwns(id, rikishi){
+  var v = sh_(SHEET_ROSTERS).getDataRange().getValues(), key = rikishi.toLowerCase();
+  for (var r=1;r<v.length;r++) if (String(v[r][0])===String(id) && String(v[r][2]).toLowerCase()===key) return { row:r+1, handle:String(v[r][1]), division:String(v[r][3]) };
+  return null;
+}
+
+/* ---- trades (between-tournament only) ---- */
+function myTrades(id, handle){
+  handle = cleanHandle(handle);
+  var v = sh_(SHEET_TRADES).getDataRange().getValues(), out = [], k = handle.toLowerCase();
+  for (var r=1;r<v.length;r++){
+    if (String(v[r][1]) !== String(id)) continue;
+    if (String(v[r][2]).toLowerCase() !== k && String(v[r][3]).toLowerCase() !== k) continue;
+    var offer=[], request=[]; try { offer=JSON.parse(v[r][4]||'[]'); } catch(e){} try { request=JSON.parse(v[r][5]||'[]'); } catch(e){}
+    out.push({ id:String(v[r][0]), fromHandle:String(v[r][2]), toHandle:String(v[r][3]), offer:offer, request:request,
+      status:String(v[r][6]), createdAt:String(v[r][7]||'') });
+  }
+  return out;
+}
+function proposeTrade(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.mode !== 'keepers' || L.draftStatus !== 'complete') return { ok:false, error:'Trades are only available after the keeper draft.' };
+  if (tournamentActive()) return { ok:false, error:'Trades are closed once the tournament starts.' };
+  var toHandle = cleanHandle(body.toHandle);
+  if (!toHandle || !isMember(L.id, toHandle)) return { ok:false, error:'That player isn\u2019t in this league.' };
+  var offer = Array.isArray(body.offer) ? body.offer : [];
+  var request = Array.isArray(body.request) ? body.request : [];
+  if (!offer.length && !request.length) return { ok:false, error:'Offer at least one wrestler.' };
+  for (var i=0;i<offer.length;i++){ var o = whoOwns(L.id, offer[i]); if (!o || o.handle.toLowerCase()!==u.handle.toLowerCase()) return { ok:false, error:'You don\u2019t own ' + offer[i] + '.' }; }
+  for (var j=0;j<request.length;j++){ var w = whoOwns(L.id, request[j]); if (!w || w.handle.toLowerCase()!==toHandle.toLowerCase()) return { ok:false, error: toHandle + ' doesn\u2019t own ' + request[j] + '.' }; }
+  var id = newId('tr_'), now = new Date().toISOString();
+  sh_(SHEET_TRADES).appendRow([id, L.id, u.handle, toHandle, JSON.stringify(offer), JSON.stringify(request), 'pending', now, '']);
+  return { ok:true, id:id };
+}
+function respondTrade(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var sh = sh_(SHEET_TRADES), v = sh.getDataRange().getValues();
+  for (var r=1;r<v.length;r++){
+    if (String(v[r][0]) !== String(body.tradeId)) continue;
+    if (String(v[r][6]) !== 'pending') return { ok:false, error:'That trade isn\u2019t pending anymore.' };
+    if (String(v[r][3]).toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the recipient can respond to this trade.' };
+    var leagueId = String(v[r][1]);
+    if (!body.accept){
+      sh.getRange(r+1, 7, 1, 2).setValues([['declined', new Date().toISOString()]]);
+      return { ok:true, declined:true };
+    }
+    if (tournamentActive()) return { ok:false, error:'Trades are closed once the tournament starts.' };
+    var offer=[], request=[]; try { offer=JSON.parse(v[r][4]||'[]'); } catch(e){} try { request=JSON.parse(v[r][5]||'[]'); } catch(e){}
+    var fromHandle = String(v[r][2]), toHandle = String(v[r][3]);
+    var lock = LockService.getScriptLock(); lock.waitLock(20000);
+    try {
+      for (var i=0;i<offer.length;i++){ var o = whoOwns(leagueId, offer[i]); if (!o || o.handle.toLowerCase()!==fromHandle.toLowerCase()) return { ok:false, error: offer[i] + ' is no longer available to trade.' }; }
+      for (var j=0;j<request.length;j++){ var w = whoOwns(leagueId, request[j]); if (!w || w.handle.toLowerCase()!==toHandle.toLowerCase()) return { ok:false, error: request[j] + ' is no longer available to trade.' }; }
+      offer.forEach(function(name){ var o = whoOwns(leagueId, name); sh_(SHEET_ROSTERS).getRange(o.row, 2).setValue(toHandle); });
+      request.forEach(function(name){ var w = whoOwns(leagueId, name); sh_(SHEET_ROSTERS).getRange(w.row, 2).setValue(fromHandle); });
+      sh.getRange(r+1, 7, 1, 2).setValues([['accepted', new Date().toISOString()]]);
+      return { ok:true, accepted:true };
+    } finally { lock.releaseLock(); }
+  }
+  return { ok:false, error:'Trade not found.' };
+}
+
+/* ---- waivers: drop one, add an unowned rikishi of the same division ---- */
+function addDrop(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.mode !== 'keepers' || L.draftStatus !== 'complete') return { ok:false, error:'Waivers open once the keeper draft is complete.' };
+  if (tournamentActive()) return { ok:false, error:'Adds/drops are closed once the tournament starts.' };
+  var drop = String(body.drop||'').trim(), add = String(body.add||'').trim();
+  if (!drop || !add) return { ok:false, error:'Pick both a wrestler to drop and one to add.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var owned = whoOwns(L.id, drop);
+    if (!owned || owned.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'You don\u2019t own ' + drop + '.' };
+    if (whoOwns(L.id, add)) return { ok:false, error: add + ' is already owned in this league.' };
+    sh_(SHEET_ROSTERS).deleteRow(owned.row);
+    sh_(SHEET_ROSTERS).appendRow([L.id, u.handle, add, owned.division, 'waiver', new Date().toISOString()]);
+    return { ok:true };
   } finally { lock.releaseLock(); }
 }
 

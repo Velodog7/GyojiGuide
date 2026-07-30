@@ -179,4 +179,14 @@
     return GG.apiPost(authed({ action:"archiveTeam", basho: basho, team: JSON.stringify(team || {}), score: score || 0, wins: wins || 0, rows: JSON.stringify(rows || []) }));
   };
   GG.myHistory = function (handle){ return GG.apiGetQ("history", { handle: handle || (GG.account.get()||{}).handle || "" }); };
+
+  /* ---- Keepers: mode, draft, trades, waivers ---- */
+  GG.setLeagueMode = function (id, mode, rosterSize){ return GG.apiPost(authed({ action:"setLeagueMode", id:id, mode:mode, rosterSize:rosterSize })); };
+  GG.startDraft     = function (id){ return GG.apiPost(authed({ action:"startDraft", id:id })); };
+  GG.draftState     = function (id){ return GG.apiGetQ("draftState", { id:id }); };
+  GG.makePick       = function (id, rikishi){ return GG.apiPost(authed({ action:"makePick", id:id, rikishi:rikishi })); };
+  GG.proposeTrade   = function (id, toHandle, offer, request){ return GG.apiPost(authed({ action:"proposeTrade", id:id, toHandle:toHandle, offer:offer, request:request })); };
+  GG.respondTrade   = function (tradeId, accept){ return GG.apiPost(authed({ action:"respondTrade", tradeId:tradeId, accept:!!accept })); };
+  GG.myTrades       = function (id){ return GG.apiGetQ("trades", { id:id, handle:(GG.account.get()||{}).handle || "" }); };
+  GG.addDrop        = function (id, add, drop){ return GG.apiPost(authed({ action:"addDrop", id:id, add:add, drop:drop })); };
 })();

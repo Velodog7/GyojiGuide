@@ -327,6 +327,44 @@
   .lg-head h3{ margin:0; font-size:1.3rem }
   .lg-sub{ color:var(--faint); font-size:.82rem; margin-top:3px }
 
+  #lgModal .authmodal__panel{ width:min(480px,100%) }
+  .lg-mode-pick{ display:flex; flex-direction:column; gap:8px; margin-top:4px }
+  .lg-mode-opt{ display:flex; align-items:flex-start; gap:10px; border:1px solid var(--line2); border-radius:10px;
+        padding:10px 12px; cursor:pointer; font-weight:400 }
+  .lg-mode-opt:has(input:checked){ border-color:var(--sun); background:rgba(var(--sun-rgb),.06) }
+  .lg-mode-opt input{ margin-top:3px }
+  .lg-mode-opt b{ display:block; color:var(--ink); font-size:.86rem }
+  .lg-mode-opt span{ display:block; color:var(--dim); font-size:.78rem; line-height:1.4; margin-top:2px }
+  #lgRosterSize{ background:var(--surface-2); border:1px solid var(--line); border-radius:9px; color:var(--ink);
+        font:inherit; font-size:.95rem; padding:8px 12px; width:90px }
+
+  .lg-mode-badge{ display:inline-block; font-size:.62rem; letter-spacing:.08em; text-transform:uppercase;
+        font-weight:700; color:var(--sun); border:1px solid rgba(var(--sun-rgb),.4); border-radius:999px;
+        padding:2px 8px; margin-left:8px; vertical-align:middle }
+  .lg-draftroom{ border:1px solid rgba(var(--sun-rgb),.35); border-radius:var(--radius-sm); padding:16px;
+        margin:0 0 22px; background:linear-gradient(160deg, rgba(var(--sun-rgb),.08), rgba(var(--sun-rgb),.02)) }
+  .lg-draftroom h4{ margin:0 0 4px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun) }
+  .lg-draft-turn{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1.05rem; margin:4px 0 12px }
+  .lg-draft-turn b{ color:var(--sun) }
+  .lg-draft-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; margin-bottom:14px;
+        max-height:360px; overflow-y:auto; padding-right:2px }
+  .lg-draft-pick{ border:1px solid var(--line2); border-radius:10px; background:var(--surface-2); cursor:pointer;
+        padding:8px; text-align:center; font-size:.8rem; color:var(--dim); transition:border-color .12s,color .12s }
+  .lg-draft-pick:hover{ border-color:var(--sun); color:var(--ink) }
+  .lg-draft-pick.disabled{ opacity:.45; cursor:not-allowed }
+  .lg-draft-board{ display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto; font-size:.8rem }
+  .lg-draft-board div{ display:flex; justify-content:space-between; gap:8px; padding:4px 8px; border-radius:6px }
+  .lg-draft-board div.me{ background:rgba(var(--sun-rgb),.1) }
+  .lg-draft-board .h{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.72rem }
+  .lg-waiting{ text-align:center; padding:30px 10px; color:var(--dim) }
+  .lg-roster-block{ margin-bottom:10px }
+  .lg-roster-block h5{ margin:0 0 6px; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--faint) }
+  .lg-trade-row{ border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; font-size:.84rem }
+  .lg-waiver-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px }
+  .lg-waiver-row select{ background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--ink);
+        font:inherit; font-size:.82rem; padding:7px 10px; min-width:140px }
+  .lg-locked-note{ font-size:.78rem; color:var(--faint); font-style:italic; margin-top:6px }
+
   .lg-myteam{ border:1px solid var(--line2); border-radius:var(--radius-sm); padding:16px 16px 14px; margin:0 0 22px; background:var(--surface) }
   .lg-myteam h4{ margin:0 0 4px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun) }
   .lg-myteam__hint{ margin:0 0 12px; font-size:.82rem; color:var(--dim) }
@@ -498,21 +536,25 @@
           <button class="btn ghost sm" id="lgInvite">Copy invite link</button>
         </div>
 
-        <div class="lg-myteam">
-          <h4>My team in this league</h4>
-          <p class="lg-myteam__hint">Your own roster for <b id="lgTeamLeagueName">this league</b> — separate from your team on other leagues or the main leaderboard.</p>
-          <div class="slots lg-slots" id="lgSlots"></div>
-          <div class="saverow">
-            <button class="btn" id="lgTeamSave">Save team for this league</button>
-            <button class="btn ghost" id="lgTeamClear">Clear picks</button>
-            <span class="status" id="lgTeamStatus"></span>
+        <div id="lgClassic">
+          <div class="lg-myteam">
+            <h4>My team in this league</h4>
+            <p class="lg-myteam__hint">Your own roster for <b id="lgTeamLeagueName">this league</b> — separate from your team on other leagues or the main leaderboard.</p>
+            <div class="slots lg-slots" id="lgSlots"></div>
+            <div class="saverow">
+              <button class="btn" id="lgTeamSave">Save team for this league</button>
+              <button class="btn ghost" id="lgTeamClear">Clear picks</button>
+              <span class="status" id="lgTeamStatus"></span>
+            </div>
+          </div>
+
+          <div class="lg-teams">
+            <h4>Teams in this league <span class="n" id="lgTeamsN">0</span></h4>
+            <div id="lgTeamsBoard"></div>
           </div>
         </div>
 
-        <div class="lg-teams">
-          <h4>Teams in this league <span class="n" id="lgTeamsN">0</span></h4>
-          <div id="lgTeamsBoard"></div>
-        </div>
+        <div id="lgKeepers" hidden></div>
 
         <div class="lg-cols">
           <div class="lg-members">
@@ -544,6 +586,18 @@
     <div class="authform">
       <label class="afl">League name
         <input id="lgNameInput" maxlength="60" placeholder="e.g. Osaka Office Basho">
+      </label>
+      <div class="afl">Mode
+        <div class="lg-mode-pick">
+          <label class="lg-mode-opt"><input type="radio" name="lgMode" value="classic" checked>
+            <b>Classic</b><span>Draft 7 fresh each basho — duplicates across players are fine.</span></label>
+          <label class="lg-mode-opt"><input type="radio" name="lgMode" value="keepers">
+            <b>Keepers</b><span>One snake draft, one persistent roster. Trade &amp; waiver between bashos.</span></label>
+        </div>
+      </div>
+      <label class="afl" id="lgRosterSizeWrap" hidden>Roster size per division (5–10)
+        <input id="lgRosterSize" type="number" min="5" max="10" value="6">
+        <span class="afl__hint" style="margin-top:4px">Each team drafts this many Makuuchi (active) and the same number of Jūryō (farm). Auto-capped if there aren't enough wrestlers to go around once everyone's joined.</span>
       </label>
       <div class="afl__hint">You'll be the commissioner — you can remove members and share an invite link so friends can join.</div>
       <button class="btn" id="lgCreate">Create league</button>
@@ -1213,14 +1267,16 @@ async function renderLeague(){
 
   lgStatus("Loading league…");
   let d = null; try { d = await GyojiGuide.leagueDetail(lg.id); } catch(e){}
-  if (d && d.ok){ lg.members = d.members || []; lg.messages = d.messages || []; }
-  else { lg.members = Array.isArray(lg.members) ? lg.members : []; lg.messages = lg.messages || []; }
+  if (d && d.ok){
+    lg.members = d.members || []; lg.messages = d.messages || [];
+    if (d.league) { lg.mode = d.league.mode || lg.mode || "classic"; lg.rosterSize = d.league.rosterSize; lg.draftStatus = d.league.draftStatus; }
+  } else { lg.members = Array.isArray(lg.members) ? lg.members : []; lg.messages = lg.messages || []; }
   lgStatus("");
 
   if (curLeagueId !== lg.id) return;   // the user switched leagues while this was loading
   $("lgPanel").hidden=false;
   const meCommish = acct && lg.commissioner.toLowerCase()===acct.handle.toLowerCase();
-  $("lgName").textContent = lg.name;
+  $("lgName").innerHTML = esc(lg.name) + (lg.mode==="keepers" ? '<span class="lg-mode-badge">Keepers</span>' : '');
   $("lgTeamLeagueName").textContent = lg.name;
   $("lgRole").textContent = meCommish ? "You're the commissioner" : "Member";
   const members = lg.members || [];
@@ -1239,13 +1295,224 @@ async function renderLeague(){
   $("lgLeave").style.display = meCommish ? "none" : "";
   renderMessages(lg.messages || []);
 
-  // my team, scoped to this league
-  const mine = members.find(m => acct && m.handle.toLowerCase()===acct.handle.toLowerCase());
-  lgTeam = { ...(mine && mine.team ? mine.team : {}) };
-  renderLgTeamSlots();
+  const isKeepers = lg.mode === "keepers";
+  $("lgClassic").hidden = isKeepers;
+  $("lgKeepers").hidden = !isKeepers;
+  stopDraftPolling();
+  if (isKeepers) {
+    await renderKeepers(lg, meCommish);
+  } else {
+    const mine = members.find(m => acct && m.handle.toLowerCase()===acct.handle.toLowerCase());
+    lgTeam = { ...(mine && mine.team ? mine.team : {}) };
+    renderLgTeamSlots();
+    renderLgTeamsBoard(lg);
+  }
+}
 
-  // every member's team in this league, ranked
-  renderLgTeamsBoard(lg);
+/* ============================================================
+   KEEPERS: draft room, rosters, trades, waivers (client)
+   ============================================================ */
+let draftPollTimer = null;
+function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } }
+function rikDivision(name){ return (RK[name] && RK[name].code && RK[name].code[0]==="J") ? "juryo" : "makuuchi"; }
+function tournamentActiveClient(){ const m = scoreModel({ results:cache.results, meta:cache.meta }); return m.started && m.lastDay < 15; }
+
+async function renderKeepers(lg, meCommish){
+  const el = $("lgKeepers");
+  if (!lg.draftStatus || lg.draftStatus === "none") {
+    el.innerHTML = `<div class="lg-draftroom">
+      <h4>Keepers draft</h4>
+      <p class="lg-myteam__hint">Roster size: <b>${lg.rosterSize||6}</b> Makuuchi (active) + <b>${lg.rosterSize||6}</b> Jūryō (farm) per team, drafted once in a randomized snake draft, then kept basho after basho.</p>
+      ${meCommish
+        ? `<button class="btn" id="lgStartDraft"${(lg.members||[]).length<2 ? ' disabled title="Need at least two members"' : ""}>Start snake draft</button><span class="status" id="lgDraftStartStatus"></span>`
+        : `<p class="lg-waiting">Waiting for the commissioner to start the draft…</p>`}
+    </div>`;
+    const startBtn = $("lgStartDraft");
+    if (startBtn) startBtn.onclick = async ()=>{
+      startBtn.disabled = true;
+      const st = $("lgDraftStartStatus"); st.textContent="Starting…"; st.className="status";
+      const r = await GyojiGuide.startDraft(lg.id);
+      if (r && r.ok) loadLeagues(lg.id);
+      else { st.textContent=(r&&r.error)||"Couldn't start."; st.className="status err"; startBtn.disabled=false; }
+    };
+    return;
+  }
+
+  if (lg.draftStatus === "active") {
+    el.innerHTML = `<div class="lg-draftroom">
+      <h4>Snake draft — live</h4>
+      <div class="lg-draft-turn" id="lgDraftTurn">Loading…</div>
+      <div class="lg-draft-grid" id="lgDraftGrid"></div>
+      <h4 style="margin-top:14px">Picks so far</h4>
+      <div class="lg-draft-board" id="lgDraftBoard"></div>
+    </div>`;
+    await pollDraft(lg);
+    draftPollTimer = setInterval(()=>pollDraft(lg), 4000);
+    return;
+  }
+
+  // complete: rosters + trade center + waivers
+  const members = lg.members || [];
+  const locked = tournamentActiveClient();
+  const cardsFor = list => list.length ? `<div class="expand-cards">${list.map(n=>
+      `<div class="ecard"><div class="pcard filled r-${RK[n]?RK[n].code[0]:"M"}">${pcardInner(n, rikDivision(n)==="juryo"?"Jūryō":"Makuuchi", false)}</div></div>`
+    ).join("")}</div>` : `<p class="lg-locked-note">None yet.</p>`;
+  const rosterHTML = members.map(m=>{
+    const you = acct && m.handle.toLowerCase()===acct.handle.toLowerCase();
+    const r = m.roster || { makuuchi:[], juryo:[] };
+    return `<div class="lg-team-row" data-h="${esc(m.handle)}">
+      <div class="lg-team-row__top">
+        <span class="lg-team-row__ava">${esc(initials(m.name))}</span>
+        <span class="lg-team-row__name">${esc(m.name)}${you?`<span class="lg-team-row__you">You</span>`:""}<span class="lg-team-row__h">@${esc(m.handle)}</span></span>
+      </div>
+      <div class="lg-team-expand" hidden>
+        <div class="lg-roster-block"><h5>Makuuchi (active) · ${r.makuuchi.length}/${lg.rosterSize}</h5>${cardsFor(r.makuuchi)}</div>
+        <div class="lg-roster-block"><h5>Jūryō (farm) · ${r.juryo.length}/${lg.rosterSize}</h5>${cardsFor(r.juryo)}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  el.innerHTML = `
+    <div class="lg-teams"><h4>Rosters</h4>${rosterHTML}</div>
+    <div class="lg-teams"><h4>Trade center</h4>
+      ${locked ? '<p class="lg-locked-note">Trades are closed while the tournament is underway.</p>' : ''}
+      <div id="lgTradesList"></div>
+      ${!locked ? tradeFormHTML(members) : ""}
+    </div>
+    <div class="lg-teams"><h4>Add / drop</h4>
+      ${locked ? '<p class="lg-locked-note">Adds/drops are closed while the tournament is underway.</p>' : waiverFormHTML()}
+    </div>`;
+
+  el.querySelectorAll(".lg-team-row").forEach(row=>{
+    const ex = row.querySelector(".lg-team-expand");
+    row.style.cursor = "pointer";
+    row.onclick = () => { ex.hidden = !ex.hidden; };
+  });
+
+  if (!locked) wireTradeAndWaiverForms(lg, members);
+  loadTradesList(lg.id);
+}
+
+async function pollDraft(lg){
+  let res=null; try { res = await GyojiGuide.draftState(lg.id); } catch(e){}
+  if (!res || !res.ok) return;
+  if (res.league.draftStatus !== "active") { lg.draftStatus = res.league.draftStatus; stopDraftPolling(); renderLeague(); return; }
+  if (curLeagueId !== lg.id) { stopDraftPolling(); return; }
+
+  const turn = res.turn || {};
+  const meOnClock = acct && turn.handle && turn.handle.toLowerCase()===acct.handle.toLowerCase();
+  const turnEl = $("lgDraftTurn");
+  if (turnEl) turnEl.innerHTML = meOnClock
+    ? `Your pick! <b>Round ${turn.round}</b> · ${turn.phase==="makuuchi"?"Makuuchi":"Jūryō"} phase`
+    : `<b>${esc(turn.handle||"—")}</b> is on the clock · Round ${turn.round} · ${turn.phase==="makuuchi"?"Makuuchi":"Jūryō"} phase`;
+
+  const picked = new Set((res.pickedNames||[]).map(n=>n.toLowerCase()));
+  const pool = Object.keys(RK).filter(n=>rikDivision(n)===turn.phase && !picked.has(n.toLowerCase()));
+  const gridEl = $("lgDraftGrid");
+  if (gridEl) {
+    gridEl.innerHTML = pool.map(n=>`<div class="lg-draft-pick${meOnClock?"":" disabled"}" data-pick="${esc(n)}">${esc(n)}</div>`).join("")
+      || `<p class="lg-locked-note">No wrestlers left in this phase.</p>`;
+    if (meOnClock) gridEl.querySelectorAll("[data-pick]").forEach(c=>{
+      c.onclick = async ()=>{
+        gridEl.querySelectorAll("[data-pick]").forEach(x=>x.classList.add("disabled"));
+        const r = await GyojiGuide.makePick(lg.id, c.dataset.pick);
+        if (!(r && r.ok)) alert((r&&r.error)||"Couldn't draft that pick.");
+        pollDraft(lg);
+      };
+    });
+  }
+  const boardEl = $("lgDraftBoard");
+  if (boardEl) boardEl.innerHTML = (res.picks||[]).slice().reverse().map(p=>{
+    const you = acct && p.handle.toLowerCase()===acct.handle.toLowerCase();
+    return `<div class="${you?"me":""}"><span class="h">R${p.round} · ${esc(p.handle)}</span><span>${esc(p.rikishi)}</span></div>`;
+  }).join("") || `<p class="lg-locked-note">No picks yet.</p>`;
+}
+
+function tradeFormHTML(members){
+  const others = members.filter(m=>!(acct && m.handle.toLowerCase()===acct.handle.toLowerCase()));
+  if (!others.length) return `<p class="lg-locked-note">No other members to trade with yet.</p>`;
+  return `<div class="lg-trade-row">
+    <label class="afl" style="margin-bottom:8px">Trade with
+      <select id="lgTradeWith">${others.map(m=>`<option value="${esc(m.handle)}">${esc(m.name)}</option>`).join("")}</select>
+    </label>
+    <div class="lg-waiver-row">
+      <div class="lg-roster-block"><h5>You offer</h5><select id="lgTradeOffer" multiple size="5"></select></div>
+      <div class="lg-roster-block"><h5>You request</h5><select id="lgTradeRequest" multiple size="5"></select></div>
+    </div>
+    <div class="saverow"><button class="btn sm" id="lgTradeSend">Propose trade</button><span class="status" id="lgTradeStatus"></span></div>
+  </div>`;
+}
+function waiverFormHTML(){
+  return `<div class="lg-waiver-row">
+      <label>Drop <select id="lgWaiverDrop"></select></label>
+      <label>Add <input id="lgWaiverAdd" placeholder="Exact wrestler name" list="lgAllRikishi"></label>
+      <button class="btn sm" id="lgWaiverSend">Submit</button>
+      <span class="status" id="lgWaiverStatus"></span>
+    </div><datalist id="lgAllRikishi">${Object.keys(RK).map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`;
+}
+function wireTradeAndWaiverForms(lg, members){
+  const mine = members.find(m=>acct && m.handle.toLowerCase()===acct.handle.toLowerCase());
+  const myRoster = mine ? [...(mine.roster.makuuchi||[]), ...(mine.roster.juryo||[])] : [];
+
+  const withSel = $("lgTradeWith"), offerSel = $("lgTradeOffer"), reqSel = $("lgTradeRequest");
+  if (withSel) {
+    const fillOffer = () => { offerSel.innerHTML = myRoster.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join(""); };
+    const fillRequest = () => {
+      const opp = members.find(m=>m.handle===withSel.value);
+      const oppRoster = opp ? [...(opp.roster.makuuchi||[]), ...(opp.roster.juryo||[])] : [];
+      reqSel.innerHTML = oppRoster.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+    };
+    fillOffer(); fillRequest();
+    withSel.onchange = fillRequest;
+    $("lgTradeSend").onclick = async () => {
+      const offer = [...offerSel.selectedOptions].map(o=>o.value);
+      const request = [...reqSel.selectedOptions].map(o=>o.value);
+      const st = $("lgTradeStatus");
+      if (!offer.length && !request.length) { st.textContent="Pick at least one wrestler."; st.className="status err"; return; }
+      st.textContent="Sending…"; st.className="status";
+      const r = await GyojiGuide.proposeTrade(lg.id, withSel.value, offer, request);
+      if (r&&r.ok){ st.textContent="Proposed ✓"; st.className="status ok"; loadTradesList(lg.id); }
+      else { st.textContent=(r&&r.error)||"Couldn't propose."; st.className="status err"; }
+    };
+  }
+
+  const dropSel = $("lgWaiverDrop");
+  if (dropSel) {
+    dropSel.innerHTML = myRoster.map(n=>`<option value="${esc(n)}">${esc(n)} (${rikDivision(n)==="juryo"?"Jūryō":"Makuuchi"})</option>`).join("");
+    $("lgWaiverSend").onclick = async () => {
+      const add = $("lgWaiverAdd").value.trim(), drop = dropSel.value;
+      const st = $("lgWaiverStatus");
+      if (!add || !drop) { st.textContent="Pick both a drop and an add."; st.className="status err"; return; }
+      st.textContent="Submitting…"; st.className="status";
+      const r = await GyojiGuide.addDrop(lg.id, add, drop);
+      if (r&&r.ok){ st.textContent="Done ✓"; st.className="status ok"; renderLeague(); }
+      else { st.textContent=(r&&r.error)||"Couldn't complete."; st.className="status err"; }
+    };
+  }
+}
+async function loadTradesList(id){
+  const box = $("lgTradesList"); if (!box) return;
+  box.innerHTML = "Loading…";
+  let res=null; try { res = await GyojiGuide.myTrades(id); } catch(e){}
+  const trades = (res && res.trades) || [];
+  if (!trades.length){ box.innerHTML = `<p class="lg-locked-note">No trades yet.</p>`; return; }
+  box.innerHTML = trades.map(t=>{
+    const youAreRecipient = acct && t.toHandle.toLowerCase()===acct.handle.toLowerCase();
+    const statusTxt = t.status==="pending" ? (youAreRecipient?"Awaiting your response":"Awaiting response") : t.status;
+    const respond = (t.status==="pending" && youAreRecipient) ? `
+      <div class="saverow" style="margin-top:8px">
+        <button class="btn sm" data-trade-accept="${esc(t.id)}">Accept</button>
+        <button class="btn ghost sm" data-trade-decline="${esc(t.id)}">Decline</button>
+      </div>` : "";
+    return `<div class="lg-trade-row">
+      <b>${esc(t.fromHandle)}</b> → <b>${esc(t.toHandle)}</b><br>
+      Offers: ${t.offer.map(esc).join(", ")||"—"}<br>
+      Requests: ${t.request.map(esc).join(", ")||"—"}<br>
+      <span class="lg-locked-note">${esc(statusTxt)}</span>${respond}
+    </div>`;
+  }).join("");
+  box.querySelectorAll("[data-trade-accept]").forEach(b=>{ b.onclick = async ()=>{ b.disabled=true; const r=await GyojiGuide.respondTrade(b.dataset.tradeAccept,true); if(r&&r.ok) renderLeague(); else { alert((r&&r.error)||"Couldn't accept."); b.disabled=false; } }; });
+  box.querySelectorAll("[data-trade-decline]").forEach(b=>{ b.onclick = async ()=>{ b.disabled=true; const r=await GyojiGuide.respondTrade(b.dataset.tradeDecline,false); if(r&&r.ok) renderLeague(); else { alert((r&&r.error)||"Couldn't decline."); b.disabled=false; } }; });
 }
 
 function lgTeamCount(){ return new Set(Object.values(lgTeam).filter(Boolean)).size; }
@@ -1352,15 +1619,26 @@ function renderMessages(msgs){
   });
 }
 
-$("lgNewBtn").onclick = ()=>{ $("lgNameInput").value=""; $("lgCreateStatus").textContent=""; $("lgModal").classList.add("open"); document.body.style.overflow="hidden"; };
+$("lgNewBtn").onclick = ()=>{ $("lgNameInput").value=""; $("lgCreateStatus").textContent="";
+  document.querySelector('input[name="lgMode"][value="classic"]').checked = true;
+  $("lgRosterSize").value = 6; $("lgRosterSizeWrap").hidden = true;
+  $("lgModal").classList.add("open"); document.body.style.overflow="hidden"; };
 $("lgModalClose").onclick = ()=>{ $("lgModal").classList.remove("open"); document.body.style.overflow=""; };
 $("lgModal").onclick = e=>{ if(e.target===$("lgModal")){ $("lgModal").classList.remove("open"); document.body.style.overflow=""; } };
+document.querySelectorAll('input[name="lgMode"]').forEach(r=>{
+  r.onchange = ()=>{ $("lgRosterSizeWrap").hidden = r.value!=="keepers" || !r.checked; };
+});
 $("lgCreate").onclick = async ()=>{
   const name=$("lgNameInput").value.trim();
   if (name.length<2){ $("lgCreateStatus").textContent="Give it a name (2+ characters)."; $("lgCreateStatus").className="status err"; return; }
+  const mode = document.querySelector('input[name="lgMode"]:checked').value;
+  const rosterSize = Math.max(5, Math.min(10, +$("lgRosterSize").value || 6));
   $("lgCreateStatus").textContent="Creating…"; $("lgCreateStatus").className="status";
   const r=await GyojiGuide.leagueCreate(name);
-  if (r&&r.ok){ $("lgModal").classList.remove("open"); document.body.style.overflow=""; loadLeagues(r.id); }
+  if (r&&r.ok){
+    if (mode==="keepers") await GyojiGuide.setLeagueMode(r.id, "keepers", rosterSize);
+    $("lgModal").classList.remove("open"); document.body.style.overflow=""; loadLeagues(r.id);
+  }
   else { $("lgCreateStatus").textContent=(r&&r.error)||"Couldn't create."; $("lgCreateStatus").className="status err"; }
 };
 $("lgMsgSend").onclick = async ()=>{
