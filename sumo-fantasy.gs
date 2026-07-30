@@ -44,6 +44,8 @@ var SHEET_META    = 'Meta';
 var SHEET_LEAGUES  = 'Leagues';
 var SHEET_MEMBERS  = 'LeagueMembers';
 var SHEET_MESSAGES = 'Messages';
+var SHEET_LGTEAMS  = 'LeagueTeams';
+var SHEET_HISTORY   = 'TeamHistory';
 
 // Label for the current tournament (shown in the app).
 var BASHO_LABEL   = 'Aki 2026';
@@ -58,6 +60,8 @@ function setup() {
   ensureSheet(ss, SHEET_LEAGUES, ['id', 'name', 'commissioner', 'created', 'inviteCode']);
   ensureSheet(ss, SHEET_MEMBERS, ['leagueId', 'handle', 'joined']);
   ensureSheet(ss, SHEET_MESSAGES, ['id', 'leagueId', 'handle', 'name', 'body', 'parentId', 'created']);
+  ensureSheet(ss, SHEET_LGTEAMS, ['leagueId', 'handle', 'team', 'updated']);
+  ensureSheet(ss, SHEET_HISTORY, ['handle', 'basho', 'team', 'score', 'wins', 'rows', 'savedAt']);
   var meta = ensureSheet(ss, SHEET_META, ['key', 'value']);
   if (meta.getLastRow() < 2) {
     meta.appendRow(['basho', BASHO_LABEL]);
@@ -104,6 +108,7 @@ function doGet(e) {
     if (action === 'leagues') return json(myLeagues(e.parameter.handle));
     if (action === 'league')  return json(leagueDetail(e.parameter.id, e.parameter.handle));
     if (action === 'invite')  return json(leagueByInvite(e.parameter.code));
+    if (action === 'history') return json({ ok: true, history: myHistory(e.parameter.handle) });
     return json({ ok: true, users: readUsers(), results: readResults(), meta: readMeta() });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -125,6 +130,8 @@ function doPost(e) {
     if (body.action === 'renameLeague') return json(renameLeague(body));
     if (body.action === 'postMessage')  return json(postMessage(body));
     if (body.action === 'deleteMessage')return json(deleteMessage(body));
+    if (body.action === 'saveLeagueTeam') return json(saveLeagueTeam(body));
+    if (body.action === 'archiveTeam') return json(archiveTeam(body));
     return json({ ok: false, error: 'unknown action' });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -336,6 +343,17 @@ function myLeagues(handle){
   return { ok:true, leagues:out };
 }
 
+function leagueTeamsOf(id){
+  var v = sh_(SHEET_LGTEAMS).getDataRange().getValues(), out={};
+  for (var r=1;r<v.length;r++){
+    if (String(v[r][0])!==String(id)) continue;
+    var h = String(v[r][1]||''); if (!h) continue;
+    var team = {}; try { team = JSON.parse(v[r][2] || '{}'); } catch(e){}
+    out[h.toLowerCase()] = { team: team, updated: String(v[r][3]||'') };
+  }
+  return out;
+}
+
 function leagueDetail(id, handle){
   var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
   handle = cleanHandle(handle);
@@ -343,7 +361,11 @@ function leagueDetail(id, handle){
   // hydrate member display names from Users
   var users = readUsers(), byh={};
   users.forEach(function(u){ byh[u.handle.toLowerCase()] = u.name; });
-  var mem = members.map(function(h){ return { handle:h, name: byh[h.toLowerCase()] || h }; });
+  var teams = leagueTeamsOf(id);
+  var mem = members.map(function(h){
+    var t = teams[h.toLowerCase()];
+    return { handle:h, name: byh[h.toLowerCase()] || h, team: t ? t.team : {}, teamUpdated: t ? t.updated : '' };
+  });
   var msgs = messagesOf(id);
   return { ok:true, league:{ id:L.id, name:L.name, commissioner:L.commissioner, inviteCode:L.inviteCode,
     isCommissioner: handle && L.commissioner.toLowerCase()===handle.toLowerCase(),
@@ -456,6 +478,71 @@ function deleteMessage(body){
     }
   }
   return { ok:false, error:'Message not found.' };
+}
+
+/* save a member's team for one specific league (independent of their
+   global team, and independent of any other league they're in) */
+function saveLeagueTeam(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (!isMember(L.id, u.handle)) return { ok:false, error:'Join the league to draft a team there.' };
+  var teamJson = typeof body.team === 'string' ? body.team : JSON.stringify(body.team || {});
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = sh_(SHEET_LGTEAMS), v = sh.getDataRange().getValues(), key = u.handle.toLowerCase();
+    for (var r=1;r<v.length;r++){
+      if (String(v[r][0])===String(L.id) && String(v[r][1]).toLowerCase()===key){
+        sh.getRange(r+1, 1, 1, 4).setValues([[L.id, u.handle, teamJson, new Date().toISOString()]]);
+        return { ok:true, updated:true };
+      }
+    }
+    sh.appendRow([L.id, u.handle, teamJson, new Date().toISOString()]);
+    return { ok:true, created:true };
+  } finally { lock.releaseLock(); }
+}
+
+/* ============================================================
+   TEAM HISTORY
+   A tournament runs every ~6 weeks; once one finishes, the client
+   snapshots the player's finished roster + final score here so it
+   survives them drafting a fresh team for the next basho. The score
+   and win count are computed client-side (scoring lives in
+   gg-account.js) and sent along with the snapshot — this just stores
+   it. Upserts on (handle, basho) so a repeated/auto call is harmless.
+   ============================================================ */
+function archiveTeam(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var basho = String(body.basho || '').trim().slice(0, 60);
+  if (!basho) return { ok:false, error:'Missing basho name.' };
+  var teamJson = typeof body.team === 'string' ? body.team : JSON.stringify(body.team || {});
+  var rowsJson = typeof body.rows === 'string' ? body.rows : JSON.stringify(body.rows || []);
+  var score = Number(body.score || 0), wins = Number(body.wins || 0);
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = sh_(SHEET_HISTORY), v = sh.getDataRange().getValues(), key = u.handle.toLowerCase();
+    for (var r=1;r<v.length;r++){
+      if (String(v[r][0]).toLowerCase()===key && String(v[r][1])===basho){
+        sh.getRange(r+1, 1, 1, 7).setValues([[u.handle, basho, teamJson, score, wins, rowsJson, new Date().toISOString()]]);
+        return { ok:true, updated:true };
+      }
+    }
+    sh.appendRow([u.handle, basho, teamJson, score, wins, rowsJson, new Date().toISOString()]);
+    return { ok:true, created:true };
+  } finally { lock.releaseLock(); }
+}
+
+function myHistory(handle){
+  handle = cleanHandle(handle);
+  if (!handle) return [];
+  var v = sh_(SHEET_HISTORY).getDataRange().getValues(), out=[], key = handle.toLowerCase();
+  for (var r=1;r<v.length;r++){
+    if (String(v[r][0]).toLowerCase()!==key) continue;
+    var team = {}; try { team = JSON.parse(v[r][2] || '{}'); } catch(e){}
+    var rows = []; try { rows = JSON.parse(v[r][5] || '[]'); } catch(e){}
+    out.push({ basho:String(v[r][1]||''), team:team, score:Number(v[r][3]||0), wins:Number(v[r][4]||0), rows:rows, savedAt:String(v[r][6]||'') });
+  }
+  out.sort(function(a,b){ return new Date(b.savedAt) - new Date(a.savedAt); });
+  return out;
 }
 
 /* ---------- JSON helper ----------

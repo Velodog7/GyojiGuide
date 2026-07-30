@@ -146,6 +146,35 @@
   .scorebox ul{ margin:0; padding-left:18px; color:var(--dim); font-size:.88rem; line-height:1.6 }
   .scorebox b{ color:var(--ink) }
 
+  /* ── countdown to the next basho ─────────────────────── */
+  .countdown{ margin:0 0 22px; border:1px solid rgba(var(--sun-rgb),.35); border-radius:var(--radius-sm);
+        padding:18px 20px; background:linear-gradient(160deg, rgba(var(--sun-rgb),.09), rgba(var(--sun-rgb),.02));
+        text-align:center }
+  .countdown__label{ font-family:"IBM Plex Mono",monospace; font-size:.68rem; letter-spacing:.16em;
+        text-transform:uppercase; color:var(--sun) }
+  .countdown__basho{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1.15rem; margin:4px 0 14px }
+  .countdown__clock{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap }
+  .cdc{ display:flex; flex-direction:column; align-items:center; min-width:58px; padding:8px 4px;
+        border-radius:10px; background:var(--surface-2); border:1px solid var(--line) }
+  .cdc b{ font-family:"IBM Plex Mono",monospace; font-size:1.5rem; color:var(--ink); font-weight:700; line-height:1 }
+  .cdc span{ font-size:.66rem; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-top:4px }
+  .countdown__sub{ margin-top:12px; font-size:.8rem; color:var(--dim) }
+
+  /* ── past teams (one snapshot per finished basho) ────── */
+  .history{ margin:22px 0 0; border:1px solid var(--line); border-radius:var(--radius-sm);
+        padding:14px 16px; background:var(--surface) }
+  .history h3{ margin:0; font-family:"Space Grotesk",sans-serif; font-size:1rem; display:flex; align-items:center; gap:8px }
+  .history h3 .n{ background:var(--surface-2); color:var(--dim); border-radius:999px; padding:1px 8px;
+        font-size:.7rem; font-family:"IBM Plex Mono",monospace; font-weight:600 }
+  .history__hint{ margin:4px 0 12px; color:var(--dim); font-size:.86rem }
+  .hist-row{ border:1px solid var(--line); border-radius:12px; padding:11px 14px; margin-bottom:8px; cursor:pointer }
+  .hist-row:hover{ border-color:var(--sun) }
+  .hist-row__top{ display:flex; align-items:center; gap:10px }
+  .hist-row__basho{ font-weight:700; font-size:.92rem }
+  .hist-row__wins{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.76rem }
+  .hist-row__score{ margin-left:auto; font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--sun) }
+  .hist-expand{ margin-top:10px }
+
   /* ── picker modal (3D flip) ─────────────────────────── */
   .pickmodal{ position:fixed; inset:0; z-index:90; display:none; background:rgba(4,3,8,.82);
         -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); padding:4vh 16px; overflow-y:auto }
@@ -384,6 +413,18 @@
   <section class="view on" id="v-team">
     <div class="banner warn" id="apiBanner" hidden></div>
 
+    <div class="countdown" id="countdown" hidden>
+      <div class="countdown__label">Next up</div>
+      <div class="countdown__basho" id="cdBasho">—</div>
+      <div class="countdown__clock" id="cdClock">
+        <div class="cdc"><b id="cdDays">0</b><span>days</span></div>
+        <div class="cdc"><b id="cdHours">0</b><span>hrs</span></div>
+        <div class="cdc"><b id="cdMins">0</b><span>min</span></div>
+        <div class="cdc"><b id="cdSecs">0</b><span>sec</span></div>
+      </div>
+      <div class="countdown__sub" id="cdSub"></div>
+    </div>
+
     <div class="signin-cta" id="signinCta">
       <span>Create an account or log in to draft a team, save it, and join the leaderboard.</span>
       <div class="signin-cta__btns">
@@ -410,6 +451,12 @@
         <li><b>+5</b> for each <i>Sanshō</i> (special prize) a wrestler earns</li>
         <li><b>+5</b> for the <i>Makuuchi Yūshō</i></li>
       </ul>
+    </div>
+
+    <div class="history" id="historyBox" hidden>
+      <h3>Your past teams <span class="n" id="historyN">0</span></h3>
+      <p class="history__hint">A new roster every basho — here's how your last ones scored.</p>
+      <div id="historyList"></div>
     </div>
   </section>
 
@@ -768,6 +815,7 @@ function setAcct(a){
   if (typeof loadLeagues === "function" && $("tab-leagues").getAttribute("aria-selected")==="true") loadLeagues();
   // a just-signed-in user with a pending invite link should auto-join
   if (a && wasOut && typeof handlePendingJoin === "function" && pendingJoin) handlePendingJoin();
+  if (a) loadHistory(); else $("historyBox").hidden = true;
 }
 function validForm(h, p, needPin){
   if (!/^[A-Za-z0-9_.-]{2,40}$/.test(h)) return "Handle: 2–40 letters, digits, _ . -";
@@ -953,6 +1001,81 @@ async function loadBoard(){
     cache = { users:data.users||[], results:data.results||[], meta:data.meta||{} };
   }
   renderBoard();
+  const model = scoreModel({ results: cache.results, meta: cache.meta });
+  renderCountdown(model);
+  maybeArchive(model);
+}
+
+/* ---------- countdown to the next basho ---------- */
+// Honbasho run six times a year in a fixed rotation, but exact dates are announced
+// tournament-by-tournament — so this is a short, manually-updated table rather than
+// a "+6 weeks" guess. Add the next confirmed date here once the JSA announces it.
+const UPCOMING_BASHO = [
+  { name: "Kyushu 2026", venue: "Fukuoka", start: "2026-11-08T00:00:00+09:00", end: "2026-11-22T23:59:59+09:00" }
+];
+let cdTimer = null;
+function nextBasho(){
+  const now = Date.now();
+  return UPCOMING_BASHO.find(b => new Date(b.start).getTime() > now) || null;
+}
+function renderCountdown(model){
+  const active = model.started && model.lastDay < 15;
+  if (cdTimer) { clearInterval(cdTimer); cdTimer = null; }
+  if (active) { $("countdown").hidden = true; return; }
+  const next = nextBasho();
+  if (!next) { $("countdown").hidden = true; return; }
+  $("countdown").hidden = false;
+  $("cdBasho").textContent = `${next.name} · ${next.venue}`;
+  $("cdSub").textContent = model.started ? "This basho has finished — draft again once the next one opens." : "Draft opens once the banzuke drops.";
+  const tick = () => {
+    const ms = new Date(next.start).getTime() - Date.now();
+    if (ms <= 0) { clearInterval(cdTimer); cdTimer = null; renderCountdown(model); return; }
+    const s = Math.floor(ms/1000);
+    $("cdDays").textContent = Math.floor(s/86400);
+    $("cdHours").textContent = String(Math.floor((s%86400)/3600)).padStart(2,"0");
+    $("cdMins").textContent = String(Math.floor((s%3600)/60)).padStart(2,"0");
+    $("cdSecs").textContent = String(s%60).padStart(2,"0");
+  };
+  tick();
+  cdTimer = setInterval(tick, 1000);
+}
+
+/* ---------- auto-archive a finished tournament's team ---------- */
+function maybeArchive(model){
+  if (!acct || !hasAPI() || !model.started || model.lastDay < 15) return;
+  if (teamCount() !== 7) return;
+  const flagKey = "fantasy.archived." + acct.handle.toLowerCase() + "." + model.basho;
+  if (localStorage.getItem(flagKey)) return;
+  const s = teamScore(team, model);
+  const totalWins = s.rows.reduce((sum,r)=>sum+r.w, 0);
+  GyojiGuide.archiveTeam(model.basho, team, s.pts, totalWins, s.rows).then(r=>{
+    if (r && r.ok) { try { localStorage.setItem(flagKey, "1"); } catch {} loadHistory(); }
+  }).catch(()=>{});
+}
+
+/* ---------- past teams ---------- */
+async function loadHistory(){
+  if (!acct || !hasAPI()) { $("historyBox").hidden = true; return; }
+  let res = null; try { res = await GyojiGuide.myHistory(acct.handle); } catch (e) {}
+  const hist = (res && res.history) || [];
+  if (!hist.length) { $("historyBox").hidden = true; return; }
+  $("historyBox").hidden = false;
+  $("historyN").textContent = hist.length;
+  $("historyList").innerHTML = hist.map((h,i)=>{
+    const totalW = h.wins;
+    return `<div class="hist-row" data-i="${i}">
+      <div class="hist-row__top">
+        <span class="hist-row__basho">${esc(h.basho)}</span>
+        <span class="hist-row__wins">${totalW} win${totalW===1?"":"s"}</span>
+        <span class="hist-row__score">${h.score} pts</span>
+      </div>
+      <div class="hist-expand" hidden>${expandCards(h.team||{}, h.rows||[])}</div>
+    </div>`;
+  }).join("");
+  $("historyList").querySelectorAll(".hist-row").forEach(row=>{
+    const ex = row.querySelector(".hist-expand");
+    row.onclick = () => { ex.hidden = !ex.hidden; };
+  });
 }
 
 // full wrestler cards for an expanded row (same look as My Team)
@@ -1309,6 +1432,8 @@ acctUI();
 paintSlots();
 syncTeam();
 handlePendingJoin();   // if arriving via an invite link (?join=…)
+loadBoard();           // populates the countdown + auto-archive check on the landing view too
+if (acct) loadHistory();
 </script>
 <script src="taiko-radio.js" defer></script>
 </body>

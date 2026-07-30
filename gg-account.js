@@ -174,4 +174,9 @@
   GG.leagueRename  = function (id, name){ return GG.apiPost(authed({ action:"renameLeague", id: id, name: name })); };
   GG.msgPost       = function (id, body, parentId){ return GG.apiPost(authed({ action:"postMessage", id: id, body: body, parentId: parentId || "" })); };
   GG.msgDelete     = function (msgId){ return GG.apiPost(authed({ action:"deleteMessage", msgId: msgId })); };
+  GG.saveLeagueTeam = function (id, team){ return GG.apiPost(authed({ action:"saveLeagueTeam", id: id, team: JSON.stringify(team || {}) })); };
+  GG.archiveTeam = function (basho, team, score, wins, rows){
+    return GG.apiPost(authed({ action:"archiveTeam", basho: basho, team: JSON.stringify(team || {}), score: score || 0, wins: wins || 0, rows: JSON.stringify(rows || []) }));
+  };
+  GG.myHistory = function (handle){ return GG.apiGetQ("history", { handle: handle || (GG.account.get()||{}).handle || "" }); };
 })();
