@@ -32,10 +32,6 @@
   /* ── header ─────────────────────────────────────────── */
   header.top{ padding:34px 0 6px }
   .brandline{ display:flex; align-items:center; gap:12px; flex-wrap:wrap }
-  .back{ font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.06em;
-        color:var(--sun); text-decoration:none; border:1px solid var(--line2);
-        padding:7px 11px; border-radius:99px; white-space:nowrap }
-  .back:hover{ border-color:var(--sun) }
   h1.title{ font-family:"Space Grotesk",sans-serif; font-weight:700; letter-spacing:-.01em;
         font-size:clamp(1.7rem,4vw,2.5rem); margin:14px 0 4px }
   h1.title span{ color:var(--sun) }
@@ -391,8 +387,6 @@
 <div class="wrap">
   <header class="top">
     <div class="brandline">
-      <a class="back" href="index.html">‹ Gyoji Guide</a>
-      <a class="back" id="toDohyo" href="dohyo.html">Enter the Dohyō →</a>
       <div class="auth-actions" id="authActions">
         <button class="authbtn ghost" id="openLogin">Log in</button>
         <button class="authbtn" id="openSignup">Sign up</button>
@@ -1412,14 +1406,21 @@ function setView(v){
 $("refreshBtn").onclick = loadBoard;
 
 /* ---------- carry the drafted team into the Dohyō simulator ---------- */
-$("toDohyo").addEventListener("click", e => {
-  if (teamCount() !== 7) return;                 // no full team → just follow the plain link
-  e.preventDefault();
-  try {
-    const enc = btoa(unescape(encodeURIComponent(JSON.stringify(team))));
-    localStorage.setItem("dohyo.team", JSON.stringify(team));
-    location.href = "dohyo.html?team=" + encodeURIComponent(enc);
-  } catch (x) { location.href = "dohyo.html"; }
+// the pill button that used to hold this is gone (the shared top nav covers
+// navigation now); wire the same handoff onto the nav's own Dohyō link once
+// gg-nav.js has mounted it.
+document.addEventListener("DOMContentLoaded", () => {
+  const navDohyo = document.querySelector('#gg-nav a[href="dohyo.html"]');
+  if (!navDohyo) return;
+  navDohyo.addEventListener("click", e => {
+    if (teamCount() !== 7) return;                 // no full team → just follow the plain link
+    e.preventDefault();
+    try {
+      const enc = btoa(unescape(encodeURIComponent(JSON.stringify(team))));
+      localStorage.setItem("dohyo.team", JSON.stringify(team));
+      location.href = "dohyo.html?team=" + encodeURIComponent(enc);
+    } catch (x) { location.href = "dohyo.html"; }
+  });
 });
 
 /* ---------- api banner ---------- */

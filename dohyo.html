@@ -865,17 +865,6 @@
     font-size:15px; letter-spacing:.01em; color:var(--dim);
     white-space:nowrap;
   }
-  /* the way back to the Gyoji Guide — mirrors its own "Enter the Dohyō" pill */
-  .gg-link{
-    display:inline-flex; align-items:center; gap:6px; flex:0 0 auto;
-    font-family:"IBM Plex Mono",monospace; font-size:.7rem; font-weight:600;
-    letter-spacing:.08em; text-transform:uppercase; color:var(--sun);
-    padding:6px 12px; border:1px solid rgba(216,178,90,.42); border-radius:20px;
-    background:rgba(20,21,27,.5); text-decoration:none;
-    transition:background .15s, color .15s, border-color .15s;
-  }
-  .gg-link:hover, .gg-link:focus-visible{ background:var(--sun); color:#14151b; border-color:var(--sun); outline:none }
-  .gg-link .gg-ico{ font-size:1.05rem; line-height:1; margin-top:-1px }
   .menu__brand b{ color:var(--ink); font-weight:700; letter-spacing:0 }
   .menu__brand i{ font-style:normal; color:var(--red); font-weight:700 }
 
@@ -1067,14 +1056,13 @@
      with no UI, for embedding as a header on the Gyoji Guide ─────────── */
   body.conly{ background:#000; overflow:hidden }
   body.conly .menu, body.conly .wrap, body.conly .bar, body.conly .credit,
-  body.conly #intro, body.conly .gg-link, body.conly .intro__back,
+  body.conly #intro,
   body.conly .stage__title, body.conly #bar{ display:none !important }
   body.conly .stage{ pointer-events:none }
   body.conly .stage__title{ display:none !important }
   body.conly .tkr{ display:none !important }
 
   .intro{ width:min(1180px,100%); margin:0 auto; padding:8px 20px 44px }
-  .intro__back{ position:fixed; top:14px; left:14px; z-index:70; margin:0 }
   .intro__title{ text-align:center; margin-bottom:6px;
         font-family:"Space Grotesk",sans-serif; font-weight:700;
         font-size:clamp(24px,4vw,38px); letter-spacing:-.01em; color:var(--ink) }
@@ -1464,7 +1452,6 @@
 <script src="gg-nav.js"></script>
 
 <header class="menu" id="menu">
-  <a class="gg-link" href="https://gyojiguide.com" aria-label="Back to Gyoji Guide"><span class="gg-ico">‹</span> Gyoji Guide</a>
   <span class="menu__brand"><b>Nagoya 2026</b><i class="menu__sub">·</i><span class="menu__sub" id="daySub">Nagoya Basho · 15 days</span></span>
   <nav class="menu__nav">
     <div class="menu__view">
@@ -1522,8 +1509,6 @@
 </div>
 
 <div class="intro" id="intro">
-  <a class="gg-link intro__back" href="https://gyojiguide.com" aria-label="Back to Gyoji Guide"><span class="gg-ico">‹</span> Gyoji Guide</a>
-
   <div class="intro__step">Step 1 <b>— pick your seven</b></div>
   <div class="intro__slots" id="introSlots"></div>
 
