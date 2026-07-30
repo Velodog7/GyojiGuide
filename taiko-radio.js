@@ -120,7 +120,12 @@
   function chooseSig(radioIndex) { return (radioIndex % 2 === 1) ? _pick(["2/4","6/8","3/4","7/8"]) : "4/4"; }
 
   function generateSong(radioIndex) {
-    var bpm = 83 + Math.round(Math.random()*(112-83));
+    // tempo: wider range than before, shifted down, and biased toward the
+    // slow end so most songs feel unhurried — with the occasional quicker
+    // one still possible, so it doesn't get predictable.
+    var MIN_BPM = 52, MAX_BPM = 104;
+    var lean = Math.pow(Math.random(), 1.6);           // skews toward 0 → mostly slow, sometimes not
+    var bpm = MIN_BPM + Math.round(lean * (MAX_BPM - MIN_BPM));
     var sig = chooseSig(radioIndex);
     var r = 0.45 + Math.random()*0.25;                 // arrangement looseness
     var meta = composeMeter(sig, r);
@@ -178,7 +183,7 @@
   var song=null, radioIndex=0, audible=new Set();
   var stepIdx=0, nextT=0, stepTimer=null, sectionTimers=[], songT0=0, songTotalMs=0, curSection="";
   var LOOK=25, AHEAD=0.1;
-  function sps() { return (60/(song?song.bpm:110))/4; }   // 16th-note grid (meter-independent)
+  function sps() { return (60/(song?song.bpm:80))/4; }   // 16th-note grid (meter-independent)
 
   function applyGain() { if (master) master.gain.value = prefs.muted ? 0 : prefs.vol; }
   function ensureCtx() {
