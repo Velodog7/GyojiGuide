@@ -181,6 +181,35 @@
     var g = AC.createGain(); g.gain.value = gain; srcN.connect(g); g.connect(master);
     srcN.start(when||0);
   }
+  /* ==== continuity across page loads ====
+     A static multi-page site can't keep one <audio>/AudioContext alive across a
+     real navigation — the page (and its audio graph) is destroyed either way.
+     So instead of true gapless audio, the currently-playing song's full generated
+     data plus how far into it we are gets persisted just before the page unloads;
+     the next page reconstructs the identical song and starts scheduling from that
+     same point (advanced by however much real time the navigation itself took),
+     so the song picks up where it left off instead of restarting from the intro. */
+  var PROG_KEY = "taiko.radio.song", saveTimer = null;
+  function saveProgress() {
+    if (!song || !prefs.enabled) { try { localStorage.removeItem(PROG_KEY); } catch (e) {} return; }
+    var elapsedMs = playing ? (performance.now() - songT0) : (curElapsedMs || 0);
+    try {
+      localStorage.setItem(PROG_KEY, JSON.stringify({
+        song: song, radioIndex: radioIndex, elapsedMs: elapsedMs, savedAt: Date.now()
+      }));
+    } catch (e) {}
+  }
+  function loadProgress() {
+    var raw; try { raw = localStorage.getItem(PROG_KEY); } catch (e) { return null; }
+    if (!raw) return null;
+    var saved; try { saved = JSON.parse(raw); } catch (e) { return null; }
+    if (!saved || !saved.song || !saved.song.sections || !saved.savedAt) return null;
+    if (Date.now() - saved.savedAt > 30000) return null;          // stale — start fresh instead
+    var carried = Date.now() - saved.savedAt;                     // keep the song moving through the gap itself
+    return { song: saved.song, radioIndex: saved.radioIndex || 0, resumeMs: Math.max(0, (saved.elapsedMs||0) + carried) };
+  }
+  var curElapsedMs = 0;                                            // last known position, kept fresh even while paused
+
   function scheduleStep(s, time) {
     var beat = false;
     song.voices.forEach(function (v) { if (v.steps[s] && audible.has(v.idx)) { playSample(v.idx, time, v.vol); beat = beat || v.role==="backbone" || v.role==="drum"; } });
@@ -203,30 +232,48 @@
     setAudible(set);
     if (sec.crash && song.crashIdx!=null) playSample(song.crashIdx, 0, 0.9);
   }
-  function scheduleSong() {
+
+  function scheduleSong(resumeMs) {
+    resumeMs = resumeMs || 0;
     clearTimers();
-    var barDur = song.spm * 15000 / song.bpm;          // ms per measure of this meter
+    var barDur = song.spm * 15000 / song.bpm;
     var bar = 0;
     song.sections.forEach(function (sec, si) {
       var at = bar * barDur;
       if (sec.build && sec.build.length) {
         sec.build.forEach(function (ev) {
-          var when = at + (ev.at||0) * barDur;
-          if (si===0 && (ev.at||0)===0) setAudible(new Set(ev.set));
-          else sectionTimers.push(setTimeout(function () { if (playing) setAudible(new Set(ev.set)); }, when));
+          var when = at + (ev.at||0) * barDur, delay = when - resumeMs;
+          if (delay <= 0) setAudible(new Set(ev.set));                                   // already past → apply now
+          else sectionTimers.push(setTimeout(function () { if (playing) setAudible(new Set(ev.set)); }, delay));
         });
-      } else if (si===0) { applySection(0); }
-      else sectionTimers.push(setTimeout(function () { if (playing) applySection(si); }, at));
+      } else {
+        var delay = at - resumeMs;
+        if (delay <= 0) { if (playing || si===0) applySection(si); }                     // catch up immediately
+        else sectionTimers.push(setTimeout(function () { if (playing) applySection(si); }, delay));
+      }
       bar += sec.bars;
     });
     songTotalMs = bar * barDur;
-    sectionTimers.push(setTimeout(function () { if (playing) onSongEnd(); }, songTotalMs));
+    var endDelay = Math.max(0, songTotalMs - resumeMs);
+    sectionTimers.push(setTimeout(function () { if (playing) onSongEnd(); }, endDelay));
   }
 
-  function beginSong() {
+  function beginSong(resumeMs) {
+    resumeMs = resumeMs || 0;
     playing = true; setState("playing");
-    stepIdx = 0; nextT = AC.currentTime + 0.08; songT0 = performance.now();
-    startEq(); scheduleSong(); stepLoop();
+    stepIdx = 0; nextT = AC.currentTime + 0.08; songT0 = performance.now() - resumeMs;
+    startEq(); scheduleSong(resumeMs); stepLoop();
+    saveProgress();
+  }
+  function resumeSong(saved) {
+    ensureCtx();
+    song = saved.song; radioIndex = saved.radioIndex;
+    if (subEl) subEl.textContent = "loading…";
+    var need = song.voices.map(function (v){ return v.idx; }).concat([song.crashIdx]);
+    return loadBuffers(need).then(function () {
+      if (AC.resume) AC.resume();
+      if (AC.state === "running") beginSong(saved.resumeMs); else armGesture();
+    });
   }
   function nextSong() {
     ensureCtx();
@@ -240,11 +287,13 @@
   }
   function onSongEnd() {
     clearTimers(); audible = new Set();
+    try { localStorage.removeItem(PROG_KEY); } catch (e) {}       // this song is over — nothing left to resume
     if (!prefs.enabled) { stopAll(); return; }
     setState("gap"); if (subEl) subEl.textContent = "…";
     sectionTimers.push(setTimeout(function () { if (prefs.enabled) nextSong(); }, 3500));
   }
   function stopAll() {
+    if (playing) curElapsedMs = performance.now() - songT0;       // remember where we were, in case of a later resume
     playing = false; clearTimers(); stopEq(); audible = new Set(); setState("paused");
     if (subEl) subEl.textContent = "paused";
   }
@@ -353,9 +402,17 @@
   }
   function reflectMute() { if (!muteBtn) return; muteBtn.textContent = prefs.muted?"🔇":"🔊"; muteBtn.title = prefs.muted?"Unmute":"Mute"; }
 
+  window.addEventListener("pagehide", saveProgress);
+  window.addEventListener("beforeunload", saveProgress);
+  document.addEventListener("visibilitychange", function () { if (document.hidden) saveProgress(); });
+  saveTimer = setInterval(function () { if (playing) saveProgress(); }, 2500);
+
   function boot() {
     buildUI();
-    if (prefs.enabled) start();
+    if (prefs.enabled) {
+      var saved = loadProgress();
+      if (saved) resumeSong(saved); else start();
+    }
     else { setState("paused"); if (subEl) subEl.textContent = "paused"; }
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
