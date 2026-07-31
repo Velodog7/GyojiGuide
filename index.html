@@ -55,7 +55,7 @@
 .edohyo__go:hover{filter:brightness(1.06)}
 .edohyo__stay{font:inherit;font-size:.82rem;letter-spacing:.04em;color:var(--muted,#878da0);
   background:none;border:0;cursor:pointer;padding:4px;text-decoration:underline}
-</style><script src="gg-config.js"></script><script src="gg-account.js"></script></head><body>
+</style><script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-roster.js"></script></head><body>
 <script src="gg-nav.js"></script><header class="hero"><a class="hero-link" href="https://gyojiguide.com/dohyo.html" aria-label="Open the Dohyō tournament viewer"><span class="hl-ico" aria-hidden="true">⬢</span>Enter the Dohyō</a><div class="hero-img" aria-hidden="true"></div><div class="hero-logo" role="img" aria-label="Gyoji Guide"><svg focusable="false" aria-hidden="true" id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1369.56 356.56"><defs><style>
 .cls-1 {
 fill: #fff;
@@ -830,7 +830,38 @@ else{openCards.add(id);card.classList.add("open");}
 (function(){var bg=document.querySelector(".hero-img");if(!bg)return;if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;var t=false;function u(){bg.style.transform="translate3d(0,"+(window.scrollY*0.2).toFixed(1)+"px,0)";t=false;}addEventListener("scroll",function(){if(!t){t=true;requestAnimationFrame(u);}},{passive:true});u();})();
 const PICKS_STORE="tachiai.picks.v1";function savePicks(){try{localStorage.setItem(PICKS_STORE,JSON.stringify(picks));}catch(e){}}function loadPicks(){try{const o=JSON.parse(localStorage.getItem(PICKS_STORE));if(o&&typeof o==="object"){BRACKETS.forEach(b=>{const v=o[b.id];if(Number.isInteger(v)&&v>=0&&v<R.length&&b.ok(R[v])&&!Object.values(picks).includes(v))picks[b.id]=v;});}}catch(e){}}loadPicks();
 (function(){var cards=document.getElementById("cards");if(!cards)return;var t=null,hm=null,lastPT="mouse";function rid(el){var c=el.closest(".card");return c?+c.dataset.rid:null;}function clr(){if(t){clearTimeout(t);t=null;}if(hm){hm.classList.remove("charging");hm=null;}}function launch(id){if(id!=null&&typeof openDraftModal==="function")openDraftModal(R[id]);}cards.addEventListener("pointerover",function(e){if(e.pointerType!=="mouse")return;var m=e.target.closest(".mug");if(!m||!m.querySelector("img"))return;if(m===hm)return;clr();hm=m;m.classList.add("charging");});cards.addEventListener("pointerout",function(e){if(e.pointerType!=="mouse")return;var m=e.target.closest(".mug");if(!m)return;if(m===hm&&!m.contains(e.relatedTarget))clr();});cards.addEventListener("pointercancel",clr);addEventListener("scroll",clr,{passive:true});cards.addEventListener("pointerdown",function(e){lastPT=e.pointerType||"mouse";},true);cards.addEventListener("click",function(e){var m=e.target.closest(".mug");if(!m||!m.querySelector("img"))return;var id=rid(m);if(id==null)return;m.classList.add("flash");setTimeout(function(){m.classList.remove("flash");},600);launch(id);});})();
-renderPills(); renderCards(); updateDraftCount(); updateCmpBar();</script>
+renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
+/* ---------- live banzuke refresh (gg-roster.js) ----------
+   The guide keeps its curated data (records prose, injuries, family, grades,
+   Elo). We refresh each known rikishi's live banzuke rank + this basho's
+   record, matching the page's own label format, and repaint. New sekitori are
+   reported but not injected (they'd have no curated profile). Live-first. */
+(function(){
+  if (!window.GGRoster || typeof R === "undefined") return;
+  var note = document.createElement("div");
+  note.style.cssText = "max-width:1160px;margin:6px auto 0;padding:2px 20px;font-size:.78rem;color:#9aa0b0;text-align:center;";
+  var nav = document.getElementById("gg-nav");
+  if (nav && nav.parentNode) nav.parentNode.insertBefore(note, nav.nextSibling); else document.body.insertBefore(note, document.body.firstChild);
+  note.textContent = "Checking the current banzuke\u2026";
+  var WORD = { Y:"Yokozuna", O:"Ozeki", S:"Sekiwake", K:"Komusubi", M:"Maegashira", J:"Juryo" };
+  GGRoster.load().then(function(res){
+    if (!res || !res.ok){ note.textContent = "Showing the bundled ranking \u2014 couldn\u2019t reach sumo-api."; return; }
+    var updated = 0, newc = 0, nm;
+    R.forEach(function(r){
+      var w = res.ranks[r.n];
+      if (!w){ return; }
+      r.rk = w.rk; r.side = w.sideCap; r.num = w.num; r.tier = w.tierName; r.d = w.div;
+      var word = WORD[w.tier] || "Maegashira";
+      r.rank = (w.tier === "M" || w.tier === "J") ? (word + " " + w.num) : word;
+      if (w.record) r.live = w.record;
+      updated++;
+    });
+    for (nm in res.ranks){ if (res.ranks.hasOwnProperty(nm)){ var hit=false, k; for(k=0;k<R.length;k++){ if(R[k].n===nm){hit=true;break;} } if(!hit) newc++; } }
+    try { renderPills(); renderCards(); if (typeof renderTiers === "function") renderTiers(); } catch(e){}
+    note.style.color = "#c3c8d4";
+    note.innerHTML = "Ranks live from the <b>" + res.label + "</b> banzuke" + (newc ? " \u00b7 " + newc + " new sekitori not yet profiled" : "");
+  });
+})();</script>
 <div class="edohyo" id="edohyo" role="dialog" aria-modal="true" aria-label="Enter the Dohyo">
 <div class="edohyo__panel">
 <div class="edohyo__seal">満</div>

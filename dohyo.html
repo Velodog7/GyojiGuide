@@ -1447,7 +1447,7 @@
   }
   @media (max-width:560px){ .bz__side .nm{ font-size:13px } .bz__row{ gap:6px } }
 </style>
-<script src="gg-config.js"></script></head>
+<script src="gg-config.js"></script><script src="gg-roster.js"></script></head>
 <body>
 <script src="gg-nav.js"></script>
 
@@ -3437,6 +3437,32 @@ paintIntroSlots();
 syncIntro();
 runCeremony();
 applyFit();                 // and once at start, before the first paint settles
+
+/* ---------- live banzuke refresh (gg-roster.js) ----------
+   The forecast runs on curated Elo / stable / fighting-style data that the
+   public API doesn't carry, so we only refresh each known wrestler's banzuke
+   rank + division from the live banzuke and leave the simulation inputs
+   untouched. Unknown newcomers are reported, not injected (no fake Elo).
+   Live-first: if the API is unreachable we keep the bundled ranks. */
+(function(){
+  if (!window.GGRoster) return;
+  var note = document.createElement("div");
+  note.style.cssText = "max-width:1080px;margin:6px auto 0;padding:2px 20px;font-size:.78rem;color:#9aa0b0;text-align:center;";
+  var nav = document.getElementById("gg-nav");
+  if (nav && nav.parentNode) nav.parentNode.insertBefore(note, nav.nextSibling); else document.body.insertBefore(note, document.body.firstChild);
+  note.textContent = "Checking the current banzuke\u2026";
+  GGRoster.load().then(function(res){
+    if (!res || !res.ok){ note.textContent = "Showing the bundled ranking \u2014 couldn\u2019t reach sumo-api."; return; }
+    var sum = GGRoster.applyTo(ROSTER, res.ranks, { codeField:"code", divField:"d", addNewcomers:false });
+    ROSTER_BY_DIV.makuuchi.length = 0; ROSTER_BY_DIV.juryo.length = 0;
+    for (var n in ROSTER){ if (ROSTER.hasOwnProperty(n) && ROSTER_BY_DIV[ROSTER[n].d]) ROSTER_BY_DIV[ROSTER[n].d].push(n); }
+    try { paintIntroSlots(); syncIntro(); } catch(e){}
+    var newcCount = 0, nm; for (nm in res.ranks){ if (res.ranks.hasOwnProperty(nm) && !(nm in ROSTER)) newcCount++; }
+    var newc = newcCount ? " \u00b7 " + newcCount + " new sekitori not yet in the forecast" : "";
+    note.style.color = "#c3c8d4";
+    note.innerHTML = "Ranks live from the <b>" + res.label + "</b> banzuke \u00b7 forecast strength stays curated" + newc;
+  });
+})();
 </script>
 <script src="taiko-radio.js" defer></script>
 </body>

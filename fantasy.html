@@ -444,6 +444,8 @@
   <!-- MY TEAM -->
   <section class="view on" id="v-team">
     <div class="banner warn" id="apiBanner" hidden></div>
+    <div id="rosterNote" hidden style="max-width:1080px;margin:0 auto 4px;padding:2px 20px;font-size:.8rem;color:#9aa0b0;"></div>
+    <script src="gg-roster.js"></script>
 
     <div class="countdown" id="countdown" hidden>
       <div class="countdown__label">Next up</div>
@@ -1714,6 +1716,29 @@ syncTeam();
 handlePendingJoin();   // if arriving via an invite link (?join=…)
 loadBoard();           // populates the countdown + auto-archive check on the landing view too
 if (acct) loadHistory();
+
+/* ---------- live banzuke refresh (gg-roster.js) ----------
+   Live-first: pull the current banzuke and refresh every wrestler's rank,
+   adding any new sekitori (shown as a photo-less card until a portrait is
+   bundled). Curated fields (kanji, country, photo) are kept untouched.
+   If the API can't be reached we simply keep the bundled roster. */
+(function(){
+  var note = $("rosterNote");
+  function show(html, color){ if(!note) return; note.hidden=false; note.innerHTML=html; if(color) note.style.color=color; }
+  if (!window.GGRoster) return;
+  show("Checking the current banzuke\u2026", "#9aa0b0");
+  GGRoster.load().then(function(res){
+    if (!res || !res.ok){ show("Showing the bundled roster \u2014 couldn\u2019t reach sumo-api.", "#9aa0b0"); return; }
+    var sum = GGRoster.applyTo(RK, res.ranks, {
+      codeField:"code", addNewcomers:true,
+      makeEntry:function(w){ return { code:w.code, kanji:"", from:"", src:"" }; }
+    });
+    try { paintSlots(); } catch(e){}
+    if (typeof renderLeague === "function" && typeof curLeagueId !== "undefined" && curLeagueId) { try { renderLeague(); } catch(e){} }
+    var extra = sum.newcomers.length ? " \u00b7 " + sum.newcomers.length + " new sekitori (no photo yet)" : "";
+    show("Live banzuke \u2014 <b>" + res.label + "</b> \u00b7 " + res.count.makuuchi + " Makuuchi + " + res.count.juryo + " J\u016bry\u014d" + extra, "#c3c8d4");
+  });
+})();
 </script>
 <script src="taiko-radio.js" defer></script>
 </body>
