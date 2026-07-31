@@ -47,7 +47,7 @@
       'display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}' +
     '.ggn-brand{grid-column:1;justify-self:start;display:inline-flex;align-items:center;gap:8px;' +
       'text-decoration:none;color:#f4ecd8;font-weight:700;font-size:.98rem;letter-spacing:.01em;white-space:nowrap}' +
-    '.ggn-brand svg,.ggn-brand img{height:48px;width:auto;display:block}' +
+    '.ggn-brand svg,.ggn-brand img{height:62px;width:auto;display:block}' +
     '.ggn-links{grid-column:2;justify-self:center;display:flex;gap:6px;align-items:stretch}' +
     '.ggn-link{display:flex;align-items:center;justify-content:center;' +
       'font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;font-size:.94rem;letter-spacing:.01em;' +
