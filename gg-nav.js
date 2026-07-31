@@ -13,9 +13,9 @@
   var GGN_LOGO="<img src=\"SumoSlapdown-logowide.svg\" alt=\"Sumo Slapdown\" class=\"ggn-logo-img\">";
   var LINKS = [
     { href: "banzuke.html", label: "The Banzuke",  match: ["banzuke.html", "banzuke"] },
-    { href: "index.html",   label: "The Guide",    match: ["", "index.html", "index"] },
-    { href: "dohyo.html",   label: "The Dohyō",    match: ["dohyo.html", "dohyo"] },
-    { href: "fantasy.html", label: "Fantasy Sumo", match: ["fantasy.html", "fantasy"] }
+    { href: "index.html",   label: "Analysis",     match: ["", "index.html", "index"] },
+    { href: "dohyo.html",   label: "Simulation",   match: ["dohyo.html", "dohyo"] },
+    { href: "fantasy.html", label: "Fantasy",      match: ["fantasy.html", "fantasy"] }
   ];
 
   var here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
