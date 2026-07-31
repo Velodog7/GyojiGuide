@@ -12,8 +12,8 @@
   "use strict";
   var GGN_LOGO="<img src=\"SumoSlapdown-logowide.svg\" alt=\"Sumo Slapdown\" class=\"ggn-logo-img\">";
   var LINKS = [
-    { href: "index.html",   label: "The Guide",    match: ["", "index.html", "index"] },
     { href: "banzuke.html", label: "The Banzuke",  match: ["banzuke.html", "banzuke"] },
+    { href: "index.html",   label: "The Guide",    match: ["", "index.html", "index"] },
     { href: "dohyo.html",   label: "The Dohyō",    match: ["dohyo.html", "dohyo"] },
     { href: "fantasy.html", label: "Fantasy Sumo", match: ["fantasy.html", "fantasy"] }
   ];
@@ -43,11 +43,11 @@
     '#gg-nav{position:relative;width:100%;z-index:900;' +
       'background:rgba(20,22,30,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);' +
       'border-bottom:1px solid rgba(216,178,90,.25);font-family:"Space Grotesk","Zen Kaku Gothic New",system-ui,sans-serif}' +
-    '.ggn-inner{max-width:1100px;margin:0 auto;min-height:58px;padding:0 16px;' +
+    '.ggn-inner{max-width:1100px;margin:0 auto;min-height:68px;padding:0 16px;' +
       'display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}' +
     '.ggn-brand{grid-column:1;justify-self:start;display:inline-flex;align-items:center;gap:8px;' +
       'text-decoration:none;color:#f4ecd8;font-weight:700;font-size:.98rem;letter-spacing:.01em;white-space:nowrap}' +
-    '.ggn-brand svg,.ggn-brand img{height:36px;width:auto;display:block}' +
+    '.ggn-brand svg,.ggn-brand img{height:48px;width:auto;display:block}' +
     '.ggn-links{grid-column:2;justify-self:center;display:flex;gap:6px;align-items:stretch}' +
     '.ggn-link{display:flex;align-items:center;justify-content:center;' +
       'font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;font-size:.94rem;letter-spacing:.01em;' +
