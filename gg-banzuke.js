@@ -1,4 +1,4 @@
-/*  GYOJI GUIDE — banzuke-e crowd header
+/*  SUMO SLAPDOWN — banzuke-e crowd header
  *  ---------------------------------------------------------------
  *  Renders the full Makuuchi + Jūryō banzuke as a woodblock-style crowd,
  *  after the fashion of an Edo "banzuke-e" print: sanyaku across the top,
@@ -135,7 +135,7 @@
       + '<div class="ggb-body">'
       +   '<div class="ggb-col ggb-colW">'+zigzag(westFile, false)+'</div>'
       +   '<div class="ggb-center">'
-      +     '<div class="ggb-logo" role="img" aria-label="Gyoji Guide">'+LOGO_SVG+'</div>'
+      +     '<div class="ggb-logo" role="img" aria-label="Sumo Slapdown">'+LOGO_SVG+'</div>'
       +     officials()
       +   '</div>'
       +   '<div class="ggb-col ggb-colE">'+zigzag(eastFile, true)+'</div>'

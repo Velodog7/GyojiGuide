@@ -1,4 +1,4 @@
-/*  GYOJI GUIDE — shared accounts + prediction-game scoring
+/*  SUMO SLAPDOWN — shared accounts + prediction-game scoring
  *  ---------------------------------------------------------------
  *  Builds on gg-config.js (needs GyojiGuide.apiGet / apiPost). Include
  *  it AFTER gg-config.js on any page that wants accounts or standings:

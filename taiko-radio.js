@@ -1,6 +1,6 @@
 /*  TAIKO RADIO  ·  gyojiguide.com
  *  ---------------------------------------------------------------
- *  Drop-in background radio for the Gyoji Guide and Enter-the-Dohyō
+ *  Drop-in background radio for the Sumo Slapdown and Enter-the-Dohyō
  *  pages. Include once, near the end of <body>:
  *
  *      <script src="taiko-radio.js" defer></script>

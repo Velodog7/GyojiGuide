@@ -1,4 +1,4 @@
-/*  GYOJI GUIDE — shared site config
+/*  SUMO SLAPDOWN — shared site config
  *  ---------------------------------------------------------------
  *  One source of truth for the Fantasy Sumo backend. Include this on
  *  every page, BEFORE the page's own scripts:

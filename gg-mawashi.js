@@ -1,4 +1,4 @@
-/*  GYOJI GUIDE — Kashō Mawashi avatar designer
+/*  SUMO SLAPDOWN — Kashō Mawashi avatar designer
  *  ---------------------------------------------------------------
  *  A small self-contained module for designing a team's avatar as a
  *  stylised mawashi (sumo belt), built from layered vector elements:

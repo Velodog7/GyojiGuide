@@ -1,4 +1,4 @@
-/*  GYOJI GUIDE — shared top navigation
+/*  SUMO SLAPDOWN — shared top navigation
  *  ---------------------------------------------------------------
  *  One centered nav bar, identical in placement and style on every page,
  *  linking the three sections together. Include near the top of <body>:
@@ -24,7 +24,7 @@
     if (document.getElementById("gg-nav")) return;
     var nav = document.createElement("nav");
     nav.id = "gg-nav";
-    nav.setAttribute("aria-label", "Gyoji Guide sections");
+    nav.setAttribute("aria-label", "Sumo Slapdown sections");
     nav.innerHTML =
       '<div class="ggn-inner">' +
       '<a class="ggn-brand" href="index.html">'+GGN_LOGO+'</a>' +
