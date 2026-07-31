@@ -135,9 +135,11 @@
         'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Team mawashi avatar">'+
         '<defs>'+clip+'</defs>'+art+'</svg>';
     }
-    // chip: whole mawashi fitted into a square box
-    return '<svg viewBox="0 0 400 600" width="'+size+'" height="'+size+'" preserveAspectRatio="xMidYMid meet" '+
-      'xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Team mawashi avatar">'+
+    // chip: zoom into the apron core (kanji + decorations sit around 200,300)
+    // instead of fitting the whole tall mawashi, so it reads well in the small circle.
+    var CX = 200, CY = 300, CW = 250;                 // square crop, centred on the apron
+    return '<svg viewBox="' + (CX - CW/2) + ' ' + (CY - CW/2) + ' ' + CW + ' ' + CW + '" ' +
+      'width="'+size+'" height="'+size+'" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Team mawashi avatar">'+
       '<defs>'+clip+'</defs>'+art+'</svg>';
   };
 
