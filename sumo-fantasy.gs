@@ -49,6 +49,7 @@ var SHEET_HISTORY   = 'TeamHistory';
 var SHEET_ROSTERS  = 'KeeperRosters';
 var SHEET_PICKS    = 'DraftPicks';
 var SHEET_TRADES   = 'Trades';
+var SHEET_FEEDBACK = 'Feedback';
 
 // Label for the current tournament (shown in the app).
 var BASHO_LABEL   = 'Aki 2026';
@@ -70,6 +71,7 @@ function setup() {
   ensureSheet(ss, SHEET_ROSTERS, ['leagueId', 'handle', 'rikishi', 'division', 'acquiredVia', 'acquiredAt']);
   ensureSheet(ss, SHEET_PICKS, ['leagueId', 'pickIndex', 'round', 'phase', 'handle', 'rikishi', 'pickedAt']);
   ensureSheet(ss, SHEET_TRADES, ['id', 'leagueId', 'fromHandle', 'toHandle', 'offer', 'request', 'status', 'createdAt', 'resolvedAt']);
+  ensureSheet(ss, SHEET_FEEDBACK, ['createdAt', 'kind', 'handle', 'subject', 'message', 'targetUser', 'page', 'status']);
   var meta = ensureSheet(ss, SHEET_META, ['key', 'value']);
   if (meta.getLastRow() < 2) {
     meta.appendRow(['basho', BASHO_LABEL]);
@@ -159,6 +161,7 @@ function doPost(e) {
     if (body.action === 'deleteMessage')return json(deleteMessage(body));
     if (body.action === 'saveLeagueTeam') return json(saveLeagueTeam(body));
     if (body.action === 'archiveTeam') return json(archiveTeam(body));
+    if (body.action === 'feedback')    return json(submitFeedback(body));
     return json({ ok: false, error: 'unknown action' });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -168,6 +171,31 @@ function doPost(e) {
 function cleanHandle(h) {
   h = String(h || '').trim().slice(0, 40);
   return /^[A-Za-z0-9_.\-]{2,40}$/.test(h) ? h : '';
+}
+
+/* Help & feedback: FAQ questions, suggestions, bug reports, abuse reports.
+   kind = 'question' | 'suggestion' | 'bug' | 'abuse'. All fields optional
+   except a non-empty message; everything is length-capped and stored on the
+   Feedback sheet with a 'new' status for the admin to triage. */
+function submitFeedback(body) {
+  var kinds = { question: 1, suggestion: 1, bug: 1, abuse: 1 };
+  var kind = String(body.kind || '').toLowerCase();
+  if (!kinds[kind]) return { ok: false, error: 'bad kind' };
+  var message = String(body.message || '').trim().slice(0, 4000);
+  if (!message) return { ok: false, error: 'Please add some detail.' };
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_FEEDBACK);
+  if (!sh) return { ok: false, error: 'not set up' };
+  sh.appendRow([
+    new Date(),
+    kind,
+    String(body.handle || '').slice(0, 40),
+    String(body.subject || '').trim().slice(0, 160),
+    message,
+    String(body.targetUser || '').trim().slice(0, 40),
+    String(body.page || '').slice(0, 200),
+    'new'
+  ]);
+  return { ok: true };
 }
 
 /* create an account: fails if the handle is taken (unless it's an

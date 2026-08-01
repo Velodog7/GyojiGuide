@@ -1,54 +1,110 @@
-# Gyoji Guide — Fantasy Sumo · deploy checklist
+# Sumo Slapdown — deploy guide
 
-## Upload to GitHub (repo root, same folder as index.html)
+A static, no-build site: plain HTML + JS modules + two SVG logos, backed by a
+Google Apps Script web app. Everything uses **relative paths**, so all the web
+files just need to sit in the **same folder** on your host (GitHub Pages,
+Netlify Drop, etc.). No bundler, no npm.
 
-**New / updated this round — required:**
+---
 
-| File | Why |
+## 1. Web files — upload these to your host (same directory)
+
+**Pages**
+| File | Nav label |
 |---|---|
-| `fantasy.html` | The fantasy page itself, with accounts + your Apps Script `API_URL` already wired in |
-| `taiko-radio.js` | Shared music player the page includes (also used by index + dohyo) |
+| `banzuke.html` | Welcome |
+| `index.html` | Analysis |
+| `dohyo.html` | Simulation |
+| `fantasy.html` | Fantasy |
 
-**Already in the repo — must still be present (fantasy.html links to them):**
-
-| File / folder | Used for |
+**Shared modules** (loaded by the pages)
+| File | Role |
 |---|---|
-| `index.html` | "‹ Gyoji Guide" back link |
-| `dohyo.html` | "Enter the Dohyō →" (carries your team over) |
-| `taiko.html` | The "＋" create-a-loop button on the radio bar |
-| `samples/` (all .mp3s) | The radio fetches its drum sounds from here |
+| `gg-config.js` | Holds the Apps Script `/exec` URL (the one place it lives) |
+| `gg-account.js` | Shared account + login/register/logout + saveAvatar |
+| `gg-nav.js` | The shared top nav, the larger logo, and the Help/feedback modal |
+| `gg-auth.js` | The unified account control that sits in the nav on every page |
+| `gg-mawashi.js` | The mawashi avatar designer (layers, textures, kanji) |
+| `gg-roster.js` | Live banzuke loader (pulls the current ranking from sumo-api) |
+| `gg-banzuke.js` | The Welcome page's Edo banzuke-e crowd illustration |
+| `taiko-radio.js` | The background taiko radio player |
 
-Everything is relative-path, so it all just needs to sit in the same directory.
-No build step, no dependencies.
+**Logo assets** (must sit alongside the HTML)
+| File | Used by |
+|---|---|
+| `SumoSlapdown-logowide.svg` | The nav logo (every page) |
+| `SumoSlapdown-logoTall.svg` | The centerpiece in the Welcome crowd |
 
-## NOT uploaded to GitHub
+**Optional standalone tool** (not in the nav; open it directly if you want it)
+| File | What it is |
+|---|---|
+| `keepers-draft-preview.html` | A self-contained click-through of the Keepers snake draft (bots draft themselves; nothing is saved). Handy for demos. |
 
-- **`sumo-fantasy.gs`** — this lives in Google, not the repo. It's already
-  deployed as your Apps Script web app; the page talks to it via the
-  `/exec` URL baked into `fantasy.html`. (Optional: commit it to the repo
-  as documentation/backup, but editing it there does nothing — changes
-  must be pasted into script.google.com and re-deployed.)
-- Your Google Sheet — stays in Drive; it's the database.
+---
 
-## After pushing
+## 2. Two things that must already exist on the host
 
-1. Open `https://gyojiguide.com/fantasy.html`.
-2. The yellow "Device mode" banner should be **gone** (means the API is live).
-3. Create an account, draft seven, hit **Save my team**.
-4. Check the Sheet → **Users** tab: your row appears (PIN stored as a hash).
-5. Open a private window → Sign in with the same handle + PIN → your team
-   comes back down. Leaderboard tab lists everyone signed up.
+These are **not** in this zip and the site expects them on your server:
 
-## Next basho (Aki, September)
+- **`samples/` folder of `.mp3` drum sounds** — `taiko-radio.js` fetches its
+  taiko hits from `samples/…​.mp3` at runtime. If that folder isn't present the
+  rest of the site works fine; the radio just won't have audio. (These are the
+  same sample files already on your current deployment.)
+- **`taiko.html`** *(optional)* — if the radio's "＋" build-a-loop button links
+  to it. Only needed if you were using that feature; the site works without it.
 
-Results flow from the Sheet's **Results** tab: enter bouts day-by-day
-(`day | division | east | west | winner | kimarite`), or add an hourly
-trigger on `refreshResults` in Apps Script (pre-set to basho `202609`).
-Until Results has rows, the page scores against the final Nagoya 2026
-standings baked into it.
+---
 
-## If you re-deploy the Apps Script
+## 3. Backend — `sumo-fantasy.gs` (Google Apps Script)
 
-A **new deployment** gets a **new `/exec` URL** → update `API_URL` at the
-top of `fantasy.html` and re-push. (Using "Manage deployments → edit →
-new version" keeps the same URL — prefer that.)
+`sumo-fantasy.gs` is **not** a web file — it's the source for your Apps Script
+web app (accounts, leagues, drafts, and the Help/feedback inbox). It's included
+here as backup/reference. To update the live backend:
+
+1. Open your Apps Script project at **script.google.com**.
+2. Paste in the contents of `sumo-fantasy.gs`.
+3. **Run `setup()` once.** This creates/updates the Sheets, including the new
+   **Feedback** sheet used by the Help modal (FAQ questions, suggestions, bug
+   reports, user reports).
+4. **Deploy → Manage deployments → Edit → New version.** Editing "New version"
+   keeps the same `/exec` URL. (If you instead create a brand-new deployment,
+   the URL changes — see step 4 below.)
+5. Set access to **Anyone**, or browser calls will be blocked.
+
+### The `/exec` URL
+
+The site currently points at:
+
+```
+https://script.google.com/macros/s/AKfycbyYJzO4zyAtAT1zu0Ph2LpfRxNpRP6BlOK21hZ6kBjzA42b_eIpHjCoc8gKvzf1ls5gXw/exec
+```
+
+This lives in **`gg-config.js`** (`GyojiGuide.API_URL`) — the single source of
+truth every page reads. `fantasy.html` also keeps a matching fallback copy.
+**If you ever create a new deployment (new URL), update it in `gg-config.js`**
+(and the fallback in `fantasy.html`) and re-upload those two files.
+
+---
+
+## 4. After uploading — quick smoke test
+
+1. Open the site. The nav shows **WELCOME · ANALYSIS · SIMULATION · FANTASY**,
+   the logo, a **?** help button, and **Log in / Sign up** at top-right.
+2. Sign up from the nav. Open another page — you're still signed in (state is
+   shared across the whole site).
+3. On **Fantasy**, draft a team and save it; sign in from a private window and
+   confirm it comes back.
+4. Click **?** → **Report a bug**, submit → check the Sheet's **Feedback** tab
+   for the new row. (If it says it couldn't send, the backend URL/access or the
+   `setup()` step needs attention.)
+
+---
+
+## Notes
+
+- The site still uses the JS namespace `GyojiGuide` and the domain
+  `gyojiguide.com` internally — these are code/infra identifiers, not visible
+  branding, and were intentionally left as-is. If you move to a new domain,
+  that's a separate swap.
+- All wrestler photos and the favicon are inlined as base64 (that's why the
+  HTML files are large) — nothing external to host for those.
