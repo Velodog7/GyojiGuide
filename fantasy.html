@@ -420,7 +420,7 @@
 </style>
 <script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-mawashi.js"></script></head>
 <body>
-<script src="gg-nav.js"></script>
+<script src="gg-nav.js"></script><script src="gg-auth.js"></script>
 
 <div class="wrap">
   <header class="top">
@@ -913,8 +913,8 @@ function acctViewStatus(msg, cls){ const s=$("acctViewStatus"); s.textContent=ms
 $("openSignup").onclick = () => openAuth("signup");
 $("openLogin").onclick  = () => openAuth("login");
 $("openAccount").onclick= () => openAuth("account");
-$("ctaSignup").onclick  = () => openAuth("signup");
-$("ctaLogin").onclick   = () => openAuth("login");
+$("ctaSignup").onclick  = () => (window.GGAuth ? GGAuth.open("signup") : openAuth("signup"));
+$("ctaLogin").onclick   = () => (window.GGAuth ? GGAuth.open("login") : openAuth("login"));
 $("authClose").onclick  = closeAuth;
 authModal.onclick = e => { if (e.target===authModal) closeAuth(); };
 document.addEventListener("keydown", e => { if (e.key==="Escape" && authModal.classList.contains("open")) closeAuth(); });
@@ -1716,6 +1716,22 @@ syncTeam();
 handlePendingJoin();   // if arriving via an invite link (?join=…)
 loadBoard();           // populates the countdown + auto-archive check on the landing view too
 if (acct) loadHistory();
+
+/* ---------- unified account control (gg-auth.js) ----------
+   The account UI now lives once, in the shared nav. Hide fantasy's own
+   header buttons and let the nav control drive sign-in/out; we just listen
+   for the shared "gg-auth-change" event and keep this page's state, team
+   and history in sync exactly as the old inline flow did. */
+(function(){
+  var aa = $("authActions"); if (aa) aa.style.display = "none";
+  document.addEventListener("gg-auth-change", function(e){
+    var a = (e.detail && e.detail.account) || (window.GyojiGuide && GyojiGuide.account.get()) || null;
+    var res = e.detail && e.detail.res;
+    if (a && res && res.team && Object.keys(res.team).length){ team = res.team; saveLocal(); }
+    try { setAcct(a); } catch(err){}
+    try { paintSlots(); } catch(err){}
+  });
+})();
 
 /* ---------- live banzuke refresh (gg-roster.js) ----------
    Live-first: pull the current banzuke and refresh every wrestler's rank,
