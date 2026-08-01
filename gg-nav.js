@@ -50,15 +50,25 @@
     '.ggn-brand svg,.ggn-brand img{height:62px;width:auto;display:block}' +
     '.ggn-links{grid-column:2;justify-self:center;display:flex;gap:6px;align-items:stretch}' +
     '.ggn-link{display:flex;align-items:center;justify-content:center;' +
-      'font-family:"Space Grotesk",system-ui,sans-serif;font-weight:600;font-size:.94rem;letter-spacing:.01em;' +
+      'font-family:"Potta One","Space Grotesk",system-ui,sans-serif;font-weight:400;font-size:.94rem;letter-spacing:.01em;' +
       'text-decoration:none;color:#c7cbd9;padding:10px 18px;border-radius:10px;transition:color .15s,background .15s}' +
     '.ggn-link:hover{color:#f4ecd8;background:rgba(255,255,255,.07)}' +
-    '.ggn-link.active{color:#0f1118;background:linear-gradient(180deg,#f0d590,#d8b25a);font-weight:700}' +
+    '.ggn-link.active{color:#0f1118;background:linear-gradient(180deg,#f0d590,#d8b25a);font-weight:400}' +
     '@media(max-width:640px){.ggn-inner{grid-template-columns:1fr;justify-items:center;gap:4px;padding:6px 12px}' +
       '.ggn-brand{grid-column:1}.ggn-links{grid-column:1;flex-wrap:wrap;justify-content:center}' +
       '.ggn-link{padding:7px 13px;font-size:.86rem}}';
 
+  function ensureFont() {
+    if (document.getElementById("gg-nav-font")) return;   // once per page
+    var pc1 = document.createElement("link"); pc1.rel = "preconnect"; pc1.href = "https://fonts.googleapis.com";
+    var pc2 = document.createElement("link"); pc2.rel = "preconnect"; pc2.href = "https://fonts.gstatic.com"; pc2.crossOrigin = "anonymous";
+    var css = document.createElement("link"); css.id = "gg-nav-font"; css.rel = "stylesheet";
+    css.href = "https://fonts.googleapis.com/css2?family=Potta+One&display=swap";
+    document.head.appendChild(pc1); document.head.appendChild(pc2); document.head.appendChild(css);
+  }
+
   function mount() {
+    ensureFont();
     var st = document.createElement("style");
     st.id = "gg-nav-css";
     st.textContent = CSS;
