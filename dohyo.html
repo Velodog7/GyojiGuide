@@ -852,12 +852,16 @@
   .menu{
     position:sticky; top:0; z-index:5;
     min-height:58px;
-    display:flex; align-items:center; flex-wrap:wrap;
-    gap:10px clamp(12px,2.2vw,22px);
-    padding:9px clamp(14px,2.4vw,24px);
+    padding:9px 0;
     background:rgba(14,15,20,.92);
     -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
     border-bottom:1px solid var(--line);
+  }
+  .menu__inner{
+    max-width:1180px; margin:0 auto; width:100%; box-sizing:border-box;
+    display:flex; align-items:center; flex-wrap:wrap;
+    gap:10px clamp(12px,2.2vw,22px);
+    padding:0 clamp(14px,2.4vw,24px);
   }
   .menu__brand{
     display:flex; align-items:baseline; gap:10px; flex:0 0 auto;
@@ -962,6 +966,7 @@
   /* ── panels ───────────────────────────────────────────────── */
   .wrap{ max-width:1440px; margin:0 auto; padding:22px 24px 80px }
   .tabs{ display:flex; gap:2px; align-items:center }
+  .tabs[hidden]{ display:none }
   .tabs button{
     background:none; border:0; border-bottom:2px solid transparent;
     color:var(--dim); font-size:12px; letter-spacing:.22em; text-transform:uppercase;
@@ -1077,6 +1082,7 @@
         grid-template-columns:repeat(auto-fill,minmax(260px,1fr)) }
 
   .intro__opts{ display:grid; gap:10px; grid-template-columns:1fr 1fr }
+  #introDiv{ grid-template-columns:repeat(3,1fr) }
   .optcard{ text-align:left; background:var(--surface); color:var(--ink);
         border:1px solid var(--line); border-radius:var(--radius); padding:15px 16px; cursor:pointer;
         transition:border-color .15s ease, background .15s ease }
@@ -1094,8 +1100,6 @@
         padding:13px 26px; cursor:pointer; white-space:nowrap }
   .intro__go:hover:not(:disabled){ filter:brightness(1.1) }
   .intro__go:disabled{ background:none; color:var(--dim); border-color:var(--line); cursor:not-allowed; font-weight:400 }
-  .intro__skip{ background:none; border:0; color:var(--dim); font:inherit; font-size:12px;
-        letter-spacing:.14em; text-transform:uppercase; cursor:pointer; text-decoration:underline }
   @media (max-width:620px){ .intro__opts{ grid-template-columns:1fr } }
 
   /* ── dohyō-iri: the ring-entering ceremony, during setup ────── */
@@ -1452,23 +1456,23 @@
 <script src="gg-nav.js"></script><script src="gg-mawashi.js"></script><script src="gg-auth.js"></script>
 
 <header class="menu" id="menu">
-  <span class="menu__brand"><b>Nagoya 2026</b><i class="menu__sub">·</i><span class="menu__sub" id="daySub">Nagoya Basho · 15 days</span></span>
-  <nav class="menu__nav">
-    <div class="menu__view">
-      <select id="daySel" aria-label="Day"></select>
-      <div class="tabs" role="tablist">
-        <button role="tab" data-tab="makuuchi" data-short="Maku" aria-selected="true">Makuuchi</button>
-        <button role="tab" data-tab="juryo" data-short="Jūryō" aria-selected="false">Jūryō</button>
-        <button role="tab" data-tab="roster" data-short="Ros" aria-selected="false">Roster</button>
-        <button role="tab" data-tab="team" data-short="Team" aria-selected="false">My Team</button>
+  <div class="menu__inner">
+    <span class="menu__brand"><b>Nagoya 2026</b><i class="menu__sub">·</i><span class="menu__sub" id="daySub">Nagoya Basho · 15 days</span></span>
+    <nav class="menu__nav">
+      <div class="menu__view">
+        <select id="daySel" aria-label="Day"></select>
+        <div class="tabs" role="tablist" id="divTabs">
+          <button role="tab" data-tab="makuuchi" data-short="Maku" aria-selected="true">Makuuchi</button>
+          <button role="tab" data-tab="juryo" data-short="Jūryō" aria-selected="false">Jūryō</button>
+        </div>
       </div>
-    </div>
-    <div class="menu__actions">
-      <button class="ghost" id="spoiler" aria-pressed="false" title="Hide results"><i class="ico">◉</i><span class="lbl">Hide results</span></button>
-      <button class="ghost" id="reroll" title="Re-roll the tournament"><i class="ico">↻</i><span class="lbl">Re-roll</span></button>
-      <button class="ghost" id="play" title="Play the day"><i class="ico">▶</i><span class="lbl">Play Day 1</span></button>
-    </div>
-  </nav>
+      <div class="menu__actions">
+        <button class="ghost" id="spoiler" aria-pressed="false" title="Hide results"><i class="ico">◉</i><span class="lbl">Hide results</span></button>
+        <button class="ghost" id="reroll" title="Re-roll the tournament"><i class="ico">↻</i><span class="lbl">Re-roll</span></button>
+        <button class="ghost" id="play" title="Play the day"><i class="ico">▶</i><span class="lbl">Play Day 1</span></button>
+      </div>
+    </nav>
+  </div>
 </header>
 
 <div class="stage">
@@ -1536,10 +1540,25 @@
     </button>
   </div>
 
+  <div class="intro__step" id="introDivStep">Step 4 <b>— which division to watch</b></div>
+  <div class="intro__opts" id="introDiv">
+    <button class="optcard" data-div="makuuchi">
+      <b>Makuuchi</b>
+      <span>Just the top division.</span>
+    </button>
+    <button class="optcard" data-div="juryo">
+      <b>Jūryō</b>
+      <span>Just the second division.</span>
+    </button>
+    <button class="optcard" data-div="both">
+      <b>Both</b>
+      <span>Makuuchi and Jūryō, with a quick switch between them.</span>
+    </button>
+  </div>
+
   <div class="intro__foot">
     <span class="intro__note" id="introNote"></span>
     <div style="display:flex; gap:18px; align-items:center">
-      <button class="intro__skip" id="introSkip">Just explore</button>
       <button class="intro__go" id="introGo" disabled>Enter the dohyō</button>
     </div>
   </div>
@@ -3111,6 +3130,7 @@ const introSlots  = document.getElementById("introSlots");
 const introGo     = document.getElementById("introGo");
 const introNote   = document.getElementById("introNote");
 let runChoice = null;                          // "watch" | "sim"
+let watchDiv = null;                           // "makuuchi" | "juryo" | "both"
 
 /* ── team-picker cards, in the Sumo Slapdown style ───────────── */
 const RANK_TILE = { Y:"Yokozuna", O:"Ōzeki", S:"Sekiwake", K:"Komusubi", M:"Maegashira", J:"Jūryō" };
@@ -3231,39 +3251,47 @@ pickGroup(document.getElementById("introRun"), "run", v => {
   runChoice = v;
   const scopeStep = document.getElementById("introScopeStep");
   const scope = document.getElementById("introScope");
+  const divStep = document.getElementById("introDivStep");
+  const div = document.getElementById("introDiv");
   const off = v === "sim";                      // simulating means nothing to watch
   scopeStep.style.opacity = off ? ".4" : "";
   scope.querySelectorAll(".optcard").forEach(b => b.classList.toggle("is-disabled", off));
+  divStep.style.opacity = off ? ".4" : "";
+  div.querySelectorAll(".optcard").forEach(b => b.classList.toggle("is-disabled", off));
 });
 pickGroup(document.getElementById("introScope"), "scope", v => { watchScope = v; });
+pickGroup(document.getElementById("introDiv"), "div", v => { watchDiv = v; });
 
 function syncIntro(){
   const n = myPicks().size;
-  const ready = n === BANDS.length && runChoice;
+  const needDiv = runChoice === "watch";         // sim-to-end skips straight to final scores
+  const ready = n === BANDS.length && runChoice && (!needDiv || watchDiv);
   introGo.disabled = !ready;
   introNote.textContent = n < BANDS.length
     ? `${n} of ${BANDS.length} picked`
-    : !runChoice ? "Choose how to run it"
+    : !runChoice ? ""
+    : (needDiv && !watchDiv) ? ""
     : runChoice === "sim" ? "Ready — jump to the final scores"
-    : `Ready — watch ${watchScope === "mine" ? "your team's bouts" : "every bout"}`;
+    : `Ready — watch ${watchScope === "mine" ? "your team's bouts" : "every bout"} in ${
+        watchDiv === "both" ? "Makuuchi and Jūryō" : watchDiv === "juryo" ? "Jūryō" : "Makuuchi"}`;
 }
 
-function enter(explore){
+function enter(){
   stopCeremony();
   document.body.classList.remove("setup");
   applyFit();                                    // menu is back — resize the ring to full
   mountDay(daySel.value);                        // rebuild the matchups now the team is set
-  if (explore) { selectTab("makuuchi"); return; }
+  document.getElementById("divTabs").hidden = watchDiv !== "both";  // only "both" needs a switch
   if (runChoice === "sim") {
     teamDay = BASHO_LEN;                        // straight to the finish
     selectTab("team");                          // the final scores, no playback
   } else {
     teamDay = 0;
-    play();                                     // day 1 on the clay (play() opens the card tab)
+    selectTab(watchDiv === "juryo" ? "juryo" : "makuuchi");   // "both" starts on Makuuchi
+    play();                                     // day 1 on the clay
   }
 }
-introGo.onclick   = () => enter(false);
-document.getElementById("introSkip").onclick = () => enter(true);
+introGo.onclick = () => enter();
 
 /* ══ dohyō-iri — the ring-entering ceremony ══════════════════
    While the person builds their team the ring is never empty: each side
