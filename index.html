@@ -896,9 +896,9 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
   document.addEventListener("keydown",function(e){ if(e.key==="Escape") hide(); });
   var wasComplete=false;
   function check(){ var c=nPicked()===7; if(c&&!wasComplete) show(); if(!c) hide(); wasComplete=c; }
+  wasComplete = nPicked()===7;  // a team completed on a previous visit shouldn't re-trigger the modal on load
   if(typeof updateDraftCount==="function"){ var _udc=updateDraftCount;
     updateDraftCount=function(){ _udc.apply(this,arguments); check(); }; }
-  check();  // a completed team saved from a previous visit is offered right away
 })();
 </script>
 <script src="taiko-radio.js" defer></script>
