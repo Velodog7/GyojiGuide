@@ -175,7 +175,7 @@
   GG.leagues       = function (handle){ return GG.apiGetQ("leagues", { handle: handle || (GG.account.get()||{}).handle || "" }); };
   GG.leagueDetail  = function (id){ return GG.apiGetQ("league", { id: id, handle: (GG.account.get()||{}).handle || "" }); };
   GG.leagueByInvite= function (code){ return GG.apiGetQ("invite", { code: code }); };
-  GG.leagueCreate  = function (name){ return GG.apiPost(authed({ action:"createLeague", name: name })); };
+  GG.leagueCreate  = function (name, mode, rosterSize){ return GG.apiPost(authed({ action:"createLeague", name: name, mode: mode || "classic", rosterSize: rosterSize || 6 })); };
   GG.leagueJoin    = function (idOrCode){
     // a 7-char uppercase token is an invite code; anything else is a league id
     var isCode = /^[A-Z0-9]{5,10}$/.test(String(idOrCode||"")) && String(idOrCode).indexOf("lg_")!==0;

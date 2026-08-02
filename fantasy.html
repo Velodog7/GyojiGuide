@@ -334,6 +334,12 @@
 
   #lgModal .authmodal__panel{ width:min(480px,100%) }
   .lg-mode-pick{ display:flex; flex-direction:column; gap:8px; margin-top:4px }
+  .lg-convert{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:rgba(var(--sun-rgb),.06);
+    border:1px solid rgba(var(--sun-rgb),.35); border-radius:12px; padding:14px 16px; margin-bottom:18px }
+  .lg-convert > div{ flex:1; min-width:220px }
+  .lg-convert b{ display:block; color:var(--ink); font-size:.9rem }
+  .lg-convert span{ display:block; color:var(--dim); font-size:.8rem; line-height:1.45; margin-top:3px }
+  .lg-convert .btn{ flex:none }
   .lg-mode-opt{ display:flex; align-items:flex-start; gap:10px; border:1px solid var(--line2); border-radius:10px;
         padding:10px 12px; cursor:pointer; font-weight:400 }
   .lg-mode-opt:has(input:checked){ border-color:var(--sun); background:rgba(var(--sun-rgb),.06) }
@@ -592,6 +598,14 @@
         </div>
 
         <div id="lgClassic">
+          <div class="lg-convert" id="lgConvert" hidden>
+            <div>
+              <b>Make this a Keepers league?</b>
+              <span>Switch to a single live snake draft — each rikishi is drafted once, by one manager, then kept basho to basho. This replaces the manual team-picking below. Only you (the commissioner) see this, and it's only possible before a draft starts.</span>
+            </div>
+            <button class="btn" id="lgConvertBtn">Switch to Keepers</button>
+            <span class="status" id="lgConvertStatus"></span>
+          </div>
           <div class="lg-myteam">
             <h4>My team in this league</h4>
             <p class="lg-myteam__hint">Your own roster for <b id="lgTeamLeagueName">this league</b> — separate from your team on other leagues or the main leaderboard.</p>
@@ -1368,6 +1382,19 @@ async function renderLeague(){
   if (isKeepers) {
     await renderKeepers(lg, meCommish);
   } else {
+    const conv = $("lgConvert");
+    conv.hidden = !meCommish;
+    if (meCommish) {
+      const btn = $("lgConvertBtn"), st = $("lgConvertStatus");
+      st.textContent = ""; st.className = "status"; btn.disabled = false;
+      btn.onclick = async () => {
+        if (!confirm("Switch this league to Keepers? Everyone's manually-picked teams here will be replaced by a single live snake draft.")) return;
+        btn.disabled = true; st.textContent = "Switching…"; st.className = "status";
+        const r = await GyojiGuide.setLeagueMode(lg.id, "keepers", lg.rosterSize || 6);
+        if (r && r.ok) loadLeagues(lg.id);
+        else { st.textContent = (r && r.error) || "Couldn't switch."; st.className = "status err"; btn.disabled = false; }
+      };
+    }
     const mine = members.find(m => acct && m.handle.toLowerCase()===acct.handle.toLowerCase());
     lgTeam = { ...(mine && mine.team ? mine.team : {}) };
     renderLgTeamSlots();
@@ -1788,9 +1815,8 @@ $("lgCreate").onclick = async ()=>{
   const mode = document.querySelector('input[name="lgMode"]:checked').value;
   const rosterSize = Math.max(5, Math.min(10, +$("lgRosterSize").value || 6));
   $("lgCreateStatus").textContent="Creating…"; $("lgCreateStatus").className="status";
-  const r=await GyojiGuide.leagueCreate(name);
+  const r=await GyojiGuide.leagueCreate(name, mode, rosterSize);
   if (r&&r.ok){
-    if (mode==="keepers") await GyojiGuide.setLeagueMode(r.id, "keepers", rosterSize);
     $("lgModal").classList.remove("open"); document.body.style.overflow=""; loadLeagues(r.id);
   }
   else { $("lgCreateStatus").textContent=(r&&r.error)||"Couldn't create."; $("lgCreateStatus").className="status err"; }
