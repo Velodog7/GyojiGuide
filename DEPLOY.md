@@ -75,8 +75,10 @@ here as backup/reference. To update the live backend:
 4. **Run `setup()` once.** This creates/updates the Sheets, including the
    **Feedback** sheet used by the Help modal (FAQ questions, suggestions, bug
    reports, user reports), the **PageViews** sheet the admin dashboard reads
-   for analytics, and two new columns (`status`, `warnMsg`) on the **Users**
-   sheet for the admin dashboard's warn/ban moderation.
+   for analytics, two new columns (`status`, `warnMsg`) on the **Users**
+   sheet for the admin dashboard's warn/ban moderation, and the
+   **LeaderboardBoard** / **LeaderboardVotes** sheets behind the Fantasy
+   page's Leaderboard-tab message board.
 5. **Deploy → Manage deployments → Edit → New version.** Editing "New version"
    keeps the same `/exec` URL. (If you instead create a brand-new deployment,
    the URL changes — see step 4 below.)

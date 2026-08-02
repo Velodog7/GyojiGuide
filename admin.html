@@ -415,10 +415,11 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
     var rows = allMsgs.filter(function(m){
       return !q || m.league.toLowerCase().indexOf(q) >= 0 || m.handle.toLowerCase().indexOf(q) >= 0 || m.body.toLowerCase().indexOf(q) >= 0;
     }).map(function(m){
+      var editBtn = m.board === "leaderboard" ? '<button class="btn sm" onclick="adminEditMsg(\'' + m.id + '\')">Edit</button>' : "";
       return "<tr><td>" + esc(m.league) + "</td><td class=\"handle\">@" + esc(m.handle) + "</td>" +
         "<td>" + fmtDate(m.created) + "</td>" +
         "<td class=\"msg-body\">" + esc(m.body) + "</td>" +
-        "<td class=\"actions\"><button class=\"btn sm danger\" onclick=\"adminDeleteMsg('" + m.id + "')\">Delete</button></td></tr>";
+        "<td class=\"actions\">" + editBtn + "<button class=\"btn sm danger\" onclick=\"adminDeleteMsg('" + m.id + "','" + m.board + "')\">Delete</button></td></tr>";
     }).join("");
     $("boardsTable").innerHTML = rows || '<tr class="empty-row"><td colspan="5">No posts match.</td></tr>';
   }
@@ -430,10 +431,20 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   }
   $("boardsRefresh").onclick = function(){ loadBoards(); };
   $("boardFilter").addEventListener("input", renderBoards);
-  window.adminDeleteMsg = async function(id){
+  window.adminDeleteMsg = async function(id, board){
     if (!confirm("Delete this post? This can\u2019t be undone.")) return;
-    var res = await aPost("adminDeleteMessage", { msgId: id });
+    var action = board === "leaderboard" ? "adminDeleteBoardMsg" : "adminDeleteMessage";
+    var res = await aPost(action, { msgId: id });
     if (res && res.ok) loadBoards(); else alert((res && res.error) || "Couldn\u2019t delete that post.");
+  };
+  window.adminEditMsg = async function(id){
+    var current = allMsgs.find(function(m){ return m.id === id; });
+    var text = prompt("Edit post:", current ? current.body : "");
+    if (text === null) return;
+    text = text.trim();
+    if (!text) return;
+    var res = await aPost("adminEditBoardMessage", { msgId: id, body: text });
+    if (res && res.ok) loadBoards(); else alert((res && res.error) || "Couldn\u2019t save that edit.");
   };
 
   /* ---------- boot: skip the gate if we still have a session key ---------- */

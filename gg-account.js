@@ -189,4 +189,11 @@
   GG.respondTrade   = function (tradeId, accept){ return GG.apiPost(authed({ action:"respondTrade", tradeId:tradeId, accept:!!accept })); };
   GG.myTrades       = function (id){ return GG.apiGetQ("trades", { id:id, handle:(GG.account.get()||{}).handle || "" }); };
   GG.addDrop        = function (id, add, drop){ return GG.apiPost(authed({ action:"addDrop", id:id, add:add, drop:drop })); };
+
+  /* ---- leaderboard board: one shared, site-wide board (not per-league) ---- */
+  GG.board          = function (){ return GG.apiGetQ("board", { handle: (GG.account.get()||{}).handle || "" }); };
+  GG.boardPost      = function (body, parentId){ return GG.apiPost(authed({ action:"postBoardMessage", body: body, parentId: parentId || "" })); };
+  GG.boardEdit      = function (msgId, body){ return GG.apiPost(authed({ action:"editBoardMessage", msgId: msgId, body: body })); };
+  GG.boardDelete    = function (msgId){ return GG.apiPost(authed({ action:"deleteBoardMessage", msgId: msgId })); };
+  GG.boardVote      = function (msgId, value){ return GG.apiPost(authed({ action:"voteBoardMessage", msgId: msgId, value: value })); };
 })();

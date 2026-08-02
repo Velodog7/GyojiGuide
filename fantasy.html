@@ -422,6 +422,27 @@
   .lg-replybox{ display:flex; gap:8px; margin-top:8px }
   .lg-replybox input{ flex:1; background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--ink); font:inherit; font-size:.85rem; padding:7px 10px }
   .lg-replybox input:focus{ outline:none; border-color:var(--sun) }
+
+  /* ── leaderboard board (vote buttons, edit mode) ───────── */
+  .lb-board{ margin-top:26px }
+  .lb-board__title{ font-family:"Space Grotesk","Zen Kaku Gothic New",sans-serif; font-size:1.1rem; margin:0 0 12px }
+  .lg-msg__row{ display:flex; gap:12px }
+  .lg-vote{ flex:none; display:flex; flex-direction:column; align-items:center; gap:2px; padding-top:1px }
+  .lg-vote__btn{ background:none; border:1px solid var(--line); color:var(--faint); width:24px; height:22px;
+        border-radius:6px; cursor:pointer; font-size:.7rem; line-height:1; display:flex; align-items:center; justify-content:center }
+  .lg-vote__btn:hover{ border-color:var(--line2) }
+  .lg-vote__btn:disabled{ cursor:default; opacity:.5 }
+  .lg-vote__btn.on.up{ background:rgba(var(--sun-rgb),.16); border-color:var(--sun); color:var(--sun) }
+  .lg-vote__btn.on.down{ background:rgba(226,59,46,.16); border-color:var(--red); color:var(--red) }
+  .lg-vote__score{ font-family:"IBM Plex Mono",monospace; font-size:.76rem; font-weight:600; color:var(--dim) }
+  .lg-msg__main{ flex:1; min-width:0 }
+  .lg-msg__edited{ color:var(--faint); font-size:.68rem; font-style:italic }
+  .lg-msg__del{ color:var(--faint) }
+  .lg-msg__del:hover{ color:#ef6f53 }
+  .lg-post-edit{ width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:8px;
+        color:var(--ink); font:inherit; font-size:.9rem; padding:8px 10px; resize:vertical; box-sizing:border-box }
+  .lg-post-edit:focus{ outline:none; border-color:var(--sun) }
+  .lg-msg__editbar{ display:flex; gap:8px; margin-top:6px }
 </style>
 <script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-mawashi.js"></script></head>
 <body>
@@ -527,6 +548,21 @@
     <div id="lbPinned" class="lb-pinned" hidden></div>
     <div id="lbBody"></div>
     <p class="foot" id="lbFoot"></p>
+
+    <div class="lb-board">
+      <h3 class="lb-board__title">Leaderboard chat</h3>
+      <div class="signin-cta" id="boardLocked" hidden>
+        <span>Log in to post and reply on the leaderboard board.</span>
+        <div class="signin-cta__btns"><button class="btn" id="boardCtaLogin">Log in</button></div>
+      </div>
+      <div id="boardMain" hidden>
+        <div class="lg-post">
+          <textarea id="boardMsgInput" rows="2" maxlength="2000" placeholder="Post to the leaderboard…"></textarea>
+          <button class="btn sm" id="boardMsgSend">Post</button>
+        </div>
+      </div>
+      <div id="boardMsgs" class="lg-msgs"></div>
+    </div>
   </section>
 
   <!-- MY LEAGUES -->
@@ -880,6 +916,8 @@ function setAcct(a){
   saveLocal(); acctUI();
   // keep the leagues tab in sync with sign-in/out
   if (typeof loadLeagues === "function" && $("tab-leagues").getAttribute("aria-selected")==="true") loadLeagues();
+  // keep the leaderboard board's own-post/vote state in sync with sign-in/out
+  if (typeof loadLbBoard === "function" && $("tab-board").getAttribute("aria-selected")==="true") loadLbBoard();
   // a just-signed-in user with a pending invite link should auto-join
   if (a && wasOut && typeof handlePendingJoin === "function" && pendingJoin) handlePendingJoin();
   if (a) loadHistory(); else $("historyBox").hidden = true;
@@ -1645,6 +1683,94 @@ function renderMessages(msgs){
   });
 }
 
+/* ---------- leaderboard board (site-wide, shown on the Leaderboard tab) ---------- */
+let boardMsgs = [];
+async function loadLbBoard(){
+  const r = await GyojiGuide.board();
+  boardMsgs = (r && r.ok) ? (r.messages||[]) : [];
+  renderLbBoard();
+}
+function boardThreadHTML(msgs, parentId){
+  return msgs.filter(m=>(m.parentId||"")===parentId).map(m=>{
+    const replies = msgs.some(x=>x.parentId===m.id) ? `<div class="lg-replies">${boardThreadHTML(msgs, m.id)}</div>` : "";
+    const mine = acct && acct.handle && acct.handle.toLowerCase()===m.handle.toLowerCase();
+    const replyUI = (!parentId && acct) ? `<button class="lg-msg__reply" data-reply="${esc(m.id)}">Reply</button>` : "";
+    const editUI = mine ? `<button class="lg-msg__reply" data-edit="${esc(m.id)}">Edit</button><button class="lg-msg__reply lg-msg__del" data-del="${esc(m.id)}">Delete</button>` : "";
+    const editedTag = m.editedByAdmin ? `<span class="lg-msg__edited">edited by admin</span>` : (m.updated ? `<span class="lg-msg__edited">edited</span>` : "");
+    const voteUI = `<div class="lg-vote">
+        <button class="lg-vote__btn ${m.myVote===1?"on up":""}" data-vote="${esc(m.id)}" data-val="1" ${acct?"":"disabled"} title="Upvote">\u25b2</button>
+        <span class="lg-vote__score">${m.score}</span>
+        <button class="lg-vote__btn ${m.myVote===-1?"on down":""}" data-vote="${esc(m.id)}" data-val="-1" ${acct?"":"disabled"} title="Downvote">\u25bc</button>
+      </div>`;
+    return `<div class="lg-msg" data-mid="${esc(m.id)}">
+      <div class="lg-msg__head"><span class="lg-msg__who">${esc(m.name)}</span><span class="lg-msg__h">@${esc(m.handle)}</span>${editedTag}<span class="lg-msg__when">${esc(timeAgo(m.created))}</span></div>
+      <div class="lg-msg__row">${voteUI}<div class="lg-msg__main"><div class="lg-msg__body" data-body="${esc(m.id)}">${esc(m.body)}</div>${replyUI}${editUI}</div></div>
+      ${replies}</div>`;
+  }).join("");
+}
+function renderLbBoard(){
+  $("boardLocked").hidden = !!acct;
+  $("boardMain").hidden = !acct;
+  const box = $("boardMsgs");
+  if (!boardMsgs.length){ box.innerHTML = `<p style="color:var(--faint);font-size:.85rem">No posts yet — start the conversation.</p>`; return; }
+  box.innerHTML = boardThreadHTML(boardMsgs, "");
+  box.querySelectorAll("[data-reply]").forEach(btn=>{
+    btn.onclick = ()=>{
+      box.querySelectorAll(".lg-replybox").forEach(x=>x.remove());
+      const wrap = document.createElement("div"); wrap.className="lg-replybox";
+      wrap.innerHTML = `<input maxlength="2000" placeholder="Reply…"><button class="btn sm">Send</button>`;
+      btn.after(wrap);
+      const inp=wrap.querySelector("input"), snd=wrap.querySelector("button");
+      inp.focus();
+      snd.onclick = async ()=>{ const t=inp.value.trim(); if(!t) return; snd.disabled=true;
+        const r=await GyojiGuide.boardPost(t, btn.dataset.reply);
+        if (r&&r.ok){ loadLbBoard(); }
+        else { snd.disabled=false; alert((r&&r.error)||"Couldn't post."); } };
+    };
+  });
+  box.querySelectorAll("[data-vote]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const r = await GyojiGuide.boardVote(btn.dataset.vote, +btn.dataset.val);
+      if (r && r.ok) loadLbBoard();
+      else { btn.disabled=false; alert((r&&r.error)||"Couldn't vote."); }
+    };
+  });
+  box.querySelectorAll("[data-edit]").forEach(btn=>{
+    btn.onclick = ()=>{
+      const id = btn.dataset.edit;
+      const bodyEl = box.querySelector(`[data-body="${id}"]`);
+      if (!bodyEl || bodyEl.querySelector("textarea")) return;
+      const orig = (boardMsgs.find(m=>m.id===id)||{}).body || bodyEl.textContent;
+      bodyEl.innerHTML = `<textarea maxlength="2000" rows="2" class="lg-post-edit">${esc(orig)}</textarea>
+        <div class="lg-msg__editbar"><button class="btn sm" data-save="${id}">Save</button><button class="btn sm ghost" data-cancel="${id}">Cancel</button></div>`;
+      bodyEl.querySelector("[data-save]").onclick = async ()=>{
+        const t = bodyEl.querySelector("textarea").value.trim(); if(!t) return;
+        const r = await GyojiGuide.boardEdit(id, t);
+        if (r&&r.ok) loadLbBoard(); else alert((r&&r.error)||"Couldn't save.");
+      };
+      bodyEl.querySelector("[data-cancel]").onclick = ()=> renderLbBoard();
+    };
+  });
+  box.querySelectorAll("[data-del]").forEach(btn=>{
+    btn.onclick = async ()=>{
+      if (!confirm("Delete this post?")) return;
+      const r = await GyojiGuide.boardDelete(btn.dataset.del);
+      if (r&&r.ok) loadLbBoard(); else alert((r&&r.error)||"Couldn't delete.");
+    };
+  });
+}
+$("boardMsgSend").onclick = async ()=>{
+  const t=$("boardMsgInput").value.trim(); if(!t) return;
+  $("boardMsgSend").disabled=true;
+  const r=await GyojiGuide.boardPost(t);
+  $("boardMsgSend").disabled=false;
+  if (r&&r.ok){ $("boardMsgInput").value=""; loadLbBoard(); }
+  else alert((r&&r.error)||"Couldn't post.");
+};
+$("boardCtaLogin").onclick = ()=> openAuth("login");
+
 $("lgNewBtn").onclick = ()=>{ $("lgNameInput").value=""; $("lgCreateStatus").textContent="";
   document.querySelector('input[name="lgMode"][value="classic"]').checked = true;
   $("lgRosterSize").value = 6; $("lgRosterSizeWrap").hidden = true;
@@ -1704,7 +1830,7 @@ function setView(v){
   document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected","false"));
   $("v-"+v).classList.add("on");
   $("tab-"+v).setAttribute("aria-selected","true");
-  if (v==="board") loadBoard();
+  if (v==="board") { loadBoard(); loadLbBoard(); }
   if (v==="leagues") loadLeagues();
 }
 $("refreshBtn").onclick = loadBoard;

@@ -50,16 +50,28 @@ var SHEET_ROSTERS  = 'KeeperRosters';
 var SHEET_PICKS    = 'DraftPicks';
 var SHEET_TRADES   = 'Trades';
 var SHEET_FEEDBACK = 'Feedback';
+var SHEET_PAGEVIEWS = 'PageViews';
+var SHEET_BOARD = 'LeaderboardBoard';
+var SHEET_BOARD_VOTES = 'LeaderboardVotes';
 
 // Label for the current tournament (shown in the app).
 var BASHO_LABEL   = 'Aki 2026';
 
+// Password for the private /admin.html dashboard (connectivity, analytics,
+// user moderation, message-board review). Change this to your own string
+// before deploying, then enter the SAME string into admin.html when it
+// asks — the page doesn't store it anywhere on its own. Same game-grade
+// security note as the PIN system above: fine for keeping the dashboard
+// away from casual visitors, not a hardened secret store.
+var ADMIN_KEY = 'change-me-admin-key';
+
 /* ---------- one-time: build the tabs ---------- */
 function setup() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var users = ensureSheet(ss, SHEET_USERS, ['handle', 'name', 'auth', 'team', 'updated', 'avatar']);
+  var users = ensureSheet(ss, SHEET_USERS, ['handle', 'name', 'auth', 'team', 'updated', 'avatar', 'status', 'warnMsg']);
   migrateUsersV1(users);                       // upgrades a v1 sheet (no auth column) in place
   migrateUsersV2(users);                       // upgrades a v1/v2 sheet (no avatar column) in place
+  migrateUsersV3(users);                       // upgrades a v1/v2/v3 sheet (no status/warnMsg columns) in place
   ensureSheet(ss, SHEET_RESULTS, ['day', 'division', 'east', 'west', 'winner', 'kimarite']);
   var leagues = ensureSheet(ss, SHEET_LEAGUES, ['id', 'name', 'commissioner', 'created', 'inviteCode',
     'mode', 'rosterSize', 'draftStatus', 'draftOrder', 'draftPickIdx', 'draftPhase']);
@@ -72,6 +84,9 @@ function setup() {
   ensureSheet(ss, SHEET_PICKS, ['leagueId', 'pickIndex', 'round', 'phase', 'handle', 'rikishi', 'pickedAt']);
   ensureSheet(ss, SHEET_TRADES, ['id', 'leagueId', 'fromHandle', 'toHandle', 'offer', 'request', 'status', 'createdAt', 'resolvedAt']);
   ensureSheet(ss, SHEET_FEEDBACK, ['createdAt', 'kind', 'handle', 'subject', 'message', 'targetUser', 'page', 'status']);
+  ensureSheet(ss, SHEET_PAGEVIEWS, ['ts', 'page', 'visitorId']);
+  ensureSheet(ss, SHEET_BOARD, ['id', 'handle', 'name', 'body', 'parentId', 'created', 'updated', 'editedByAdmin']);
+  ensureSheet(ss, SHEET_BOARD_VOTES, ['msgId', 'handle', 'value', 'votedAt']);
   var meta = ensureSheet(ss, SHEET_META, ['key', 'value']);
   if (meta.getLastRow() < 2) {
     meta.appendRow(['basho', BASHO_LABEL]);
@@ -109,6 +124,17 @@ function migrateUsersV2(sh) {
   }
 }
 
+// pre-admin-dashboard Users sheets had no 'status'/'warnMsg' columns (used
+// by the admin panel to warn/ban accounts). Append them as columns 7-8 if
+// missing; existing rows just get blank cells, which read as "active".
+function migrateUsersV3(sh) {
+  var lastCol = Math.max(6, sh.getLastColumn());
+  var head = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  if (String(head[6] || '').toLowerCase() !== 'status') {
+    sh.getRange(1, 7, 1, 2).setValues([['status', 'warnMsg']]);
+  }
+}
+
 // pre-Keepers Leagues sheets had only [id,name,commissioner,created,inviteCode].
 // Append the draft/keeper columns if missing; existing (Classic) leagues just
 // get blank cells, which mode-aware code below treats as mode:'classic'.
@@ -132,6 +158,10 @@ function doGet(e) {
     if (action === 'history') return json({ ok: true, history: myHistory(e.parameter.handle) });
     if (action === 'draftState') return json(draftState(e.parameter.id));
     if (action === 'trades')  return json({ ok: true, trades: myTrades(e.parameter.id, e.parameter.handle) });
+    if (action === 'board')   return json({ ok: true, messages: boardMessages(e.parameter.handle) });
+    if (action === 'adminStats')    { var g1 = adminGate(e.parameter.adminKey); if (g1) return json(g1); return json(adminStats()); }
+    if (action === 'adminUsers')    { var g2 = adminGate(e.parameter.adminKey); if (g2) return json(g2); return json(adminUsers()); }
+    if (action === 'adminMessages') { var g3 = adminGate(e.parameter.adminKey); if (g3) return json(g3); return json(adminMessages()); }
     return json({ ok: true, users: readUsers(), results: readResults(), meta: readMeta() });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -161,7 +191,19 @@ function doPost(e) {
     if (body.action === 'deleteMessage')return json(deleteMessage(body));
     if (body.action === 'saveLeagueTeam') return json(saveLeagueTeam(body));
     if (body.action === 'archiveTeam') return json(archiveTeam(body));
+    if (body.action === 'postBoardMessage')      return json(postBoardMessage(body));
+    if (body.action === 'editBoardMessage')      return json(editBoardMessage(body));
+    if (body.action === 'deleteBoardMessage')    return json(deleteBoardMessage(body));
+    if (body.action === 'voteBoardMessage')      return json(voteBoardMessage(body));
+    if (body.action === 'adminEditBoardMessage') return json(adminEditBoardMessage(body));
+    if (body.action === 'adminDeleteBoardMsg')   return json(adminDeleteBoardMsg(body));
     if (body.action === 'feedback')    return json(submitFeedback(body));
+    if (body.action === 'logPageview') return json(logPageview(body));
+    if (body.action === 'adminWarnUser')      return json(adminWarnUser(body));
+    if (body.action === 'adminBanUser')       return json(adminBanUser(body));
+    if (body.action === 'adminUnbanUser')     return json(adminUnbanUser(body));
+    if (body.action === 'adminDeleteUser')    return json(adminDeleteUser(body));
+    if (body.action === 'adminDeleteMessage') return json(adminDeleteMessageFn(body));
     return json({ ok: false, error: 'unknown action' });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -240,9 +282,10 @@ function login(body) {
   if (!row) return { ok: false, error: 'No account with that handle \u2014 create one.' };
   if (String(row.auth || '') === '') return { ok: false, error: 'This handle has no PIN yet \u2014 use Create account to claim it.' };
   if (row.auth !== auth) return { ok: false, error: 'Wrong PIN.' };
+  if (row.status === 'banned') return { ok: false, error: 'This account has been suspended.' };
   var team = {};
   try { team = JSON.parse(row.team || '{}'); } catch (x) {}
-  return { ok: true, handle: row.handle, name: row.name, team: team, avatar: row.avatar || '' };
+  return { ok: true, handle: row.handle, name: row.name, team: team, avatar: row.avatar || '', warning: row.status === 'warned' ? row.warnMsg : '' };
 }
 
 /* save a team: only with the account's own hash */
@@ -300,7 +343,7 @@ function findUser(handle) {
   var key = String(handle || '').toLowerCase();
   for (var r = 1; r < v.length; r++) {
     if (String(v[r][0]).trim().toLowerCase() === key) {
-      return { handle: String(v[r][0]), name: String(v[r][1] || v[r][0]), auth: String(v[r][2] || ''), team: v[r][3], updated: String(v[r][4] || ''), avatar: String(v[r][5] || '') };
+      return { handle: String(v[r][0]), name: String(v[r][1] || v[r][0]), auth: String(v[r][2] || ''), team: v[r][3], updated: String(v[r][4] || ''), avatar: String(v[r][5] || ''), status: String(v[r][6] || ''), warnMsg: String(v[r][7] || '') };
     }
   }
   return null;
@@ -357,6 +400,7 @@ function verifyAuth(handle, auth) {
   var u = findUser(handle);
   if (!u) return null;
   if (String(u.auth || '') === '' || String(u.auth) !== String(auth || '')) return null;
+  if (u.status === 'banned') return null;
   return u;
 }
 function sh_(name){ return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name); }
@@ -546,6 +590,112 @@ function deleteMessage(body){
     }
   }
   return { ok:false, error:'Message not found.' };
+}
+
+/* ============================================================
+   LEADERBOARD BOARD
+   One shared, site-wide message board (not per-league) shown on the
+   Fantasy page's Leaderboard tab. Any signed-in player can post and
+   reply; a poster can edit or delete their own posts; the admin
+   dashboard can edit or delete anyone's (see adminEditBoardMessage /
+   adminDeleteBoardMsg below). Upvote/downvote is one vote per
+   (message, handle) — casting the same value again removes it.
+   ============================================================ */
+function boardVoteTally_(){
+  var v = sh_(SHEET_BOARD_VOTES).getDataRange().getValues();
+  var out = {};
+  for (var r=1;r<v.length;r++){
+    var mid = String(v[r][0]); if (!mid) continue;
+    if (!out[mid]) out[mid] = { up:0, down:0, voters:{} };
+    var val = Number(v[r][2]) || 0;
+    if (val > 0) out[mid].up++; else if (val < 0) out[mid].down++;
+    out[mid].voters[String(v[r][1]).toLowerCase()] = val;
+  }
+  return out;
+}
+function boardMessages(handle){
+  var v = sh_(SHEET_BOARD).getDataRange().getValues();
+  var tally = boardVoteTally_();
+  var key = cleanHandle(handle).toLowerCase();
+  var out = [];
+  for (var r=1;r<v.length;r++){
+    if (!String(v[r][0]).trim()) continue;
+    var id = String(v[r][0]);
+    var t = tally[id] || { up:0, down:0, voters:{} };
+    out.push({
+      id:id, handle:String(v[r][1]), name:String(v[r][2]||v[r][1]), body:String(v[r][3]||''),
+      parentId:String(v[r][4]||''), created:String(v[r][5]||''), updated:String(v[r][6]||''),
+      editedByAdmin: String(v[r][7]||'')==='1',
+      up:t.up, down:t.down, score:t.up-t.down,
+      myVote: key ? (t.voters[key]||0) : 0
+    });
+  }
+  return out;
+}
+function postBoardMessage(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Sign in to post.' };
+  var text = String(body.body||'').trim().slice(0,2000); if (!text) return { ok:false, error:'Empty message.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var mid = newId('bm_');
+    sh_(SHEET_BOARD).appendRow([mid, u.handle, u.name, text, String(body.parentId||''), new Date().toISOString(), '', '']);
+    return { ok:true, id:mid };
+  } finally { lock.releaseLock(); }
+}
+function boardMsgRow_(msgId){
+  var sh = sh_(SHEET_BOARD), v = sh.getDataRange().getValues();
+  for (var r=1;r<v.length;r++) if (String(v[r][0])===String(msgId)) return { row:r+1, handle:String(v[r][1]) };
+  return null;
+}
+function editBoardMessage(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Sign in first.' };
+  var m = boardMsgRow_(body.msgId); if (!m) return { ok:false, error:'Message not found.' };
+  if (m.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'You can only edit your own posts.' };
+  var text = String(body.body||'').trim().slice(0,2000); if (!text) return { ok:false, error:'Message can\u2019t be empty.' };
+  sh_(SHEET_BOARD).getRange(m.row,4,1,1).setValue(text);
+  sh_(SHEET_BOARD).getRange(m.row,7,1,1).setValue(new Date().toISOString());
+  return { ok:true };
+}
+function deleteBoardMessage(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Sign in first.' };
+  var m = boardMsgRow_(body.msgId); if (!m) return { ok:false, error:'Message not found.' };
+  if (m.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'You can only delete your own posts.' };
+  sh_(SHEET_BOARD).deleteRow(m.row);
+  return { ok:true };
+}
+function voteBoardMessage(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Sign in to vote.' };
+  var m = boardMsgRow_(body.msgId); if (!m) return { ok:false, error:'Message not found.' };
+  var val = Number(body.value);
+  if (val !== 1 && val !== -1) return { ok:false, error:'Bad vote value.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = sh_(SHEET_BOARD_VOTES), v = sh.getDataRange().getValues(), key = u.handle.toLowerCase();
+    for (var r=1;r<v.length;r++){
+      if (String(v[r][0])===String(body.msgId) && String(v[r][1]).toLowerCase()===key){
+        if (Number(v[r][2]) === val){ sh.deleteRow(r+1); }               // same value again -> remove the vote
+        else sh.getRange(r+1,3,1,2).setValues([[val, new Date().toISOString()]]);
+        return { ok:true, tally: boardVoteTally_()[String(body.msgId)] || { up:0, down:0 } };
+      }
+    }
+    sh.appendRow([body.msgId, u.handle, val, new Date().toISOString()]);
+    return { ok:true, tally: boardVoteTally_()[String(body.msgId)] || { up:0, down:0 } };
+  } finally { lock.releaseLock(); }
+}
+function adminEditBoardMessage(body){
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var m = boardMsgRow_(body.msgId); if (!m) return { ok:false, error:'Message not found.' };
+  var text = String(body.body||'').trim().slice(0,2000); if (!text) return { ok:false, error:'Message can\u2019t be empty.' };
+  var sh = sh_(SHEET_BOARD);
+  sh.getRange(m.row,4,1,1).setValue(text);
+  sh.getRange(m.row,7,1,2).setValues([[new Date().toISOString(), '1']]);
+  return { ok:true };
+}
+function adminDeleteBoardMsg(body){
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var m = boardMsgRow_(body.msgId); if (!m) return { ok:false, error:'Message not found.' };
+  sh_(SHEET_BOARD).deleteRow(m.row);
+  return { ok:true };
 }
 
 /* save a member's team for one specific league (independent of their
@@ -833,6 +983,166 @@ function myHistory(handle){
   }
   out.sort(function(a,b){ return new Date(b.savedAt) - new Date(a.savedAt); });
   return out;
+}
+
+/* ============================================================
+   ADMIN DASHBOARD
+   Backs the private admin.html page: site/API connectivity, pageview
+   analytics, user moderation (warn/ban/delete), and a read-only feed of
+   every message-board post across all leagues. Every admin action here
+   requires body.adminKey (or ?adminKey= on GETs) to match ADMIN_KEY above.
+   ============================================================ */
+function adminGate(key) {
+  if (ADMIN_KEY && String(key || '') === String(ADMIN_KEY)) return null;
+  return { ok: false, error: 'Not authorised.' };
+}
+
+/* record one pageview; called from every public page via gg-nav.js.
+   No auth needed — it's write-only and never echoes anything back. */
+function logPageview(body) {
+  var page = String(body.page || '').trim().slice(0, 80);
+  var vid = String(body.visitorId || '').trim().slice(0, 60);
+  if (!page || !vid) return { ok: false };
+  try { sh_(SHEET_PAGEVIEWS).appendRow([new Date().toISOString(), page, vid]); }
+  catch (e) { return { ok: false }; }
+  return { ok: true };
+}
+
+/* live reachability check from the server side — this is the same side
+   that actually needs sumo-api (refreshResults, gg-roster.js's fallback
+   chain), so it's a truer signal than checking from the visitor's browser. */
+function checkSumoApi() {
+  var start = Date.now();
+  try {
+    var resp = UrlFetchApp.fetch('https://www.sumo-api.com/api/rikishis?limit=1', { muteHttpExceptions: true });
+    var code = resp.getResponseCode();
+    return { ok: code >= 200 && code < 300, code: code, ms: Date.now() - start, checkedAt: new Date().toISOString() };
+  } catch (e) {
+    return { ok: false, error: String(e), ms: Date.now() - start, checkedAt: new Date().toISOString() };
+  }
+}
+
+function adminStats() {
+  var v = sh_(SHEET_PAGEVIEWS).getDataRange().getValues();
+  var total = 0, uniques = {}, byPage = {}, since7 = Date.now() - 7 * 24 * 3600 * 1000, total7 = 0, uniq7 = {};
+  for (var r = 1; r < v.length; r++) {
+    var vid = String(v[r][2] || ''); if (!vid) continue;
+    var page = String(v[r][1] || '(unknown)');
+    total++; uniques[vid] = 1;
+    if (!byPage[page]) byPage[page] = { total: 0, uniques: {} };
+    byPage[page].total++; byPage[page].uniques[vid] = 1;
+    var t = Date.parse(String(v[r][0] || ''));
+    if (!isNaN(t) && t >= since7) { total7++; uniq7[vid] = 1; }
+  }
+  var pages = [];
+  for (var p in byPage) pages.push({ page: p, total: byPage[p].total, unique: Object.keys(byPage[p].uniques).length });
+  pages.sort(function (a, b) { return b.total - a.total; });
+
+  var userRows = Math.max(0, sh_(SHEET_USERS).getDataRange().getValues().length - 1);
+  var leagueRows = Math.max(0, sh_(SHEET_LEAGUES).getDataRange().getValues().length - 1);
+  var msgRows = Math.max(0, sh_(SHEET_MESSAGES).getDataRange().getValues().length - 1);
+
+  return {
+    ok: true,
+    pageviews: { total: total, unique: Object.keys(uniques).length, last7Total: total7, last7Unique: Object.keys(uniq7).length, byPage: pages },
+    counts: { users: userRows, leagues: leagueRows, messages: msgRows },
+    api: checkSumoApi()
+  };
+}
+
+function adminUsers() {
+  var v = sh_(SHEET_USERS).getDataRange().getValues();
+  var mem = sh_(SHEET_MEMBERS).getDataRange().getValues();
+  var msgs = sh_(SHEET_MESSAGES).getDataRange().getValues();
+  var leagueCount = {}, msgCount = {};
+  for (var r = 1; r < mem.length; r++) { var h = String(mem[r][1] || '').toLowerCase(); if (h) leagueCount[h] = (leagueCount[h] || 0) + 1; }
+  for (var r2 = 1; r2 < msgs.length; r2++) { var h2 = String(msgs[r2][2] || '').toLowerCase(); if (h2) msgCount[h2] = (msgCount[h2] || 0) + 1; }
+  var out = [];
+  for (var i = 1; i < v.length; i++) {
+    if (!String(v[i][0]).trim()) continue;
+    var handle = String(v[i][0]), key = handle.toLowerCase();
+    var team = {}; try { team = JSON.parse(v[i][3] || '{}'); } catch (e) {}
+    out.push({
+      handle: handle, name: String(v[i][1] || handle), updated: String(v[i][4] || ''),
+      teamPicks: Object.keys(team).filter(function (k) { return team[k]; }).length,
+      status: String(v[i][6] || 'active') || 'active', warnMsg: String(v[i][7] || ''),
+      leagues: leagueCount[key] || 0, messages: msgCount[key] || 0
+    });
+  }
+  out.sort(function (a, b) { return new Date(b.updated) - new Date(a.updated); });
+  return { ok: true, users: out };
+}
+
+function findUserRow_(handle) {
+  var sh = sh_(SHEET_USERS), v = sh.getDataRange().getValues(), key = String(handle || '').toLowerCase();
+  for (var r = 1; r < v.length; r++) if (String(v[r][0]).trim().toLowerCase() === key) return r + 1;
+  return 0;
+}
+
+function adminWarnUser(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var row = findUserRow_(body.handle); if (!row) return { ok: false, error: 'User not found.' };
+  var msg = String(body.message || '').trim().slice(0, 500);
+  if (!msg) return { ok: false, error: 'A warning needs a message.' };
+  sh_(SHEET_USERS).getRange(row, 7, 1, 2).setValues([['warned', msg]]);
+  return { ok: true };
+}
+
+function adminBanUser(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var row = findUserRow_(body.handle); if (!row) return { ok: false, error: 'User not found.' };
+  var msg = String(body.message || '').trim().slice(0, 500) || 'This account has been suspended.';
+  sh_(SHEET_USERS).getRange(row, 7, 1, 2).setValues([['banned', msg]]);
+  return { ok: true };
+}
+
+function adminUnbanUser(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var row = findUserRow_(body.handle); if (!row) return { ok: false, error: 'User not found.' };
+  sh_(SHEET_USERS).getRange(row, 7, 1, 2).setValues([['active', '']]);
+  return { ok: true };
+}
+
+function adminDeleteUser(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var row = findUserRow_(body.handle); if (!row) return { ok: false, error: 'User not found.' };
+  sh_(SHEET_USERS).deleteRow(row);
+  return { ok: true };
+}
+
+function adminMessages() {
+  var v = sh_(SHEET_MESSAGES).getDataRange().getValues();
+  var lv = sh_(SHEET_LEAGUES).getDataRange().getValues();
+  var names = {}; for (var r = 1; r < lv.length; r++) names[String(lv[r][0])] = String(lv[r][1]);
+  var out = [];
+  for (var i = 1; i < v.length; i++) {
+    if (!String(v[i][0]).trim()) continue;
+    out.push({
+      id: String(v[i][0]), leagueId: String(v[i][1]), league: names[String(v[i][1])] || '(deleted league)',
+      handle: String(v[i][2]), name: String(v[i][3] || v[i][2]), body: String(v[i][4] || ''),
+      parentId: String(v[i][5] || ''), created: String(v[i][6] || ''), board: 'league'
+    });
+  }
+  var bv = sh_(SHEET_BOARD).getDataRange().getValues();
+  for (var j = 1; j < bv.length; j++) {
+    if (!String(bv[j][0]).trim()) continue;
+    out.push({
+      id: String(bv[j][0]), leagueId: '', league: 'Leaderboard (site-wide)',
+      handle: String(bv[j][1]), name: String(bv[j][2] || bv[j][1]), body: String(bv[j][3] || ''),
+      parentId: String(bv[j][4] || ''), created: String(bv[j][5] || ''), board: 'leaderboard'
+    });
+  }
+  out.sort(function (a, b) { return new Date(b.created) - new Date(a.created); });
+  return { ok: true, messages: out };
+}
+
+function adminDeleteMessageFn(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var sh = sh_(SHEET_MESSAGES), v = sh.getDataRange().getValues();
+  for (var r = 1; r < v.length; r++) {
+    if (String(v[r][0]) === String(body.msgId)) { sh.deleteRow(r + 1); return { ok: true }; }
+  }
+  return { ok: false, error: 'Message not found.' };
 }
 
 /* ---------- JSON helper ----------
