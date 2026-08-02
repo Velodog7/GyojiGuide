@@ -259,10 +259,19 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
 
   /* ---------- gate ---------- */
   async function tryUnlock(key){
-    var err = $("gateErr");
-    err.textContent = "";
+    var err = $("gateErr"), btn = $("gateGo");
+    if (!key){ err.textContent = "Enter the admin key first."; return; }
+    err.textContent = "Checking\u2026";
+    btn.disabled = true;
     state.key = key;
-    var res = await aGet("adminStats");
+    var res;
+    if (!GG || !GG.hasAPI || !GG.hasAPI()){
+      res = null;
+    } else {
+      try { res = await GG.apiGetQ("adminStats", { adminKey: key }); }
+      catch (e) { err.textContent = "Request failed: " + (e && e.message ? e.message : e); btn.disabled = false; return; }
+    }
+    btn.disabled = false;
     if (res && res.ok){
       sessionStorage.setItem(KEYNAME, key);
       $("gate").hidden = true;
@@ -272,7 +281,9 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
       setView("conn");
     } else {
       state.key = "";
-      err.textContent = (res && res.error) ? "Incorrect admin key." : "Couldn't reach the backend — check gg-config.js's API_URL.";
+      if (res === null) err.textContent = "Couldn\u2019t reach the backend \u2014 check that gg-config.js sits next to admin.html and its API_URL is set.";
+      else if (res && res.error === "Not authorised.") err.textContent = "Incorrect admin key.";
+      else err.textContent = "Backend error: " + ((res && res.error) || "unknown response.");
     }
   }
   $("gateGo").onclick = function(){ tryUnlock(($("gateKey").value || "").trim()); };
