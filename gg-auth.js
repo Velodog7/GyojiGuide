@@ -38,13 +38,15 @@
   /* ---------------- styles ---------------- */
   var CSS =
     ".ggn-acct{grid-column:3;justify-self:end;display:flex;align-items:center;gap:8px}"+
-    ".gga-btn{font:inherit;font-weight:600;font-size:.82rem;padding:8px 14px;border-radius:9px;cursor:pointer;"+
-      "border:1px solid #39404f;background:transparent;color:#c7cbd9;transition:color .15s,background .15s,border-color .15s;white-space:nowrap}"+
+    ".gga-btn{font:inherit;font-weight:600;font-size:.82rem;padding:0 14px;border-radius:9px;cursor:pointer;"+
+      "border:1px solid #39404f;background:transparent;color:#c7cbd9;transition:color .15s,background .15s,border-color .15s;white-space:nowrap;"+
+      "box-sizing:border-box;height:40px;display:inline-flex;align-items:center;justify-content:center}"+
     ".gga-btn:hover{color:#e0a23a;border-color:#e0a23a}"+
     ".gga-btn.solid{background:#e0a23a;border-color:#e0a23a;color:#141620}"+
     ".gga-btn.solid:hover{filter:brightness(1.08);color:#141620}"+
-    ".gga-chip{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 5px;border-radius:999px;cursor:pointer;"+
-      "border:1px solid #39404f;background:rgba(255,255,255,.03);color:#f1f2f6;font:inherit;font-weight:600;font-size:.84rem}"+
+    ".gga-chip{display:flex;align-items:center;gap:8px;padding:0 10px 0 5px;border-radius:999px;cursor:pointer;"+
+      "border:1px solid #39404f;background:rgba(255,255,255,.03);color:#f1f2f6;font:inherit;font-weight:600;font-size:.84rem;"+
+      "box-sizing:border-box;height:40px}"+
     ".gga-chip:hover{border-color:#e0a23a}"+
     ".gga-chip__ava{width:28px;height:28px;border-radius:50%;overflow:hidden;background:#222633;display:grid;place-items:center;"+
       "font-size:.8rem;color:#e0a23a;flex:none}"+
