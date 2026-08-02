@@ -847,12 +847,20 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
   if (!window.GGRoster){ return; }
   show("loading", "Checking for the latest data\u2026");
   var WORD = { Y:"Yokozuna", O:"Ozeki", S:"Sekiwake", K:"Komusubi", M:"Maegashira", J:"Juryo" };
+  function bucketOf(tier, num){
+    if (tier === "Y" || tier === "O" || tier === "S" || tier === "K") return "sanyaku";
+    if (tier === "J") return "juryo";
+    if (num <= 4) return "m1_4";
+    if (num <= 8) return "m5_8";
+    if (num <= 12) return "m9_12";
+    return "m13_16";
+  }
   GGRoster.load().then(function(res){
     if (!res || !res.ok){ show("warn", "Showing saved data \u2014 couldn\u2019t reach sumo-api for a live update."); return; }
     R.forEach(function(r){
       var w = res.ranks[r.n];
       if (!w){ return; }
-      r.rk = w.rk; r.side = w.sideCap; r.num = w.num; r.tier = w.tierName; r.d = w.div;
+      r.rk = w.rk; r.side = w.sideCap; r.num = w.num; r.tier = bucketOf(w.tier, w.num); r.d = w.div;
       var word = WORD[w.tier] || "Maegashira";
       r.rank = (w.tier === "M" || w.tier === "J") ? (word + " " + w.num) : word;
       if (w.record) r.live = w.record;
