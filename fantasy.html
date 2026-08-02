@@ -920,6 +920,8 @@ function setAcct(a){
   if (typeof loadLbBoard === "function" && $("tab-board").getAttribute("aria-selected")==="true") loadLbBoard();
   // a just-signed-in user with a pending invite link should auto-join
   if (a && wasOut && typeof handlePendingJoin === "function" && pendingJoin) handlePendingJoin();
+  // a just-signed-in user arriving via an account-modal league quick link should land there
+  if (a && wasOut && typeof handlePendingLeague === "function" && pendingLeague) handlePendingLeague();
   if (a) loadHistory(); else $("historyBox").hidden = true;
 }
 function validForm(h, p, needPin){
@@ -1824,6 +1826,14 @@ async function handlePendingJoin(){
   if (r && r.ok){ setView("leagues"); loadLeagues(jid); }
 }
 
+// account-modal quick link: ?league=<leagueId> — jump straight to a league you're already in
+const pendingLeague = new URLSearchParams(location.search).get("league") || null;
+function handlePendingLeague(){
+  if (!pendingLeague) return;
+  if (!acct){ openAuth("login"); return; }
+  setView("leagues"); loadLeagues(pendingLeague);
+}
+
 /* ---------- tabs ---------- */
 function setView(v){
   document.querySelectorAll(".view").forEach(s=>s.classList.remove("on"));
@@ -1864,6 +1874,7 @@ acctUI();
 paintSlots();
 syncTeam();
 handlePendingJoin();   // if arriving via an invite link (?join=…)
+handlePendingLeague(); // if arriving via an account-modal league quick link (?league=…)
 loadBoard();           // populates the countdown + auto-archive check on the landing view too
 if (acct) loadHistory();
 

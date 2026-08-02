@@ -78,7 +78,10 @@ here as backup/reference. To update the live backend:
    for analytics, two new columns (`status`, `warnMsg`) on the **Users**
    sheet for the admin dashboard's warn/ban moderation, and the
    **LeaderboardBoard** / **LeaderboardVotes** sheets behind the Fantasy
-   page's Leaderboard-tab message board.
+   page's Leaderboard-tab message board. (Editable handles and the account
+   modal's trophy case/history/leagues panel added later reuse these same
+   sheets — no new ones, but still redeploy per the next step so the new
+   backend actions go live.)
 5. **Deploy → Manage deployments → Edit → New version.** Editing "New version"
    keeps the same `/exec` URL. (If you instead create a brand-new deployment,
    the URL changes — see step 4 below.)

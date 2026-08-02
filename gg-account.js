@@ -142,6 +142,18 @@
     return res;
   };
   GG.logout = function () { GG.account.set(null); };
+  GG.changeHandle = async function (newHandle, pin) {
+    var a = GG.account.get();
+    if (!a) return { ok: false, error: "Sign in first." };
+    newHandle = String(newHandle || "").trim();
+    if (!validHandle(newHandle)) return { ok: false, error: "Handle: 2\u201340 letters, digits, _ . -" };
+    if (String(pin || "").length < 4) return { ok: false, error: "Re-enter your PIN to confirm the change." };
+    var newAuth = await GG.pinAuth(newHandle, pin);
+    var res = await GG.apiPost({ action: "changeHandle", handle: a.handle, auth: a.auth, newHandle: newHandle, newAuth: newAuth });
+    if (res && res.ok) { a.handle = newHandle; a.auth = newAuth; GG.account.set(a); }
+    return res;
+  };
+  GG.accountSummary = function (handle) { return GG.apiGetQ("accountSummary", { handle: handle || (GG.account.get()||{}).handle || "" }); };
   GG.saveTeam = async function (team) {
     var a = GG.account.get();
     if (!a) return { ok: false, error: "Sign in first." };

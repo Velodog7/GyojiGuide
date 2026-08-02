@@ -159,6 +159,7 @@ function doGet(e) {
     if (action === 'draftState') return json(draftState(e.parameter.id));
     if (action === 'trades')  return json({ ok: true, trades: myTrades(e.parameter.id, e.parameter.handle) });
     if (action === 'board')   return json({ ok: true, messages: boardMessages(e.parameter.handle) });
+    if (action === 'accountSummary') return json(accountSummary(e.parameter.handle));
     if (action === 'adminStats')    { var g1 = adminGate(e.parameter.adminKey); if (g1) return json(g1); return json(adminStats()); }
     if (action === 'adminUsers')    { var g2 = adminGate(e.parameter.adminKey); if (g2) return json(g2); return json(adminUsers()); }
     if (action === 'adminMessages') { var g3 = adminGate(e.parameter.adminKey); if (g3) return json(g3); return json(adminMessages()); }
@@ -174,6 +175,7 @@ function doPost(e) {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (body.action === 'register') return json(register(body));
     if (body.action === 'login')    return json(login(body));
+    if (body.action === 'changeHandle') return json(changeHandle(body));
     if (body.action === 'save')     return json(saveTeam(body));
     if (body.action === 'saveAvatar') return json(saveAvatar(body));
     if (body.action === 'createLeague') return json(createLeague(body));
@@ -286,6 +288,60 @@ function login(body) {
   var team = {};
   try { team = JSON.parse(row.team || '{}'); } catch (x) {}
   return { ok: true, handle: row.handle, name: row.name, team: team, avatar: row.avatar || '', warning: row.status === 'warned' ? row.warnMsg : '' };
+}
+
+/* change handle: the account's PIN hash is bound to the handle string
+   (see GG.pinAuth client-side — it hashes "handle:pin:salt"), so a rename
+   needs a freshly-computed hash for the new handle, not just a rename. The
+   client re-derives that hash from the PIN the user re-enters and sends
+   both: the OLD auth (proving they own the account) and the NEW auth (to
+   store going forward). Cascades the new handle into every sheet that
+   references it as a foreign key. */
+function changeHandle(body) {
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok: false, error: 'Not authorised.' };
+  var newHandle = cleanHandle(body.newHandle);
+  if (!newHandle) return { ok: false, error: 'Handle: 2\u201340 letters, digits, _ . -' };
+  if (newHandle.toLowerCase() === u.handle.toLowerCase()) return { ok: false, error: 'That\u2019s already your handle.' };
+  var newAuth = String(body.newAuth || '').slice(0, 80);
+  if (!newAuth) return { ok: false, error: 'Missing new PIN hash.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    if (findUser(newHandle)) return { ok: false, error: 'That handle is already taken.' };
+    var oldHandle = u.handle;
+    var usersSh = sh_(SHEET_USERS), uv = usersSh.getDataRange().getValues();
+    var found = false;
+    for (var r = 1; r < uv.length; r++) {
+      if (String(uv[r][0]).toLowerCase() === oldHandle.toLowerCase()) {
+        usersSh.getRange(r + 1, 1).setValue(newHandle);
+        usersSh.getRange(r + 1, 3).setValue(newAuth);
+        found = true;
+        break;
+      }
+    }
+    if (!found) return { ok: false, error: 'Account not found.' };
+    renameHandleInSheet_(SHEET_MEMBERS, [1], oldHandle, newHandle);
+    renameHandleInSheet_(SHEET_MESSAGES, [2], oldHandle, newHandle);
+    renameHandleInSheet_(SHEET_LGTEAMS, [1], oldHandle, newHandle);
+    renameHandleInSheet_(SHEET_HISTORY, [0], oldHandle, newHandle);
+    renameHandleInSheet_(SHEET_ROSTERS, [1], oldHandle, newHandle);
+    renameHandleInSheet_(SHEET_PICKS, [4], oldHandle, newHandle);
+    renameHandleInSheet_(SHEET_TRADES, [2, 3], oldHandle, newHandle);
+    renameHandleInSheet_(SHEET_LEAGUES, [2], oldHandle, newHandle);      // commissioner
+    renameHandleInSheet_(SHEET_BOARD, [1], oldHandle, newHandle);
+    renameHandleInSheet_(SHEET_BOARD_VOTES, [1], oldHandle, newHandle);
+    return { ok: true, handle: newHandle };
+  } finally { lock.releaseLock(); }
+}
+function renameHandleInSheet_(sheetName, cols, oldHandle, newHandle) {
+  var sh = sh_(sheetName); if (!sh) return;
+  var v = sh.getDataRange().getValues();
+  var key = oldHandle.toLowerCase();
+  for (var r = 1; r < v.length; r++) {
+    for (var ci = 0; ci < cols.length; ci++) {
+      var c = cols[ci];
+      if (String(v[r][c] || '').toLowerCase() === key) sh.getRange(r + 1, c + 1).setValue(newHandle);
+    }
+  }
 }
 
 /* save a team: only with the account's own hash */
@@ -983,6 +1039,63 @@ function myHistory(handle){
   }
   out.sort(function(a,b){ return new Date(b.savedAt) - new Date(a.savedAt); });
   return out;
+}
+
+/* everyone's archived basho results in one read — used by both the badge
+   computation (needs other players' scores to know who was "highest") and
+   the all-time rank (needs everyone's running totals). */
+function allHistoryRows_(){
+  var v = sh_(SHEET_HISTORY).getDataRange().getValues(), out = [];
+  for (var r = 1; r < v.length; r++) {
+    if (!String(v[r][0]).trim()) continue;
+    var rows = []; try { rows = JSON.parse(v[r][5] || '[]'); } catch (e) {}
+    out.push({ handle: String(v[r][0]), basho: String(v[r][1] || ''), score: Number(v[r][3] || 0), wins: Number(v[r][4] || 0), rows: rows, savedAt: String(v[r][6] || '') });
+  }
+  return out;
+}
+function computeBadges_(handle, allHistory) {
+  var key = handle.toLowerCase();
+  var mine = allHistory.filter(function (h) { return h.handle.toLowerCase() === key; });
+  var byBasho = {};
+  allHistory.forEach(function (h) { (byBasho[h.basho] = byBasho[h.basho] || []).push(h); });
+  var badges = [];
+  mine.forEach(function (h) {
+    if ((h.rows || []).some(function (row) { return row.yusho; })) {
+      badges.push({ id: 'yusho-' + h.basho, icon: '\ud83c\udfc6', label: 'Y\u016bsh\u014d Winner \u2014 ' + h.basho });
+    }
+    var peers = byBasho[h.basho] || [];
+    var top = peers.reduce(function (m, p) { return Math.max(m, p.score || 0); }, 0);
+    if (peers.length > 1 && top > 0 && h.score === top) {
+      badges.push({ id: 'top-' + h.basho, icon: '\u2b50', label: 'Highest Scorer \u2014 ' + h.basho });
+    }
+  });
+  return badges;
+}
+function allTimeRank_(allHistory, handle) {
+  var totals = {};
+  allHistory.forEach(function (h) { var k = h.handle.toLowerCase(); totals[k] = (totals[k] || 0) + (h.score || 0); });
+  var ranked = Object.keys(totals).map(function (k) { return { handle: k, total: totals[k] }; })
+    .sort(function (a, b) { return b.total - a.total; });
+  var key = handle.toLowerCase();
+  var idx = ranked.findIndex(function (r) { return r.handle === key; });
+  return { rank: idx >= 0 ? idx + 1 : null, of: ranked.length, total: totals[key] || 0 };
+}
+/* one consolidated read for the account modal: trophy case, historical
+   performance (with an all-time rank), and active-league quick links. */
+function accountSummary(handle) {
+  handle = cleanHandle(handle);
+  if (!handle) return { ok: false, error: 'Bad handle.' };
+  var allHistory = allHistoryRows_();
+  var mine = allHistory.filter(function (h) { return h.handle.toLowerCase() === handle.toLowerCase(); })
+    .sort(function (a, b) { return new Date(b.savedAt) - new Date(a.savedAt); });
+  var leaguesRes = myLeagues(handle);
+  return {
+    ok: true,
+    badges: computeBadges_(handle, allHistory),
+    history: mine.map(function (h) { return { basho: h.basho, score: h.score, wins: h.wins, savedAt: h.savedAt }; }),
+    allTime: allTimeRank_(allHistory, handle),
+    leagues: (leaguesRes && leaguesRes.ok) ? leaguesRes.leagues : []
+  };
 }
 
 /* ============================================================

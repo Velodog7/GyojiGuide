@@ -73,8 +73,33 @@
     ".gga-status.err{color:#f0655a}.gga-status.ok{color:#43c08a}"+
     ".gga-acctrow{display:flex;align-items:center;gap:12px;margin-bottom:16px}"+
     ".gga-acctrow .gga-chip__ava{width:46px;height:46px;font-size:1.1rem}"+
+    ".gga-acctrow__id{flex:1;min-width:0}"+
     ".gga-acctrow b{display:block;color:#f1f2f6;font-size:1rem}"+
     ".gga-acctrow small{color:#878da0;font-family:'IBM Plex Mono',monospace;font-size:.75rem}"+
+    ".gga-editbtn{flex:none;width:30px;height:30px;border-radius:8px;border:1px solid #2a2d38;background:#1b1e27;"+
+      "color:#878da0;font-size:.85rem;cursor:pointer;display:grid;place-items:center}"+
+    ".gga-editbtn:hover{color:#e0a23a;border-color:#e0a23a}"+
+    ".gga-handleform{background:#1b1e27;border:1px solid #2a2d38;border-radius:12px;padding:12px 13px;margin-bottom:16px}"+
+    ".gga-handleform__btns{display:flex;gap:8px;margin-top:2px}"+
+    ".gga-handleform__btns .gga-primary{margin-top:0;width:auto;flex:1}"+
+    ".gga-handleform__btns .gga-menu-btn{margin-top:0;width:auto;flex:none;padding:11px 14px}"+
+    ".gga-summary{margin-bottom:4px}"+
+    ".gga-sec{margin:0 0 16px}"+
+    ".gga-sec h3{margin:0 0 8px;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:#878da0;font-weight:600}"+
+    ".gga-empty{margin:0;font-size:.84rem;color:#66697a;font-style:italic}"+
+    ".gga-badges{display:flex;flex-wrap:wrap;gap:7px}"+
+    ".gga-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(224,162,58,.12);border:1px solid rgba(224,162,58,.35);"+
+      "color:#e0a23a;border-radius:999px;padding:5px 11px;font-size:.78rem;font-weight:600;white-space:nowrap}"+
+    ".gga-hist{display:flex;flex-direction:column;gap:1px;border:1px solid #2a2d38;border-radius:10px;overflow:hidden}"+
+    ".gga-hist__row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;"+
+      "background:#1b1e27;font-size:.84rem;color:#c7cbd9}"+
+    ".gga-hist__row span:first-child{font-weight:600;color:#e9eaf0}"+
+    ".gga-rank{margin:9px 0 0;font-size:.82rem;color:#878da0}"+
+    ".gga-rank b{color:#e0a23a}"+
+    ".gga-leagues{display:flex;flex-wrap:wrap;gap:7px}"+
+    ".gga-leaguechip{background:#1b1e27;border:1px solid #2a2d38;color:#e9eaf0;border-radius:999px;padding:6px 13px;"+
+      "font:inherit;font-size:.8rem;font-weight:500;cursor:pointer}"+
+    ".gga-leaguechip:hover{border-color:#e0a23a;color:#e0a23a}"+
     ".gga-menu-btn{width:100%;text-align:left;background:#1b1e27;border:1px solid #2a2d38;color:#e9eaf0;font:inherit;"+
       "font-size:.9rem;padding:11px 13px;border-radius:10px;cursor:pointer;margin-top:8px}"+
     ".gga-menu-btn:hover{border-color:#e0a23a}"+
@@ -144,12 +169,22 @@
       modal.innerHTML =
         '<button class="gga-x" aria-label="Close">\u2715</button>'+
         '<div class="gga-acctrow"><span class="gga-chip__ava">'+avaInner(a)+'</span>'+
-          '<span><b>'+esc(a.name || a.handle)+'</b><small>@'+esc(a.handle)+'</small></span></div>'+
+          '<span class="gga-acctrow__id"><b>'+esc(a.name || a.handle)+'</b><small>@'+esc(a.handle)+'</small></span>'+
+          '<button class="gga-editbtn" id="ggaEditHandle" title="Edit handle" aria-label="Edit handle">\u270e</button></div>'+
+        '<div class="gga-handleform" id="ggaHandleForm" hidden>'+
+          '<label class="gga-fld"><span>New handle</span><input id="ggaNewHandle" maxlength="40" autocomplete="off" placeholder="'+esc(a.handle)+'"></label>'+
+          '<label class="gga-fld"><span>Current PIN</span><input id="ggaHandlePin" type="password" maxlength="24" autocomplete="current-password" placeholder="Confirm with your PIN"></label>'+
+          '<div class="gga-handleform__btns"><button class="gga-primary" id="ggaSaveHandle">Save handle</button><button class="gga-menu-btn" id="ggaCancelHandle">Cancel</button></div>'+
+          '<div class="gga-status" id="ggaHandleStatus"></div>'+
+        '</div>'+
+        '<div class="gga-summary" id="ggaSummary"><p class="gga-empty">Loading your stats\u2026</p></div>'+
         (window.MawashiDesigner ? '<button class="gga-menu-btn" id="ggaEdit">Edit mawashi avatar</button>' : '')+
         '<button class="gga-menu-btn danger" id="ggaLogout">Log out</button>';
       modal.querySelector(".gga-x").onclick = A.close;
       var eb = modal.querySelector("#ggaEdit"); if (eb) eb.onclick = openAvatar;
       modal.querySelector("#ggaLogout").onclick = function(){ GG.logout(); refresh(); fire(); A.close(); };
+      wireHandleEdit(a);
+      loadSummary(a);
       return;
     }
     // login / signup
@@ -173,6 +208,74 @@
     setTimeout(focusFirst, 0);
   }
   function focusFirst(){ var el = modal.querySelector("#ggaHandle"); if (el) el.focus(); }
+
+  /* ---------------- account modal: handle editor ---------------- */
+  function wireHandleEdit(a){
+    var editBtn = modal.querySelector("#ggaEditHandle"), form = modal.querySelector("#ggaHandleForm");
+    if (editBtn) editBtn.onclick = function(){
+      form.hidden = !form.hidden;
+      if (!form.hidden){ modal.querySelector("#ggaNewHandle").value = a.handle; modal.querySelector("#ggaNewHandle").focus(); }
+    };
+    var cancel = modal.querySelector("#ggaCancelHandle");
+    if (cancel) cancel.onclick = function(){ form.hidden = true; };
+    var save = modal.querySelector("#ggaSaveHandle");
+    if (save) save.onclick = async function(){
+      var st = modal.querySelector("#ggaHandleStatus");
+      var nh = (modal.querySelector("#ggaNewHandle").value || "").trim();
+      var pin = modal.querySelector("#ggaHandlePin").value || "";
+      if (!nh){ st.textContent = "Enter a new handle."; st.className = "gga-status err"; return; }
+      st.textContent = "Saving\u2026"; st.className = "gga-status"; save.disabled = true;
+      try {
+        var res = await GG.changeHandle(nh, pin);
+        if (res && res.ok){
+          st.textContent = "Handle updated \u2713"; st.className = "gga-status ok";
+          refresh(); fire(res);
+          setTimeout(function(){ renderModal(); }, 500);
+        } else {
+          st.textContent = (res && res.error) || "Couldn\u2019t update handle."; st.className = "gga-status err"; save.disabled = false;
+        }
+      } catch (e){ st.textContent = "Network error \u2014 try again."; st.className = "gga-status err"; save.disabled = false; }
+    };
+  }
+
+  /* ---------------- account modal: trophy case / history / leagues ---------------- */
+  async function loadSummary(a){
+    var box = modal.querySelector("#ggaSummary"); if (!box) return;
+    var res; try { res = await GG.accountSummary(a.handle); } catch (e){ res = null; }
+    box = modal.querySelector("#ggaSummary"); if (!box) return;   // modal may have moved on while this was in flight
+    if (!res || !res.ok){ box.innerHTML = '<p class="gga-empty">Couldn\u2019t load your stats.</p>'; return; }
+    box.innerHTML = summaryHTML(res);
+    box.querySelectorAll("[data-league]").forEach(function(btn){
+      btn.onclick = function(){
+        var id = btn.dataset.league;
+        if (typeof window.setView === "function" && typeof window.loadLeagues === "function" && document.getElementById("v-leagues")){
+          window.setView("leagues"); window.loadLeagues(id); A.close();
+        } else {
+          location.href = "fantasy.html?league=" + encodeURIComponent(id);
+        }
+      };
+    });
+  }
+  function summaryHTML(res){
+    var badges = res.badges || [];
+    var trophyHTML = badges.length
+      ? '<div class="gga-badges">'+badges.map(function(b){ return '<span class="gga-badge" title="'+esc(b.label)+'">'+b.icon+' '+esc(b.label)+'</span>'; }).join("")+'</div>'
+      : '<p class="gga-empty">No trophies yet \u2014 keep playing!</p>';
+    var hist = res.history || [];
+    var histHTML = hist.length
+      ? '<div class="gga-hist">'+hist.map(function(h){ return '<div class="gga-hist__row"><span>'+esc(h.basho)+'</span><span>'+h.score+' pts \u00b7 '+h.wins+' wins</span></div>'; }).join("")+'</div>'
+      : '<p class="gga-empty">No past basho on record yet.</p>';
+    var at = res.allTime || {};
+    var rankLine = at.rank ? ('<p class="gga-rank">All-time rank: <b>#'+at.rank+'</b> of '+at.of+' \u00b7 '+at.total+' total pts</p>') : '';
+    var leagues = res.leagues || [];
+    var leaguesHTML = leagues.length
+      ? '<div class="gga-leagues">'+leagues.map(function(l){ return '<button class="gga-leaguechip" data-league="'+esc(l.id)+'">'+esc(l.name)+(l.isCommissioner?' \u2605':'')+'</button>'; }).join("")+'</div>'
+      : '<p class="gga-empty">Not in any leagues yet.</p>';
+    return ''+
+      '<div class="gga-sec"><h3>Trophy case</h3>'+trophyHTML+'</div>'+
+      '<div class="gga-sec"><h3>Historical performance</h3>'+histHTML+rankLine+'</div>'+
+      '<div class="gga-sec"><h3>Active leagues</h3>'+leaguesHTML+'</div>';
+  }
 
   async function submit(){
     var h = (modal.querySelector("#ggaHandle").value || "").trim();
