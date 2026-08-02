@@ -50,7 +50,7 @@
     ".gga-chip:hover{border-color:#e0a23a}"+
     ".gga-chip__ava{width:28px;height:28px;border-radius:50%;overflow:hidden;background:#222633;display:grid;place-items:center;"+
       "font-size:.8rem;color:#e0a23a;flex:none}"+
-    ".gga-chip__ava svg{width:100%;height:100%;display:block}"+
+    ".gga-chip__ava svg{width:100%;height:100%;display:block;transform:scale(1.1);transform-origin:center}"+
     ".gga-chip__nm{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"+
     /* modal */
     ".gga-ov{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;"+
