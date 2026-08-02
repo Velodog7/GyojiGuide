@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Sumo Slapdown · Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#000; --surface:#181a22; --surface-2:#20232e; --line:#2a2e3a; --line-2:#3a4050;
+  --ink:#f1f2f6; --dim:#a7adbe; --muted:#878da0;
+  --sun:#d8b25a; --sun-rgb:216,178,90; --red:#e23b2e; --up:#43c08a; --down:#ef6f53;
+  --radius:14px; --radius-sm:9px; --maxw:1180px;
+  font-family:"Inter",system-ui,sans-serif;
+}
+*{ box-sizing:border-box }
+html,body{ margin:0; background:var(--bg); color:var(--ink) }
+body{ min-height:100vh; padding-bottom:60px }
+button,input,textarea{ font-family:inherit }
+::placeholder{ color:#666c7d }
+
+/* ---------- password gate ---------- */
+#gate{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px }
+.gate-card{ width:min(380px,100%); background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:28px }
+.gate-card h1{ font-family:"Space Grotesk",sans-serif; font-size:1.3rem; margin:0 0 4px }
+.gate-card p{ color:var(--muted); font-size:.86rem; margin:0 0 18px; line-height:1.5 }
+.gate-card input{ width:100%; background:var(--surface-2); border:1px solid var(--line); color:var(--ink); border-radius:var(--radius-sm); padding:11px 13px; font-size:.95rem }
+.gate-card input:focus{ outline:none; border-color:var(--sun) }
+.gate-card button{ width:100%; margin-top:12px; background:var(--sun); border:1px solid var(--sun); color:#141620; font-weight:700; font-size:.92rem; padding:11px; border-radius:var(--radius-sm); cursor:pointer }
+.gate-card button:hover{ filter:brightness(1.08) }
+.gate-err{ min-height:18px; margin-top:10px; font-size:.82rem; color:var(--down) }
+
+/* ---------- shell ---------- */
+#dash{ }
+header.adm-top{ border-bottom:1px solid var(--line); background:rgba(20,22,30,.9) }
+.adm-top-inner{ max-width:var(--maxw); margin:0 auto; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px }
+.adm-brand{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1.05rem }
+.adm-brand span{ color:var(--sun) }
+.adm-lock{ background:none; border:1px solid var(--line); color:var(--dim); border-radius:var(--radius-sm); padding:7px 13px; font-size:.8rem; cursor:pointer }
+.adm-lock:hover{ border-color:var(--red); color:var(--down) }
+
+nav.tabs{ position:sticky; top:0; z-index:30; background:rgba(0,0,0,.92); backdrop-filter:blur(10px); border-bottom:1px solid var(--line) }
+.tabs-inner{ max-width:var(--maxw); margin:0 auto; padding:0 6px; display:flex }
+.tab{ flex:1 1 0; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+      background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); padding:9px 0; cursor:pointer; transition:color .12s }
+.tab svg{ width:20px; height:20px; display:block }
+.tab-lab{ font-size:.6rem; font-weight:500; letter-spacing:.01em; line-height:1; white-space:nowrap }
+.tab:hover{ color:var(--dim) }
+.tab[aria-selected="true"]{ color:var(--sun); border-bottom-color:var(--red) }
+.tab .n{ position:absolute; top:6px; left:50%; transform:translateX(4px); font-family:"IBM Plex Mono",monospace; font-size:.58rem;
+      font-weight:600; color:#fff; background:var(--red); border-radius:999px; min-width:15px; height:15px;
+      display:flex; align-items:center; justify-content:center; padding:0 4px; line-height:1 }
+
+main{ max-width:var(--maxw); margin:0 auto; padding:24px 20px 80px }
+.view{ display:none }
+.view.on{ display:block }
+.v-title{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1.35rem; margin:0 0 6px }
+.v-sub{ color:var(--muted); font-size:.86rem; margin:0 0 20px; line-height:1.5 }
+
+/* ---------- generic bits ---------- */
+.grid-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:22px }
+.stat-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:15px 17px }
+.stat-card .k{ font-family:"IBM Plex Mono",monospace; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted) }
+.stat-card .v{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1.7rem; margin-top:4px }
+.stat-card .v.small{ font-size:1.1rem }
+
+.badge{ display:inline-flex; align-items:center; gap:6px; font-family:"IBM Plex Mono",monospace; font-size:.72rem; font-weight:600; padding:4px 10px; border-radius:999px }
+.badge .dot{ width:7px; height:7px; border-radius:50% }
+.badge.up{ color:var(--up); background:rgba(67,192,138,.14) }
+.badge.up .dot{ background:var(--up) }
+.badge.down{ color:var(--down); background:rgba(239,111,83,.14) }
+.badge.down .dot{ background:var(--down) }
+.badge.warn{ color:#e0a23a; background:rgba(224,162,58,.14) }
+.badge.warn .dot{ background:#e0a23a }
+.badge.neutral{ color:var(--muted); background:rgba(255,255,255,.05) }
+.badge.neutral .dot{ background:var(--muted) }
+
+.card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; margin-bottom:18px }
+.card h3{ font-family:"Space Grotesk",sans-serif; font-size:1rem; margin:0 0 12px }
+.kv{ display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-top:1px solid var(--line); font-size:.88rem }
+.kv:first-of-type{ border-top:0 }
+.kv .lab{ color:var(--muted) }
+.kv b{ font-family:"IBM Plex Mono",monospace; font-weight:600 }
+
+.btn{ background:var(--surface-2); border:1px solid var(--line); color:var(--dim); border-radius:var(--radius-sm);
+      padding:8px 14px; font-size:.82rem; font-weight:500; cursor:pointer }
+.btn:hover{ border-color:var(--line-2) }
+.btn.gold{ background:var(--sun); border-color:var(--sun); color:#141620; font-weight:700 }
+.btn.gold:hover{ filter:brightness(1.08) }
+.btn.danger{ border-color:rgba(226,59,46,.5); color:var(--down) }
+.btn.danger:hover{ background:rgba(226,59,46,.12); border-color:var(--red) }
+.btn.sm{ padding:5px 10px; font-size:.74rem; border-radius:7px }
+.btn:disabled{ opacity:.4; cursor:default }
+
+.toolbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px }
+.filter{ background:var(--surface-2); border:1px solid var(--line); color:var(--ink); border-radius:var(--radius-sm);
+      padding:9px 12px; font-size:.86rem; width:240px; max-width:100% }
+.filter:focus{ outline:none; border-color:var(--sun) }
+
+.tbl-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius) }
+table{ width:100%; border-collapse:collapse; font-size:.84rem; min-width:640px }
+th{ position:sticky; top:0; background:#1b1d27; color:var(--muted); font-weight:600; text-align:left; padding:10px 12px;
+      font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; border-bottom:1px solid var(--line); white-space:nowrap }
+td{ padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top }
+tbody tr:hover{ background:rgba(255,255,255,.025) }
+tbody tr:last-child td{ border-bottom:0 }
+td.handle{ font-weight:600; white-space:nowrap }
+td.handle small{ display:block; color:var(--muted); font-weight:400; font-family:"IBM Plex Mono",monospace; font-size:.72rem }
+td.actions{ white-space:nowrap }
+td.actions .btn{ margin-right:6px }
+td.msg-body{ max-width:420px; white-space:pre-wrap; word-break:break-word; color:var(--dim); line-height:1.45 }
+td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:nowrap }
+.warn-msg{ display:block; margin-top:3px; font-size:.74rem; color:#e0a23a }
+.empty-row td{ text-align:center; color:var(--muted); padding:24px }
+.load-row td{ text-align:center; color:var(--muted); padding:24px; font-family:"IBM Plex Mono",monospace; font-size:.8rem }
+</style>
+</head>
+<body>
+<script src="gg-config.js"></script>
+
+<div id="gate">
+  <div class="gate-card">
+    <h1>Sumo Slapdown <span>Admin</span></h1>
+    <p>This dashboard isn't linked from the site and isn't meant for players — connectivity, traffic, accounts, and message-board moderation live here.</p>
+    <input id="gateKey" type="password" placeholder="Admin key" autocomplete="off" />
+    <button id="gateGo">Unlock dashboard</button>
+    <div class="gate-err" id="gateErr"></div>
+  </div>
+</div>
+
+<div id="dash" hidden>
+  <header class="adm-top">
+    <div class="adm-top-inner">
+      <div class="adm-brand">Sumo Slapdown <span>Admin</span></div>
+      <button class="adm-lock" id="lockBtn">Lock</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <div class="tabs-inner">
+      <button class="tab" id="tab-conn" role="tab" aria-selected="true" onclick="setView('conn')" aria-label="Connectivity" title="Connectivity">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+        <span class="tab-lab">Connectivity</span>
+      </button>
+      <button class="tab" id="tab-analytics" role="tab" aria-selected="false" onclick="setView('analytics')" aria-label="Analytics" title="Analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="20" y2="21"/><rect x="5" y="12" width="3.5" height="7" fill="currentColor" stroke="none"/><rect x="10.5" y="8" width="3.5" height="11" fill="currentColor" stroke="none"/><rect x="16" y="4" width="3.5" height="15" fill="currentColor" stroke="none"/></svg>
+        <span class="tab-lab">Analytics</span>
+      </button>
+      <button class="tab" id="tab-users" role="tab" aria-selected="false" onclick="setView('users')" aria-label="Users" title="Users">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="n" id="userN">0</span>
+        <span class="tab-lab">Users</span>
+      </button>
+      <button class="tab" id="tab-boards" role="tab" aria-selected="false" onclick="setView('boards')" aria-label="Message Boards" title="Message Boards">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        <span class="n" id="boardN">0</span>
+        <span class="tab-lab">Message Boards</span>
+      </button>
+    </div>
+  </nav>
+
+  <main>
+    <section class="view on" id="v-conn">
+      <h2 class="v-title">Connectivity</h2>
+      <p class="v-sub">Live reachability, checked from the Apps Script backend itself — the same side that actually depends on sumo-api.</p>
+      <div class="card" style="max-width:480px">
+        <h3>sumo-api.com</h3>
+        <div class="kv"><span class="lab">Status</span><span id="apiBadge"><span class="badge neutral"><span class="dot"></span>Checking…</span></span></div>
+        <div class="kv"><span class="lab">Response code</span><b id="apiCode">—</b></div>
+        <div class="kv"><span class="lab">Latency</span><b id="apiMs">—</b></div>
+        <div class="kv"><span class="lab">Last checked</span><b id="apiWhen">—</b></div>
+        <button class="btn gold" id="recheckBtn" style="margin-top:14px">Recheck now</button>
+      </div>
+      <div class="card" style="max-width:480px">
+        <h3>Apps Script backend</h3>
+        <div class="kv"><span class="lab">Status</span><span class="badge up"><span class="dot"></span>Reachable</span></div>
+        <div class="kv"><span class="lab">Sheet totals</span><b id="sheetTotals">—</b></div>
+      </div>
+    </section>
+
+    <section class="view" id="v-analytics">
+      <h2 class="v-title">Site analytics</h2>
+      <p class="v-sub">Total and unique page visits, tracked anonymously by a per-browser id — no accounts involved. Counting starts from when this was turned on, not from launch.</p>
+      <div class="grid-cards">
+        <div class="stat-card"><div class="k">Total pageviews</div><div class="v" id="pvTotal">—</div></div>
+        <div class="stat-card"><div class="k">Unique visitors</div><div class="v" id="pvUnique">—</div></div>
+        <div class="stat-card"><div class="k">Pageviews · last 7 days</div><div class="v" id="pv7Total">—</div></div>
+        <div class="stat-card"><div class="k">Unique · last 7 days</div><div class="v" id="pv7Unique">—</div></div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Page</th><th class="num">Total views</th><th class="num">Unique visitors</th></tr></thead>
+          <tbody id="pvTable"><tr class="load-row"><td colspan="3">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="view" id="v-users">
+      <h2 class="v-title">Users</h2>
+      <p class="v-sub">Everyone with an account. Warn leaves a message they'll see next time they log in; ban blocks login and posting until unbanned; delete removes the account row (their past posts and league history stay).</p>
+      <div class="toolbar">
+        <input class="filter" id="userFilter" placeholder="Filter by handle or name…" />
+        <button class="btn" id="usersRefresh">Refresh</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Handle</th><th>Status</th><th class="num">Team</th><th class="num">Leagues</th><th class="num">Posts</th><th>Last active</th><th>Actions</th></tr></thead>
+          <tbody id="usersTable"><tr class="load-row"><td colspan="7">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="view" id="v-boards">
+      <h2 class="v-title">Message boards</h2>
+      <p class="v-sub">Every post across every league's board, newest first.</p>
+      <div class="toolbar">
+        <input class="filter" id="boardFilter" placeholder="Filter by league, handle, or text…" />
+        <button class="btn" id="boardsRefresh">Refresh</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>League</th><th>Author</th><th>Posted</th><th>Message</th><th>Actions</th></tr></thead>
+          <tbody id="boardsTable"><tr class="load-row"><td colspan="5">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var GG = window.GyojiGuide;
+  var KEYNAME = "adm.key";
+  var state = { key: sessionStorage.getItem(KEYNAME) || "", loaded: {} };
+  var allUsers = [], allMsgs = [];
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+  function fmtDate(iso){
+    var t = Date.parse(iso || "");
+    if (isNaN(t)) return "—";
+    return new Date(t).toLocaleString(undefined, { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit" });
+  }
+
+  async function aGet(action, extra){
+    if (!GG || !GG.hasAPI || !GG.hasAPI()) return null;
+    var params = Object.assign({ adminKey: state.key }, extra || {});
+    try { return await GG.apiGetQ(action, params); } catch(e){ return null; }
+  }
+  async function aPost(action, extra){
+    if (!GG || !GG.hasAPI || !GG.hasAPI()) return null;
+    var payload = Object.assign({ action: action, adminKey: state.key }, extra || {});
+    try { return await GG.apiPost(payload); } catch(e){ return null; }
+  }
+
+  /* ---------- gate ---------- */
+  async function tryUnlock(key){
+    var err = $("gateErr");
+    err.textContent = "";
+    state.key = key;
+    var res = await aGet("adminStats");
+    if (res && res.ok){
+      sessionStorage.setItem(KEYNAME, key);
+      $("gate").hidden = true;
+      $("dash").hidden = false;
+      renderConnectivity(res);
+      loadAnalytics(res);
+      setView("conn");
+    } else {
+      state.key = "";
+      err.textContent = (res && res.error) ? "Incorrect admin key." : "Couldn't reach the backend — check gg-config.js's API_URL.";
+    }
+  }
+  $("gateGo").onclick = function(){ tryUnlock(($("gateKey").value || "").trim()); };
+  $("gateKey").addEventListener("keydown", function(e){ if (e.key === "Enter") tryUnlock(($("gateKey").value || "").trim()); });
+  $("lockBtn").onclick = function(){
+    sessionStorage.removeItem(KEYNAME);
+    state.key = ""; state.loaded = {};
+    $("dash").hidden = true; $("gate").hidden = false;
+    $("gateKey").value = ""; $("gateKey").focus();
+  };
+
+  /* ---------- tabs ---------- */
+  window.setView = function(v){
+    document.querySelectorAll(".view").forEach(function(s){ s.classList.remove("on"); });
+    document.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected","false"); });
+    $("v-"+v).classList.add("on");
+    $("tab-"+v).setAttribute("aria-selected","true");
+    if (v === "users" && !state.loaded.users) loadUsers();
+    if (v === "boards" && !state.loaded.boards) loadBoards();
+  };
+
+  /* ---------- connectivity ---------- */
+  function renderConnectivity(res){
+    var api = res && res.api;
+    var badge = $("apiBadge");
+    if (api && api.ok){
+      badge.innerHTML = '<span class="badge up"><span class="dot"></span>Reachable</span>';
+    } else {
+      badge.innerHTML = '<span class="badge down"><span class="dot"></span>Unreachable</span>';
+    }
+    $("apiCode").textContent = api && api.code ? api.code : (api && api.error ? "error" : "—");
+    $("apiMs").textContent = api && typeof api.ms === "number" ? api.ms + " ms" : "—";
+    $("apiWhen").textContent = api ? fmtDate(api.checkedAt) : "—";
+    var c = res && res.counts;
+    $("sheetTotals").textContent = c ? (c.users + " users · " + c.leagues + " leagues · " + c.messages + " posts") : "—";
+  }
+  $("recheckBtn").onclick = async function(){
+    $("recheckBtn").disabled = true; $("recheckBtn").textContent = "Checking…";
+    var res = await aGet("adminStats");
+    if (res && res.ok) { renderConnectivity(res); loadAnalytics(res); }
+    $("recheckBtn").disabled = false; $("recheckBtn").textContent = "Recheck now";
+  };
+
+  /* ---------- analytics ---------- */
+  function loadAnalytics(res){
+    var pv = res && res.pageviews;
+    if (!pv) return;
+    $("pvTotal").textContent = pv.total;
+    $("pvUnique").textContent = pv.unique;
+    $("pv7Total").textContent = pv.last7Total;
+    $("pv7Unique").textContent = pv.last7Unique;
+    var rows = (pv.byPage || []).map(function(p){
+      return "<tr><td>" + esc(p.page) + "</td><td class=\"num\">" + p.total + "</td><td class=\"num\">" + p.unique + "</td></tr>";
+    }).join("");
+    $("pvTable").innerHTML = rows || '<tr class="empty-row"><td colspan="3">No pageviews recorded yet.</td></tr>';
+  }
+
+  /* ---------- users ---------- */
+  function statusBadge(status){
+    if (status === "banned") return '<span class="badge down"><span class="dot"></span>Banned</span>';
+    if (status === "warned") return '<span class="badge warn"><span class="dot"></span>Warned</span>';
+    return '<span class="badge up"><span class="dot"></span>Active</span>';
+  }
+  function renderUsers(){
+    var q = ($("userFilter").value || "").toLowerCase();
+    var rows = allUsers.filter(function(u){
+      return !q || u.handle.toLowerCase().indexOf(q) >= 0 || (u.name||"").toLowerCase().indexOf(q) >= 0;
+    }).map(function(u){
+      var actions = '<button class="btn sm" onclick="adminWarn(\'' + u.handle + '\')">Warn</button>';
+      actions += u.status === "banned"
+        ? '<button class="btn sm" onclick="adminUnban(\'' + u.handle + '\')">Unban</button>'
+        : '<button class="btn sm danger" onclick="adminBan(\'' + u.handle + '\')">Ban</button>';
+      actions += '<button class="btn sm danger" onclick="adminDelete(\'' + u.handle + '\')">Delete</button>';
+      var warnLine = u.warnMsg ? '<span class="warn-msg">' + esc(u.warnMsg) + '</span>' : "";
+      return "<tr><td class=\"handle\">@" + esc(u.handle) + "<small>" + esc(u.name) + "</small></td>" +
+        "<td>" + statusBadge(u.status) + warnLine + "</td>" +
+        "<td class=\"num\">" + u.teamPicks + "/7</td>" +
+        "<td class=\"num\">" + u.leagues + "</td>" +
+        "<td class=\"num\">" + u.messages + "</td>" +
+        "<td>" + fmtDate(u.updated) + "</td>" +
+        "<td class=\"actions\">" + actions + "</td></tr>";
+    }).join("");
+    $("usersTable").innerHTML = rows || '<tr class="empty-row"><td colspan="7">No users match.</td></tr>';
+  }
+  async function loadUsers(){
+    $("usersTable").innerHTML = '<tr class="load-row"><td colspan="7">Loading…</td></tr>';
+    var res = await aGet("adminUsers");
+    if (res && res.ok){ allUsers = res.users || []; state.loaded.users = true; $("userN").textContent = allUsers.length; renderUsers(); }
+    else $("usersTable").innerHTML = '<tr class="empty-row"><td colspan="7">Couldn\u2019t load users.</td></tr>';
+  }
+  $("usersRefresh").onclick = function(){ loadUsers(); };
+  $("userFilter").addEventListener("input", renderUsers);
+
+  window.adminWarn = async function(handle){
+    var msg = prompt("Warning message for @" + handle + " (shown next time they log in):");
+    if (!msg) return;
+    var res = await aPost("adminWarnUser", { handle: handle, message: msg });
+    if (res && res.ok) loadUsers(); else alert((res && res.error) || "Couldn\u2019t warn that user.");
+  };
+  window.adminBan = async function(handle){
+    if (!confirm("Ban @" + handle + "? They won\u2019t be able to log in or post until unbanned.")) return;
+    var msg = prompt("Message shown if they try to log in:", "This account has been suspended.") || "";
+    var res = await aPost("adminBanUser", { handle: handle, message: msg });
+    if (res && res.ok) loadUsers(); else alert((res && res.error) || "Couldn\u2019t ban that user.");
+  };
+  window.adminUnban = async function(handle){
+    if (!confirm("Restore @" + handle + "\u2019s access?")) return;
+    var res = await aPost("adminUnbanUser", { handle: handle });
+    if (res && res.ok) loadUsers(); else alert((res && res.error) || "Couldn\u2019t unban that user.");
+  };
+  window.adminDelete = async function(handle){
+    if (!confirm("Permanently delete @" + handle + "\u2019s account? This can\u2019t be undone. Their past posts and league history stay on the boards.")) return;
+    var res = await aPost("adminDeleteUser", { handle: handle });
+    if (res && res.ok) loadUsers(); else alert((res && res.error) || "Couldn\u2019t delete that user.");
+  };
+
+  /* ---------- message boards ---------- */
+  function renderBoards(){
+    var q = ($("boardFilter").value || "").toLowerCase();
+    var rows = allMsgs.filter(function(m){
+      return !q || m.league.toLowerCase().indexOf(q) >= 0 || m.handle.toLowerCase().indexOf(q) >= 0 || m.body.toLowerCase().indexOf(q) >= 0;
+    }).map(function(m){
+      return "<tr><td>" + esc(m.league) + "</td><td class=\"handle\">@" + esc(m.handle) + "</td>" +
+        "<td>" + fmtDate(m.created) + "</td>" +
+        "<td class=\"msg-body\">" + esc(m.body) + "</td>" +
+        "<td class=\"actions\"><button class=\"btn sm danger\" onclick=\"adminDeleteMsg('" + m.id + "')\">Delete</button></td></tr>";
+    }).join("");
+    $("boardsTable").innerHTML = rows || '<tr class="empty-row"><td colspan="5">No posts match.</td></tr>';
+  }
+  async function loadBoards(){
+    $("boardsTable").innerHTML = '<tr class="load-row"><td colspan="5">Loading…</td></tr>';
+    var res = await aGet("adminMessages");
+    if (res && res.ok){ allMsgs = res.messages || []; state.loaded.boards = true; $("boardN").textContent = allMsgs.length; renderBoards(); }
+    else $("boardsTable").innerHTML = '<tr class="empty-row"><td colspan="5">Couldn\u2019t load messages.</td></tr>';
+  }
+  $("boardsRefresh").onclick = function(){ loadBoards(); };
+  $("boardFilter").addEventListener("input", renderBoards);
+  window.adminDeleteMsg = async function(id){
+    if (!confirm("Delete this post? This can\u2019t be undone.")) return;
+    var res = await aPost("adminDeleteMessage", { msgId: id });
+    if (res && res.ok) loadBoards(); else alert((res && res.error) || "Couldn\u2019t delete that post.");
+  };
+
+  /* ---------- boot: skip the gate if we still have a session key ---------- */
+  if (state.key) tryUnlock(state.key);
+})();
+</script>
+</body>
+</html>

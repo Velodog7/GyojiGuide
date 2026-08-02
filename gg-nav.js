@@ -243,6 +243,21 @@
   function openHelp(){ ensureHelp(); if (!htab) htab = "faq"; renderHelp(); hov.classList.add("open"); document.body.style.overflow = "hidden"; }
   window.GGHelp = { open: openHelp, close: closeHelp };
 
+  /* fire-and-forget pageview beacon for the admin dashboard's analytics tab.
+     One anonymous id per browser (localStorage), never tied to an account. */
+  function trackPageview() {
+    try {
+      var GG = window.GyojiGuide;
+      if (!GG || !GG.hasAPI || !GG.hasAPI()) return;
+      var KEY = "gg.visitorId", vid = localStorage.getItem(KEY);
+      if (!vid) {
+        vid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("v" + Date.now() + Math.random().toString(16).slice(2));
+        try { localStorage.setItem(KEY, vid); } catch (e) {}
+      }
+      GG.apiPost({ action: "logPageview", page: here, visitorId: vid });
+    } catch (e) {}
+  }
+
   function mount() {
     ensureFont();
     var st = document.createElement("style");
@@ -250,6 +265,7 @@
     st.textContent = CSS;
     document.head.appendChild(st);
     build();
+    trackPageview();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount);
   else mount();

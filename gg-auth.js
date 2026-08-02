@@ -187,9 +187,15 @@
       if (res && res.ok){
         // persist avatar onto the local account if the backend sent one
         if (res.avatar){ try { var d = JSON.parse(res.avatar); var a = acct(); if (a){ a.avatar = d; GG.account.set(a); } } catch (e) {} }
-        status(mode === "signup" ? "Account created \u2713" : "Logged in \u2713", "ok");
-        refresh(); fire(res);
-        setTimeout(A.close, 550);
+        if (res.warning){
+          status("\u26a0\ufe0f " + res.warning, "err");
+          refresh(); fire(res);
+          // leave the modal open so the warning doesn't just flash by
+        } else {
+          status(mode === "signup" ? "Account created \u2713" : "Logged in \u2713", "ok");
+          refresh(); fire(res);
+          setTimeout(A.close, 550);
+        }
       } else {
         status((res && res.error) || "Something went wrong.", "err");
         if (btn) btn.disabled = false;

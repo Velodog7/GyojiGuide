@@ -40,6 +40,13 @@ Netlify Drop, etc.). No bundler, no npm.
 |---|---|
 | `keepers-draft-preview.html` | A self-contained click-through of the Keepers snake draft (bots draft themselves; nothing is saved). Handy for demos. |
 
+**Private admin dashboard** (deliberately not linked anywhere — see below)
+| File | What it is |
+|---|---|
+| `admin.html` | Connectivity to sumo-api, pageview analytics, user moderation (warn/ban/delete), and a read-only feed of every message-board post across all leagues. Password-gated by `ADMIN_KEY` in `sumo-fantasy.gs`. |
+
+`admin.html` isn't added to `gg-nav.js`'s link list and isn't referenced from any other page, so a visitor won't stumble onto it from the site itself — but like every other file here it's still a public URL on a static host. That's obscurity, not real access control. Don't put anything in it you'd be upset to see leaked, and don't reuse `ADMIN_KEY` anywhere else.
+
 ---
 
 ## 2. Two things that must already exist on the host
@@ -63,13 +70,17 @@ here as backup/reference. To update the live backend:
 
 1. Open your Apps Script project at **script.google.com**.
 2. Paste in the contents of `sumo-fantasy.gs`.
-3. **Run `setup()` once.** This creates/updates the Sheets, including the new
+3. **Set your own `ADMIN_KEY`** near the top of the file (it ships with a
+   placeholder value) — this is the password `admin.html` asks for.
+4. **Run `setup()` once.** This creates/updates the Sheets, including the
    **Feedback** sheet used by the Help modal (FAQ questions, suggestions, bug
-   reports, user reports).
-4. **Deploy → Manage deployments → Edit → New version.** Editing "New version"
+   reports, user reports), the **PageViews** sheet the admin dashboard reads
+   for analytics, and two new columns (`status`, `warnMsg`) on the **Users**
+   sheet for the admin dashboard's warn/ban moderation.
+5. **Deploy → Manage deployments → Edit → New version.** Editing "New version"
    keeps the same `/exec` URL. (If you instead create a brand-new deployment,
    the URL changes — see step 4 below.)
-5. Set access to **Anyone**, or browser calls will be blocked.
+6. Set access to **Anyone**, or browser calls will be blocked.
 
 ### The `/exec` URL
 
