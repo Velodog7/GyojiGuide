@@ -89,7 +89,7 @@ here as backup/reference. To update the live backend:
 The site currently points at:
 
 ```
-https://script.google.com/macros/s/AKfycbyYJzO4zyAtAT1zu0Ph2LpfRxNpRP6BlOK21hZ6kBjzA42b_eIpHjCoc8gKvzf1ls5gXw/exec
+https://script.google.com/macros/s/AKfycbx0T_PS3CuAfVl8MQwCAmvDgbP8_eX9jaGbzQcNE6D-lIBhuMoQpWigRh40dce7zF896g/exec
 ```
 
 This lives in **`gg-config.js`** (`GyojiGuide.API_URL`) — the single source of
