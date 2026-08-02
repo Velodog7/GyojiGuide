@@ -50,7 +50,7 @@
     '#gg-nav{position:relative;width:100%;z-index:900;' +
       'background:rgba(20,22,30,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);' +
       'border-bottom:1px solid rgba(216,178,90,.25);font-family:"Space Grotesk","Zen Kaku Gothic New",system-ui,sans-serif}' +
-    '.ggn-inner{max-width:1100px;margin:0 auto;min-height:68px;padding:0 16px;' +
+    '.ggn-inner{max-width:1180px;margin:0 auto;min-height:68px;padding:0 20px;' +
       'display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}' +
     '.ggn-brand{grid-column:1;justify-self:start;display:inline-flex;align-items:center;gap:8px;' +
       'text-decoration:none;color:#f4ecd8;font-weight:700;font-size:.98rem;letter-spacing:.01em;white-space:nowrap}' +
