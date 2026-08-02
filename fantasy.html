@@ -38,12 +38,17 @@
   .sub{ color:var(--muted); max-width:70ch; line-height:1.55; margin:0 0 4px; font-size:.95rem }
 
   /* ── tabs ───────────────────────────────────────────── */
-  .tabs{ display:flex; gap:6px; margin:22px 0 8px; border-bottom:1px solid var(--line) }
-  .tab{ background:none; border:0; color:var(--dim); font-weight:600; font-size:.95rem;
-        padding:12px 16px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px }
-  .tab[aria-selected="true"]{ color:var(--ink); border-bottom-color:var(--sun) }
-  .tab .n{ font-family:"IBM Plex Mono",monospace; font-size:.72rem; color:var(--sun);
-        background:rgba(var(--sun-rgb),.14); border-radius:99px; padding:1px 7px; margin-left:7px }
+  nav.tabs{ position:sticky; top:0; z-index:30; background:rgba(0,0,0,.92); backdrop-filter:blur(10px); border-bottom:1px solid var(--line) }
+  .tabs-inner{ max-width:1180px; margin:0 auto; padding:0 6px; display:flex }
+  .tab{ flex:1 1 0; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+        background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); padding:9px 0; cursor:pointer; transition:color .12s }
+  .tab svg{ width:20px; height:20px; display:block }
+  .tab-lab{ font-size:.6rem; font-weight:500; letter-spacing:.01em; line-height:1; white-space:nowrap }
+  .tab:hover{ color:var(--dim) }
+  .tab[aria-selected="true"]{ color:var(--sun); border-bottom-color:var(--red) }
+  .tab .n{ position:absolute; top:6px; left:50%; transform:translateX(4px); font-family:"IBM Plex Mono",monospace; font-size:.58rem;
+        font-weight:600; color:#fff; background:var(--red); border-radius:999px; min-width:15px; height:15px;
+        display:flex; align-items:center; justify-content:center; padding:0 4px; line-height:1 }
   .view{ display:none; padding:22px 0 40px }
   .view.on{ display:block }
 
@@ -421,6 +426,25 @@
 <script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-mawashi.js"></script></head>
 <body>
 <script src="gg-nav.js"></script><script src="gg-auth.js"></script>
+<nav class="tabs" role="tablist">
+  <div class="tabs-inner">
+    <button class="tab" id="tab-team" role="tab" aria-selected="true" onclick="setView('team')" aria-label="My Team" title="My Team">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="n" id="pickN">0/7</span>
+      <span class="tab-lab">My Team</span>
+    </button>
+    <button class="tab" id="tab-board" role="tab" aria-selected="false" onclick="setView('board')" aria-label="Leaderboard" title="Leaderboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="20" y2="21"/><rect x="5" y="12" width="3.5" height="7" fill="currentColor" stroke="none"/><rect x="10.5" y="8" width="3.5" height="11" fill="currentColor" stroke="none"/><rect x="16" y="4" width="3.5" height="15" fill="currentColor" stroke="none"/></svg>
+      <span class="n" id="lbN">0</span>
+      <span class="tab-lab">Leaderboard</span>
+    </button>
+    <button class="tab" id="tab-leagues" role="tab" aria-selected="false" onclick="setView('leagues')" aria-label="My Leagues" title="My Leagues">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+      <span class="n" id="lgN">0</span>
+      <span class="tab-lab">My Leagues</span>
+    </button>
+  </div>
+</nav>
 
 <div class="wrap">
   <header class="top">
@@ -433,12 +457,6 @@
     </div>
     <h1 class="title">Fantasy <span>Sumo</span></h1>
   </header>
-
-  <nav class="tabs" role="tablist">
-    <button class="tab" id="tab-team" role="tab" aria-selected="true" onclick="setView('team')">My Team <span class="n" id="pickN">0/7</span></button>
-    <button class="tab" id="tab-board" role="tab" aria-selected="false" onclick="setView('board')">Leaderboard <span class="n" id="lbN">0</span></button>
-    <button class="tab" id="tab-leagues" role="tab" aria-selected="false" onclick="setView('leagues')">My Leagues <span class="n" id="lgN">0</span></button>
-  </nav>
 
   <!-- MY TEAM -->
   <section class="view on" id="v-team">
@@ -1020,7 +1038,14 @@ function setStatus(msg, cls){ const s=$("saveStatus"); s.textContent=msg; s.clas
 // Returns { totalW, kachi, yusho } per wrestler name, from the results list.
 /* ---------- scoring (shared, prediction-game rules) ---------- */
 // Give the shared scorer this page's exact banzuke so the sanyaku bonus is right.
-(function(){ const map={}; Object.keys(RK).forEach(n=>{ map[n]=RK[n].code[0]; }); if (window.GyojiGuide && GyojiGuide.setRanks) GyojiGuide.setRanks(map); })();
+// Re-run after the live GGRoster refresh below patches RK, so promotions/
+// demotions and new sekitori feed the sanyaku bonus too — not just the
+// bundled snapshot from page load.
+function syncRanksFromRK(){
+  const map={}; Object.keys(RK).forEach(n=>{ map[n]=RK[n].code[0]; });
+  if (window.GyojiGuide && GyojiGuide.setRanks) GyojiGuide.setRanks(map);
+}
+syncRanksFromRK();
 const scoreModel = d => GyojiGuide.scoreModel(d);
 const teamScore  = (t,m) => GyojiGuide.teamScore(t,m);
 
@@ -1748,6 +1773,7 @@ if (acct) loadHistory();
       codeField:"code", addNewcomers:true,
       makeEntry:function(w){ return { code:w.code, kanji:"", from:"", src:"" }; }
     });
+    syncRanksFromRK();
     try { paintSlots(); } catch(e){}
     if (typeof renderLeague === "function" && typeof curLeagueId !== "undefined" && curLeagueId) { try { renderLeague(); } catch(e){} }
     var extra = sum.newcomers.length ? " \u00b7 " + sum.newcomers.length + " new sekitori (no photo yet)" : "";
