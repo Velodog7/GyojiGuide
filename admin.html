@@ -258,32 +258,40 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   }
 
   /* ---------- gate ---------- */
+  var checking = false;
   async function tryUnlock(key){
+    if (checking) return;   // ignore repeat clicks/Enter while a check is already in flight
     var err = $("gateErr"), btn = $("gateGo");
     if (!key){ err.textContent = "Enter the admin key first."; return; }
+    checking = true;
     err.textContent = "Checking\u2026";
     btn.disabled = true;
     state.key = key;
-    var res;
-    if (!GG || !GG.hasAPI || !GG.hasAPI()){
-      res = null;
-    } else {
-      try { res = await GG.apiGetQ("adminStats", { adminKey: key }); }
-      catch (e) { err.textContent = "Request failed: " + (e && e.message ? e.message : e); btn.disabled = false; return; }
-    }
-    btn.disabled = false;
-    if (res && res.ok){
-      sessionStorage.setItem(KEYNAME, key);
-      $("gate").hidden = true;
-      $("dash").hidden = false;
-      renderConnectivity(res);
-      loadAnalytics(res);
-      setView("conn");
-    } else {
-      state.key = "";
-      if (res === null) err.textContent = "Couldn\u2019t reach the backend \u2014 check that gg-config.js sits next to admin.html and its API_URL is set.";
-      else if (res && res.error === "Not authorised.") err.textContent = "Incorrect admin key.";
-      else err.textContent = "Backend error: " + ((res && res.error) || "unknown response.");
+    try {
+      var res = null;
+      if (!GG || !GG.hasAPI || !GG.hasAPI()){
+        err.textContent = "Couldn\u2019t reach the backend \u2014 check that gg-config.js sits next to admin.html and its API_URL is set.";
+      } else {
+        res = await GG.apiGetQ("adminStats", { adminKey: key });
+        if (res && res.ok){
+          sessionStorage.setItem(KEYNAME, key);
+          $("gate").hidden = true;
+          $("dash").hidden = false;
+          renderConnectivity(res);
+          loadAnalytics(res);
+          setView("conn");
+        } else if (res && res.error === "Not authorised."){
+          err.textContent = "Incorrect admin key.";
+        } else {
+          err.textContent = "Backend error: " + ((res && res.error) || "unrecognized response \u2014 open the Console tab for details.");
+        }
+      }
+    } catch (e) {
+      err.textContent = "Something went wrong: " + (e && e.message ? e.message : e) + " \u2014 open the Console tab for the full error.";
+      console.error("admin unlock failed:", e);
+    } finally {
+      checking = false;
+      btn.disabled = false;
     }
   }
   $("gateGo").onclick = function(){ tryUnlock(($("gateKey").value || "").trim()); };
