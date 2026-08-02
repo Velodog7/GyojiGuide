@@ -71,11 +71,11 @@
     ".gga-switch a{color:#e0a23a;cursor:pointer;text-decoration:underline}"+
     ".gga-status{min-height:18px;font-size:.82rem;margin-top:10px;color:#878da0}"+
     ".gga-status.err{color:#f0655a}.gga-status.ok{color:#43c08a}"+
-    ".gga-avatar-full{display:flex;justify-content:center;align-items:center;background:#0d0f15;border:1px solid #2a2d38;"+
-      "border-radius:14px;padding:12px;margin:8px 0 16px}"+
-    ".gga-avatar-full svg{display:block;max-width:100%;height:auto}"+
     ".gga-acctrow{display:flex;align-items:center;gap:12px;margin-bottom:16px}"+
-    ".gga-acctrow .gga-chip__ava{width:46px;height:46px;font-size:1.1rem}"+
+    ".gga-acctrow__ava{flex:none;width:40px;height:60px;border-radius:8px;overflow:hidden;"+
+      "background:#0d0f15;border:1px solid #2a2d38;display:flex;align-items:center;justify-content:center}"+
+    ".gga-acctrow__ava svg{display:block;width:100%;height:100%}"+
+    ".gga-acctrow__initials{color:#e0a23a;font-weight:700;font-size:1.1rem}"+
     ".gga-acctrow__id{flex:1;min-width:0}"+
     ".gga-acctrow b{display:block;color:#f1f2f6;font-size:1rem}"+
     ".gga-acctrow small{color:#878da0;font-family:'IBM Plex Mono',monospace;font-size:.75rem}"+
@@ -121,6 +121,12 @@
       try { return window.MawashiDesigner.renderSVG((a && a.avatar) || window.MawashiDesigner.DEFAULT, { variant:"chip", size:28 }); } catch (e) {}
     }
     return esc(initials(a));
+  }
+  function avaFull(a){
+    if (window.MawashiDesigner) {
+      try { return window.MawashiDesigner.renderSVG((a && a.avatar) || window.MawashiDesigner.DEFAULT, { variant:"full", size:56 }); } catch (e) {}
+    }
+    return '<span class="gga-acctrow__initials">'+esc(initials(a))+'</span>';
   }
 
   /* ---------------- nav control ---------------- */
@@ -169,13 +175,9 @@
     var a = acct();
     modal.classList.remove("wide");
     if (mode === "account" && a){
-      var fullAva = window.MawashiDesigner
-        ? '<div class="gga-avatar-full">'+window.MawashiDesigner.renderSVG(a.avatar || window.MawashiDesigner.DEFAULT, { variant:"full", size:150 })+'</div>'
-        : '';
       modal.innerHTML =
         '<button class="gga-x" aria-label="Close">\u2715</button>'+
-        fullAva+
-        '<div class="gga-acctrow"><span class="gga-chip__ava">'+avaInner(a)+'</span>'+
+        '<div class="gga-acctrow"><span class="gga-acctrow__ava">'+avaFull(a)+'</span>'+
           '<span class="gga-acctrow__id"><b>'+esc(a.name || a.handle)+'</b><small>@'+esc(a.handle)+'</small></span>'+
           '<button class="gga-editbtn" id="ggaEditHandle" title="Edit handle" aria-label="Edit handle">\u270e</button></div>'+
         '<div class="gga-handleform" id="ggaHandleForm" hidden>'+
