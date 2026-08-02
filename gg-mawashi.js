@@ -336,7 +336,11 @@
       ".mwd-swatches{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px}"+
       ".mwd-sw{width:24px;height:24px;border-radius:6px;border:2px solid transparent;cursor:pointer;padding:0}"+
       ".mwd-sw.on{border-color:#fff;box-shadow:0 0 0 1px #000}"+
-      ".mwd-custom input{width:30px;height:26px;padding:0;border:1px solid #2a2d38;border-radius:6px;background:none;cursor:pointer}"+
+      ".mwd-custom{position:relative;display:inline-block;width:28px;height:28px;flex:none;border-radius:50%;cursor:pointer;"+
+        "border:2px solid #2a2d38;background:conic-gradient(from 0deg,red,#ff0,#0f0,#0ff,#00f,#f0f,red)}"+
+      ".mwd-custom.on{border-color:#fff;box-shadow:0 0 0 1px #000}"+
+      ".mwd-custom__dot{position:absolute;inset:6px;border-radius:50%;border:1px solid rgba(0,0,0,.4);pointer-events:none}"+
+      ".mwd-custom input[type=color]{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer}"+
       ".mwd-row{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:.8rem;color:#c3c8d4}"+
       ".mwd-row label{flex:0 0 74px}"+ ".mwd-row input[type=range]{flex:1}"+ ".mwd-row span{flex:0 0 40px;text-align:right;color:#878da0;font-family:monospace;font-size:.72rem}"+
       ".mwd-lab{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:#878da0;margin:2px 0 2px}"+
@@ -378,9 +382,13 @@
     }
 
     function swatches(current, id){
+      var isCustom = !MD.PALETTE.some(function(c){ return String(c).toLowerCase()===String(current||"").toLowerCase(); });
       return '<div class="mwd-swatches" id="'+id+'">'+
         MD.PALETTE.map(function(c){ return '<button type="button" class="mwd-sw'+(String(c).toLowerCase()===String(current).toLowerCase()?" on":"")+'" style="background:'+c+'" data-color="'+c+'"></button>'; }).join("")+
-        '<span class="mwd-custom"><input type="color" value="'+(current||"#cccccc")+'" data-customcolor="1"></span></div>';
+        '<label class="mwd-custom'+(isCustom?" on":"")+'" title="Pick any color">'+
+          '<span class="mwd-custom__dot" style="background:'+(current||"#cccccc")+'"></span>'+
+          '<input type="color" value="'+(current||"#cccccc")+'" data-customcolor="1">'+
+        '</label></div>';
     }
     function wireSw(id, onPick){
       var box=panelEl.querySelector("#"+id); if(!box) return;
