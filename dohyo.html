@@ -439,8 +439,8 @@
     background:none; border:0; padding:0;
     cursor:pointer;
   }
-  .slot--east{ left:36.6%; transform:translateX(-50%) }
-  .slot--west{ left:65.6%; transform:translateX(-50%) }
+  .slot--east{ left:36.6%; transform:translateX(-50%); --facex:4cqw }
+  .slot--west{ left:65.6%; transform:translateX(-50%); --facex:-4cqw }
   .slot:empty{ pointer-events:none }
   .slot::before{                    /* the pool of shade between his heels */
     content:""; position:absolute; z-index:-1;
@@ -767,7 +767,7 @@
   .stage.clashing .slot--east img{ animation:clashE var(--clashT,3s) cubic-bezier(.4,0,.35,1) both }
   .stage.clashing .slot--west img{ animation:clashW var(--clashT,3s) cubic-bezier(.4,0,.35,1) both }
   @keyframes clashE{
-    0%  { transform:translateX(0) rotate(0) scaleX(var(--flip,1)) }
+    0%  { transform:translateX(4cqw) translateY(.55cqw) rotate(1.6deg) scaleX(var(--flip,1)) }  /* launch from the shikiri-sen */
     12% { transform:translateX(calc(11.8cqw)) rotate(2.4deg) scaleX(var(--flip,1)) }  /* tachiai — they meet */
     22% { transform:translateX(calc(11.2cqw + var(--push,0) * 0.15cqw - var(--sway,0) * 1.0cqw)) rotate(1.8deg) scaleX(var(--flip,1)) }  /* the other man drives first */
     34% { transform:translateX(calc(12.3cqw + var(--push,0) * 0.35cqw + var(--sway,0) * 0.7cqw)) rotate(2.6deg) scaleX(var(--flip,1)) }
@@ -779,7 +779,7 @@
     100%{ transform:translateX(calc(11.7cqw + var(--push,0) * 5.4cqw)) rotate(1.9deg) scaleX(var(--flip,1)) }  /* he has him */
   }
   @keyframes clashW{
-    0%  { transform:translateX(0) rotate(0) scaleX(var(--flip,-1)) }
+    0%  { transform:translateX(-4cqw) translateY(.55cqw) rotate(-1.6deg) scaleX(var(--flip,-1)) }  /* launch from the shikiri-sen */
     12% { transform:translateX(calc(-11.8cqw)) rotate(-2.4deg) scaleX(var(--flip,-1)) }  /* tachiai — they meet */
     22% { transform:translateX(calc(-11.2cqw + var(--push,0) * 0.15cqw - var(--sway,0) * 1.0cqw)) rotate(-1.8deg) scaleX(var(--flip,-1)) }  /* the other man drives first */
     34% { transform:translateX(calc(-12.3cqw + var(--push,0) * 0.35cqw + var(--sway,0) * 0.7cqw)) rotate(-2.6deg) scaleX(var(--flip,-1)) }
@@ -796,7 +796,7 @@
   .stage.clashing .slot--east::before{ animation:clashShadowE var(--clashT,3s) cubic-bezier(.4,0,.35,1) both }
   .stage.clashing .slot--west::before{ animation:clashShadowW var(--clashT,3s) cubic-bezier(.4,0,.35,1) both }
   @keyframes clashShadowE{
-    0%  { transform:translateX(-50%) }
+    0%  { transform:translateX(calc(-50% + 4cqw)) }
     12% { transform:translateX(calc(-50% + 11.8cqw)) }
     22% { transform:translateX(calc(-50% + 11.2cqw + var(--push,0) * 0.15cqw - var(--sway,0) * 1.0cqw)) }
     34% { transform:translateX(calc(-50% + 12.3cqw + var(--push,0) * 0.35cqw + var(--sway,0) * 0.7cqw)) }
@@ -808,7 +808,7 @@
     100%{ transform:translateX(calc(-50% + 11.7cqw + var(--push,0) * 5.4cqw)) }
   }
   @keyframes clashShadowW{
-    0%  { transform:translateX(-50%) }
+    0%  { transform:translateX(calc(-50% - 4cqw)) }
     12% { transform:translateX(calc(-50% - 11.8cqw)) }
     22% { transform:translateX(calc(-50% - 11.2cqw + var(--push,0) * 0.15cqw - var(--sway,0) * 1.0cqw)) }
     34% { transform:translateX(calc(-50% - 12.3cqw + var(--push,0) * 0.35cqw + var(--sway,0) * 0.7cqw)) }
@@ -828,23 +828,24 @@
   .stage.henka.clashing .slot.henkaLose img{ animation:henkaRush var(--clashT,3s) cubic-bezier(.5,.4,.6,1) both }
   .stage.henka.clashing .slot.henkaWin::before{  animation:shHStep var(--clashT,3s) cubic-bezier(.3,.7,.4,1) both }
   .stage.henka.clashing .slot.henkaLose::before{ animation:shHRush var(--clashT,3s) cubic-bezier(.5,.4,.6,1) both }
-  @keyframes henkaStep{                /* charge, then dart aside and turn to watch */
-    0%  { transform:translateX(0) scaleX(var(--flip,1)) }
-    34% { transform:translateX(calc(var(--hstep,-7cqw) * .35)) scaleX(var(--flip,1)) }
-    58% { transform:translateX(var(--hstep,-7cqw)) rotate(4deg) scaleX(var(--flip,1)) }
+  @keyframes henkaStep{                /* dart aside fast, then just watch him fall */
+    0%  { transform:translateX(var(--facex,0cqw)) scaleX(var(--flip,1)) }
+    40% { transform:translateX(var(--hstep,-7cqw)) rotate(4deg) scaleX(var(--flip,1)) }
     100%{ transform:translateX(var(--hstep,-7cqw)) rotate(2deg) scaleX(var(--flip,1)) }
   }
-  @keyframes henkaRush{                /* charge hard, then stumble into empty space */
-    0%  { transform:translateX(0) scaleX(var(--flip,1)) }
-    50% { transform:translateX(calc(var(--hmid,16cqw) * .6)) scaleX(var(--flip,1)) }
+  @keyframes henkaRush{                /* lunge hard into the space where he was — early and committed */
+    0%  { transform:translateX(var(--facex,0cqw)) scaleX(var(--flip,1)) }
+    45% { transform:translateX(var(--hmid,16cqw)) rotate(0deg) scaleX(var(--flip,1)) }
     100%{ transform:translateX(var(--hmid,16cqw)) rotate(0deg) scaleX(var(--flip,1)) }
   }
   @keyframes shHStep{
-    0%  { transform:translateX(-50%) }
+    0%  { transform:translateX(calc(-50% + var(--facex,0cqw))) }
+    40% { transform:translateX(calc(-50% + var(--hstep,-7cqw))) }
     100%{ transform:translateX(calc(-50% + var(--hstep,-7cqw))) }
   }
   @keyframes shHRush{
-    0%  { transform:translateX(-50%) }
+    0%  { transform:translateX(calc(-50% + var(--facex,0cqw))) }
+    45% { transform:translateX(calc(-50% + var(--hmid,16cqw))) }
     100%{ transform:translateX(calc(-50% + var(--hmid,16cqw))) }
   }
   /* the bar reflows to the width it's given: gaps and padding scale, the
@@ -1428,14 +1429,29 @@
   @keyframes champIn{ from{ opacity:0; transform:translateY(8px) } }
 
   /* the person's team, tallied inside the between-days modal */
-  .dmt{ border-bottom:1px solid var(--line); padding:12px 20px }
+  .dmt{ border-bottom:1px solid var(--line); padding:14px 20px;
+        background:linear-gradient(180deg, rgba(var(--sun-rgb),.09), rgba(var(--sun-rgb),.03));
+        border-top:2px solid rgba(var(--sun-rgb),.5) }
   .dmt__head{ display:flex; align-items:baseline; justify-content:space-between;
-        font-size:10px; letter-spacing:.28em; text-transform:uppercase; color:var(--sun); margin-bottom:8px }
-  .dmt__head b{ font-family:ui-monospace,Menlo,monospace; font-size:15px; letter-spacing:0; color:var(--ink) }
-  .dmt__rows{ display:grid; grid-template-columns:1fr auto auto; gap:2px 14px;
-        font-size:12px; color:var(--dim) }
-  .dmt__rows span:nth-child(3n){ text-align:right; font-family:ui-monospace,Menlo,monospace; color:var(--sun) }
-  .dmt__rows span:nth-child(3n+1){ color:var(--ink) }
+        font-size:11px; letter-spacing:.24em; text-transform:uppercase; color:var(--sun); margin-bottom:10px }
+  .dmt__head b{ font-family:ui-monospace,Menlo,monospace; font-size:18px; letter-spacing:0; color:var(--ink) }
+  .dmt__dayrec{ font-style:normal; font-family:ui-monospace,Menlo,monospace; font-size:12px; letter-spacing:.04em;
+        color:var(--dim); margin-left:10px }
+  .dmt__rows{ display:flex; flex-direction:column; gap:3px }
+  .dmt__row{ display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:0 12px;
+        padding:5px 10px; border-radius:8px; font-size:13px; background:rgba(255,255,255,.02);
+        border:1px solid transparent }
+  .dmt__row.won{  background:rgba(67,192,138,.14);  border-color:rgba(67,192,138,.4) }
+  .dmt__row.lost{ background:rgba(226,86,74,.13);   border-color:rgba(226,86,74,.38) }
+  .dmt__today{ order:-1; width:18px; height:18px; border-radius:50%; font-size:10px; font-weight:700;
+        display:grid; place-items:center; font-family:ui-monospace,Menlo,monospace; color:transparent }
+  .dmt__row.won  .dmt__today{ background:var(--win,#43c08a); color:#08130d }
+  .dmt__row.lost .dmt__today{ background:#e2564a; color:#1a0605 }
+  .dmt__name{ color:var(--ink); font-weight:500 }
+  .dmt__row.won  .dmt__name{ color:#7ee0b4 }
+  .dmt__row.lost .dmt__name{ color:#f0a097 }
+  .dmt__rec{ font-family:ui-monospace,Menlo,monospace; color:var(--dim) }
+  .dmt__pts{ text-align:right; font-family:ui-monospace,Menlo,monospace; color:var(--sun); min-width:34px }
 
   /* the footer carries the day on — one tap and the next day's card runs */  .modal__foot{ display:flex; align-items:center; justify-content:space-between; gap:16px;
           padding:14px 20px; border-top:1px solid var(--line); background:var(--surface); }
@@ -2094,6 +2110,7 @@ const endKimCall = () => kimCall.classList.remove("on");
    the win/loss animations. Duration is kept just under the hold so they've
    settled square by the time the gyōji makes the call. */
 const CLASH_MS = 3000;
+const HENKA_MS = 650;             // a henka is a quick sidestep — the dodge and lunge snap
 stage.style.setProperty("--clashT", CLASH_MS + "ms");
 
 /* which family a kimarite belongs to — it decides how the loser goes down.
@@ -2120,7 +2137,7 @@ const FINISH = {
   /* a throw takes them both over — he goes down too, and lands on top */
   throw: { fall:"slammed",  shadow:"shSlammed",  win:"rideDown",   wsh:"shRide",   impact:505, ex: 0.62, ey:3.4, er:-98,  dim:".5", both:true },
   /* the sidestep: the loser charges into empty space and lands flat on his face */
-  henka: { fall:"henkaPlant", shadow:"shHenkaPlant", win:"henkaHold", wsh:"shHenkaHold", impact:520, dim:".5" },
+  henka: { fall:"henkaPlant", shadow:"shHenkaPlant", win:"henkaHold", wsh:"shHenkaHold", impact:340, dim:".5" },
 };
 
 /* how far each man is from his own tawara, measured off the artwork */
@@ -2153,9 +2170,11 @@ function clash(b){
     loseSlot.classList.add("henkaLose");
     winSlot.style.setProperty("--hstep", (winSide === "east" ? -7 : 7) + "cqw");
     loseSlot.style.setProperty("--hmid", (loseSide === "east" ? 16 : -16) + "cqw");
+    stage.style.setProperty("--clashT", HENKA_MS + "ms");     // a quick dodge, not a 3s grind
     stage.classList.remove("clashing"); void stage.offsetWidth; stage.classList.add("clashing");
     return;
   }
+  stage.style.setProperty("--clashT", CLASH_MS + "ms");        // everything else keeps the full clash
   const gap = Math.abs((ROSTER[b[1]]?.elo || 2200) - (ROSTER[b[5]]?.elo || 2200));
   const eloF = Math.min(1.4, 0.7 + gap / 500);
   const mag = (FAMILY_MAG[fam] ?? 1) * eloF;
@@ -2435,7 +2454,9 @@ async function playBout(i){
   stage.classList.remove("facing");
   if (!still) hakkeyoi();
   if (decided && !still) clash(card[div][i]);
-  await wait(still ? 400 : decided ? 3200 : 3600);
+  const isHenka = decided && kimFamily(card[div][i][3]) === "henka";
+  const clashWait = still ? 400 : !decided ? 3600 : isHenka ? (HENKA_MS + 60) : 3200;
+  await wait(clashWait);
   if (token !== runToken) { endClash(); return; }
   endShout();
   if (decided) {
@@ -2933,11 +2954,27 @@ function paintTeamCard(upto){
   if (!picks.length) { host.hidden = true; return; }
   const { rows, total, running, done } = tally(upto);
   host.hidden = false;
-  host.innerHTML = `<div class="dmt__head">Your team${done ? " · final" : ""}` +
-    `<b>${done ? total : running} pts</b></div>` +
-    `<div class="dmt__rows">` + rows.map(r =>
-      `<span>${r.n}</span><span>${r.s.w}–${r.s.l}</span>` +
-      `<span>${r.pts}${r.extra ? " ★" : ""}</span>`).join("") + `</div>`;
+  // count how the team did on the day just fought
+  let dayW = 0, dayL = 0;
+  const rowHTML = rows.map(r => {
+    const today = boutFor(r.n, upto);                       // this wrestler's bout on THIS day
+    let cls = "", mark = "";
+    if (today && today.decided) {
+      if (today.won) { cls = "won"; mark = "W"; dayW++; }
+      else           { cls = "lost"; mark = "L"; dayL++; }
+    }
+    return `<div class="dmt__row ${cls}">` +
+      `<span class="dmt__name">${r.n}</span>` +
+      `<span class="dmt__today">${mark}</span>` +
+      `<span class="dmt__rec">${r.s.w}–${r.s.l}</span>` +
+      `<span class="dmt__pts">${r.pts}${r.extra ? " ★" : ""}</span>` +
+      `</div>`;
+  }).join("");
+  host.innerHTML =
+    `<div class="dmt__head"><span>Your team${done ? " · final" : ""}` +
+      `<em class="dmt__dayrec">${dayW}–${dayL} today</em></span>` +
+      `<b>${done ? total : running} pts</b></div>` +
+    `<div class="dmt__rows">${rowHTML}</div>`;
 }
 document.getElementById("dayModalX").onclick = closeDayModal;
 dayModalNext.onclick = () => {
