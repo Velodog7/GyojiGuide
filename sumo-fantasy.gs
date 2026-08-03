@@ -63,7 +63,12 @@ var BASHO_LABEL   = 'Aki 2026';
 // asks — the page doesn't store it anywhere on its own. Same game-grade
 // security note as the PIN system above: fine for keeping the dashboard
 // away from casual visitors, not a hardened secret store.
-var ADMIN_KEY = 'change-me-admin-key';
+var ADMIN_KEY = '06011990';
+
+// Bump this whenever the backend changes. Fetch <exec>?action=version to
+// confirm which code is actually LIVE — if this number doesn't match, the
+// deploy didn't land (you saved but didn't "Deploy → New version").
+var BACKEND_VERSION = '2026-08-02-keepers-delete';
 
 /* ---------- one-time: build the tabs ---------- */
 function setup() {
@@ -150,6 +155,7 @@ function migrateLeaguesV2(sh) {
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'data';
   try {
+    if (action === 'version') return json({ ok: true, version: BACKEND_VERSION });
     if (action === 'list')    return json({ ok: true, users: readUsers() });
     if (action === 'results') return json({ ok: true, results: readResults() });
     if (action === 'leagues') return json(myLeagues(e.parameter.handle));
@@ -183,6 +189,7 @@ function doPost(e) {
     if (body.action === 'leaveLeague')  return json(leaveLeague(body));
     if (body.action === 'removeMember') return json(removeMember(body));
     if (body.action === 'renameLeague') return json(renameLeague(body));
+    if (body.action === 'deleteLeague') return json(deleteLeague(body));
     if (body.action === 'postMessage')  return json(postMessage(body));
     if (body.action === 'setLeagueMode') return json(setLeagueMode(body));
     if (body.action === 'startDraft')    return json(startDraft(body));
@@ -553,12 +560,15 @@ function leagueByInvite(code){
 function createLeague(body){
   var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
   var name = String(body.name||'').trim().slice(0,60); if (!name) return { ok:false, error:'Name your league first.' };
+  var mode = (body.mode === 'keepers') ? 'keepers' : 'classic';
+  var rosterSize = Math.max(5, Math.min(10, Number(body.rosterSize) || 6));
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var id = newId('lg_'), code = inviteCode(), when = new Date().toISOString();
-    sh_(SHEET_LEAGUES).appendRow([id, name, u.handle, when, code]);
+    // full row incl. mode columns so a keepers league is never momentarily classic
+    sh_(SHEET_LEAGUES).appendRow([id, name, u.handle, when, code, mode, rosterSize, 'none', '', 0, 'makuuchi']);
     sh_(SHEET_MEMBERS).appendRow([id, u.handle, when]);
-    return { ok:true, id:id, inviteCode:code };
+    return { ok:true, id:id, inviteCode:code, mode:mode, rosterSize:rosterSize };
   } finally { lock.releaseLock(); }
 }
 
@@ -608,6 +618,35 @@ function renameLeague(body){
   var name = String(body.name||'').trim().slice(0,60); if (!name) return { ok:false, error:'Name can\u2019t be empty.' };
   sh_(SHEET_LEAGUES).getRange(L.row,2).setValue(name);
   return { ok:true };
+}
+
+// Delete a whole league. Commissioner-only, and cascades: removes the
+// league row plus every row keyed to its id in the member/message/team/
+// roster/pick/trade sheets, so nothing is orphaned behind it.
+function deleteLeague(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase()!==u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can delete the league.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var id = String(L.id);
+    deleteRowsWhere_(SHEET_MEMBERS,  0, id);
+    deleteRowsWhere_(SHEET_MESSAGES, 1, id);
+    deleteRowsWhere_(SHEET_LGTEAMS,  0, id);
+    deleteRowsWhere_(SHEET_ROSTERS,  0, id);
+    deleteRowsWhere_(SHEET_PICKS,    0, id);
+    deleteRowsWhere_(SHEET_TRADES,   1, id);
+    // the league row itself last — re-read its row in case earlier deletes shifted nothing here (different sheet), but be safe
+    var ls = sh_(SHEET_LEAGUES), lv = ls.getDataRange().getValues();
+    for (var r=lv.length-1;r>=1;r--) if (String(lv[r][0])===id) ls.deleteRow(r+1);
+    return { ok:true };
+  } finally { lock.releaseLock(); }
+}
+// delete every row in `sheetName` whose column `col` (0-based) equals `id`
+function deleteRowsWhere_(sheetName, col, id){
+  var sh = sh_(sheetName); if (!sh) return;
+  var v = sh.getDataRange().getValues();
+  for (var r=v.length-1;r>=1;r--) if (String(v[r][col])===String(id)) sh.deleteRow(r+1);
 }
 
 /* ---- message board ---- */
