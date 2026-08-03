@@ -235,7 +235,7 @@
   .call__mine{ font-style:normal; font-family:"IBM Plex Mono",ui-monospace,monospace;
         font-size:1cqw; font-weight:700; letter-spacing:.18em; text-transform:uppercase;
         color:#0d0f15; background:var(--sun); padding:.2cqw .8cqw; border-radius:99px;
-        box-shadow:0 0 1.4cqw rgba(var(--sun-rgb),.6); }
+        box-shadow:0 0 0 1px rgba(var(--sun-rgb),.45); }
   .call__pill{
     font-style:normal; font-weight:700;
     font-size:.85cqw; letter-spacing:.24em; text-transform:uppercase;
@@ -465,14 +465,6 @@
   }
   .slot:focus-visible{ outline:2px solid var(--ink); outline-offset:6px; border-radius:4px }
 
-  /* the winner takes the win: a lift, and the light finds them */
-  .slot::after{
-    content:""; position:absolute; left:50%; bottom:-1.4cqw;
-    width:22cqw; height:5cqw; transform:translateX(-50%);
-    background:radial-gradient(closest-side, rgba(242,193,78,.55), rgba(242,193,78,0) 72%);
-    opacity:0; pointer-events:none; z-index:-1;
-  }
-  .slot.won::after{ animation:bloom 1.7s ease-out }
   /* a soft gold halo marks a wrestler from your team on the clay */
   .slot.mine::after{ content:""; position:absolute; left:50%; bottom:1cqw; z-index:-1;
         width:20cqw; height:20cqw; transform:translateX(-50%); border-radius:50%;
@@ -584,10 +576,8 @@
   }
   /* henka finish — the loser carries on from his charge into a flat faceplant;
      the winner simply holds where he stepped aside. */
-  @keyframes henkaPlant{
-    0%  { transform:translateX(var(--startx,0cqw)) scaleX(var(--flip,1)) }
-    38% { transform:translateX(calc((var(--startx,0cqw) + var(--hend,22cqw)) * .55)) rotate(calc(var(--hrot,88deg) * .3)) scaleX(var(--flip,1)) }
-    70% { transform:translateX(calc(var(--hend,22cqw) * .95)) translateY(2cqw) rotate(calc(var(--hrot,88deg) * .8)) scaleX(var(--flip,1)) }
+  @keyframes henkaPlant{               /* the rush already laid him out — just hold him flat */
+    0%  { transform:translateX(var(--endx,22cqw)) translateY(var(--endy,3.4cqw)) rotate(var(--endr,88deg)) scaleX(var(--flip,1)) }
     100%{ transform:translateX(var(--endx,22cqw)) translateY(var(--endy,3.4cqw)) rotate(var(--endr,88deg)) scaleX(var(--flip,1)); filter:var(--endf,none) }
   }
   @keyframes henkaHold{
@@ -595,9 +585,8 @@
     40% { transform:translateX(calc(var(--startx,-7cqw) * 1.05)) translateY(-.6cqw) scaleX(var(--flip,1)) }
     100%{ transform:translateX(var(--endx,-7cqw)) rotate(var(--endr,0deg)) scaleX(var(--flip,1)) }
   }
-  @keyframes shHenkaPlant{
-    0%  { transform:translateX(calc(-50% + var(--startx,0cqw))) }
-    70% { transform:translateX(calc(-50% + var(--hend,22cqw) * .95)) scaleX(1.1) }
+  @keyframes shHenkaPlant{             /* hold — the rush shadow already carried it here */
+    0%  { transform:translateX(calc(-50% + var(--endx,22cqw))) scaleX(1.6) scaleY(.7); opacity:.3 }
     100%{ transform:translateX(calc(-50% + var(--endx,22cqw))) scaleX(1.6) scaleY(.7); opacity:.3 }
   }
   @keyframes shHenkaHold{
@@ -723,15 +712,15 @@
   }
 
 
-  @keyframes bloom{ 0%{opacity:0} 18%{opacity:1} 100%{opacity:0} }
   @keyframes chip{ 50%{ transform:scale(1.12) } }
   /* the clay takes the hit when a man goes down */
-  .stage.impact{ animation:impact .42s cubic-bezier(.36,.07,.19,.97) both }
+  .stage.impact{ animation:impact .38s cubic-bezier(.36,.07,.19,.97) both }
   @keyframes impact{
     0%  { transform:none }
-    20% { transform:translateY(.55cqw) }
-    45% { transform:translateY(-.3cqw) translateX(.22cqw) }
-    70% { transform:translateY(.18cqw) translateX(-.14cqw) }
+    14% { transform:translateY(1.15cqw) scale(1.012) }
+    38% { transform:translateY(-.62cqw) translateX(.46cqw) }
+    62% { transform:translateY(.34cqw) translateX(-.3cqw) }
+    82% { transform:translateY(-.14cqw) translateX(.12cqw) }
     100%{ transform:none }
   }
   @media (prefers-reduced-motion:reduce){
@@ -833,10 +822,11 @@
     40% { transform:translateX(var(--hstep,-7cqw)) rotate(4deg) scaleX(var(--flip,1)) }
     100%{ transform:translateX(var(--hstep,-7cqw)) rotate(2deg) scaleX(var(--flip,1)) }
   }
-  @keyframes henkaRush{                /* lunge hard into the space where he was — early and committed */
-    0%  { transform:translateX(var(--facex,0cqw)) scaleX(var(--flip,1)) }
-    45% { transform:translateX(var(--hmid,16cqw)) rotate(0deg) scaleX(var(--flip,1)) }
-    100%{ transform:translateX(var(--hmid,16cqw)) rotate(0deg) scaleX(var(--flip,1)) }
+  @keyframes henkaRush{                /* charge through the empty space and pitch onto his face — one motion */
+    0%  { transform:translateX(var(--facex,0cqw)) rotate(0deg) scaleX(var(--flip,1)) }
+    30% { transform:translateX(calc(var(--hmid,16cqw) * .7)) rotate(calc(var(--hrot,88deg) * .18)) scaleX(var(--flip,1)) }
+    60% { transform:translateX(var(--hmid,16cqw)) translateY(1.4cqw) rotate(calc(var(--hrot,88deg) * .55)) scaleX(var(--flip,1)) }
+    100%{ transform:translateX(var(--hend,22cqw)) translateY(var(--endy,3.4cqw)) rotate(var(--hrot,88deg)) scaleX(var(--flip,1)) }
   }
   @keyframes shHStep{
     0%  { transform:translateX(calc(-50% + var(--facex,0cqw))) }
@@ -845,8 +835,8 @@
   }
   @keyframes shHRush{
     0%  { transform:translateX(calc(-50% + var(--facex,0cqw))) }
-    45% { transform:translateX(calc(-50% + var(--hmid,16cqw))) }
-    100%{ transform:translateX(calc(-50% + var(--hmid,16cqw))) }
+    60% { transform:translateX(calc(-50% + var(--hmid,16cqw))) }
+    100%{ transform:translateX(calc(-50% + var(--hend,22cqw))) scaleX(1.1) }
   }
   /* the bar reflows to the width it's given: gaps and padding scale, the
      strapline drops, action buttons fall back to their glyphs, and the whole
@@ -917,12 +907,6 @@
   .menu.is-nano .menu__actions .ghost{ min-width:30px; padding:7px 6px }
 
   /* ── bout bar ─────────────────────────────────────────────── */
-  .bar{
-    display:flex; justify-content:center; align-items:center;
-    max-width:1440px; margin:0 auto;
-    padding:22px 24px;
-    border-bottom:1px solid var(--line);
-  }
   .bar__h2h{
     font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
     font-size:11px; letter-spacing:.06em; color:var(--dim);
@@ -956,15 +940,13 @@
   }
   .credit a{ color:var(--dim) }
   .bar__kim{ font-size:14px; color:var(--ink); letter-spacing:.06em }
-  .bar__meta{ font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:var(--faint) }
-  .bar__nav{ display:flex; gap:6px }
-  .bar__nav button, .ghost{
+  .ghost{
     background:none; border:1px solid var(--line); color:var(--dim);
     font-size:11px; letter-spacing:.16em; text-transform:uppercase;
     padding:6px 11px; border-radius:var(--radius-sm); cursor:pointer;
   }
-  .bar__nav button:hover, .ghost:hover{ color:var(--ink); border-color:var(--line2) }
-  .bar__nav button:disabled{ opacity:.3; cursor:default }
+  .ghost:hover{ color:var(--ink); border-color:var(--line2) }
+  .ghost:disabled{ opacity:.3; cursor:default }
 
   /* ── panels ───────────────────────────────────────────────── */
   .wrap{ max-width:1440px; margin:0 auto; padding:22px 24px 80px }
@@ -1057,7 +1039,6 @@
      while the ring-entering ceremony plays above. */
   body.setup .menu,
   body.setup .wrap,
-  body.setup .bar,
   body.setup .credit{ display:none }
   /* the ring stays full size during setup — same as the simulation */
   body:not(.setup) #intro{ display:none }
@@ -1065,9 +1046,9 @@
   /* ── ceremony-only mode (dohyo.html?ceremony=1) — the ring-entering loop
      with no UI, for embedding as a header on the Sumo Slapdown ─────────── */
   body.conly{ background:#000; overflow:hidden }
-  body.conly .menu, body.conly .wrap, body.conly .bar, body.conly .credit,
+  body.conly .menu, body.conly .wrap, body.conly .credit,
   body.conly #intro,
-  body.conly .stage__title, body.conly #bar{ display:none !important }
+  body.conly .stage__title{ display:none !important }
   body.conly .stage{ pointer-events:none }
   body.conly .stage__title{ display:none !important }
   body.conly .tkr{ display:none !important }
@@ -1597,14 +1578,6 @@
 </div>
 
 
-<div class="bar" id="bar">
-  <span class="bar__meta" id="barMeta">Nagoya · Day 1 · July 12, 2026</span>
-  <div class="bar__nav">
-    <button id="prev" disabled>‹ Prev</button>
-    <button id="next" disabled>Next ›</button>
-  </div>
-</div>
-
 <div class="wrap">
   <div class="panel" id="p-makuuchi"><div class="bouts" id="l-makuuchi"></div></div>
   <div class="panel" id="p-juryo" hidden><div class="bouts" id="l-juryo"></div></div>
@@ -1816,7 +1789,7 @@ function throwSalt(div){
 
 /* nobody carries a win into the next bout */
 function clearWon(){
-  clearTimeout(callT); clearTimeout(bowT); clearRites();
+  clearTimeout(callT); clearTimeout(bowT); clearTimeout(tachiaiT); clearRites();
   stage.classList.remove("awarding");
   endKimCall();
   for (const el of [slots.east, slots.west]) {
@@ -1828,6 +1801,7 @@ function clearWon(){
   stage.classList.remove("henka");
   bar.classList.remove("won");
   clearTimeout(impactT);                        // no shake for a bout that's been cleared
+  clearTimeout(tachiaiT);
   stage.classList.remove("impact");
 }
 
@@ -1846,10 +1820,6 @@ function loadBout(div, i){
     if (fresh) throwSalt(div);                   // Makuuchi only — throwSalt checks
   }
   stage.classList.remove("call-e", "call-w");
-
-  barMeta.textContent  = `${div === "juryo" ? "Jūryō" : "Makuuchi"} · Bout ${i + 1} of ${card[div].length}`;
-  prev.disabled = i === 0;
-  next.disabled = i === card[div].length - 1;
 
   document.querySelectorAll(".bout").forEach(el => el.setAttribute("aria-current", "false"));
   const row = document.querySelector(`#l-${div} .bout[data-i="${i}"]`);
@@ -2024,12 +1994,8 @@ function clearBout(){
   bar.classList.add("is-empty");
   barH2H.textContent = ""; split.hidden = true;
   record.className = "hud__record"; record.textContent = "";
-  barMeta.textContent = `Nagoya · ${card.label} · ${card.date}, 2026`;
-  prev.disabled = next.disabled = true;
   document.querySelectorAll(".bout").forEach(el => el.setAttribute("aria-current", "false"));
 }
-prev.onclick = () => { stop(); current && loadBout(current.div, current.i - 1); };
-next.onclick = () => { stop(); current && loadBout(current.div, current.i + 1); };
 
 /* ── play the day ─────────────────────────────────────────── */
 const playBtn = document.getElementById("play");
@@ -2109,7 +2075,7 @@ const endKimCall = () => kimCall.classList.remove("on");
 /* the clash — run on the two wrestlers during the hold, then handed off to
    the win/loss animations. Duration is kept just under the hold so they've
    settled square by the time the gyōji makes the call. */
-const CLASH_MS = 3000;
+const CLASH_MS = 2100;
 const HENKA_MS = 650;             // a henka is a quick sidestep — the dodge and lunge snap
 stage.style.setProperty("--clashT", CLASH_MS + "ms");
 
@@ -2137,7 +2103,7 @@ const FINISH = {
   /* a throw takes them both over — he goes down too, and lands on top */
   throw: { fall:"slammed",  shadow:"shSlammed",  win:"rideDown",   wsh:"shRide",   impact:505, ex: 0.62, ey:3.4, er:-98,  dim:".5", both:true },
   /* the sidestep: the loser charges into empty space and lands flat on his face */
-  henka: { fall:"henkaPlant", shadow:"shHenkaPlant", win:"henkaHold", wsh:"shHenkaHold", impact:340, dim:".5" },
+  henka: { fall:"henkaPlant", shadow:"shHenkaPlant", win:"henkaHold", wsh:"shHenkaHold", impact:40, dim:".5" },
 };
 
 /* how far each man is from his own tawara, measured off the artwork */
@@ -2188,9 +2154,19 @@ function clash(b){
   stage.classList.remove("clashing");
   void stage.offsetWidth;                       // restart the animation each bout
   stage.classList.add("clashing");
+  // a jolt at the tachiai itself — the two bodies meeting (12% into the clash)
+  if (!still) {
+    clearTimeout(tachiaiT);
+    tachiaiT = setTimeout(() => {
+      stage.classList.remove("impact"); void stage.offsetWidth;
+      stage.classList.add("impact");
+      setTimeout(() => stage.classList.remove("impact"), 380);
+    }, CLASH_MS * 0.12);
+  }
 }
 
 let impactT = null;
+let tachiaiT = null;
 /* dress the two slots for the ending this kimarite calls for, then let the
    clay shake when he lands. Direction and distance live in the CSS. */
 function dressFinish(kim, winnerEl, loserEl, loserSide){
@@ -2514,7 +2490,7 @@ function jumpTo(i){
   const n = card[division].length;
   if (i < 0 || i >= n) return;
   abortWaits();                          // drop whatever bout is mid-flight
-  clearTimeout(callT); clearTimeout(bowT); clearRites();
+  clearTimeout(callT); clearTimeout(bowT); clearTimeout(tachiaiT); clearRites();
   endKimCall(); endClash(); endShout(); endKachi();
   stage.classList.remove("awarding", "facing", "is-paused");
   playBout(i);
@@ -2550,7 +2526,7 @@ function stop(){
   playing = false; paused = false; suspense = false;
   runToken++;                                            // orphan any in-flight bout loop
   abortWaits();
-  clearTimeout(callT); clearTimeout(bowT); clearRites();
+  clearTimeout(callT); clearTimeout(bowT); clearTimeout(tachiaiT); clearRites();
   stage.classList.remove("awarding", "facing", "is-paused");
   endKimCall(); endClash(); endShout(); endKachi();
   clearCall();
