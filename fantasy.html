@@ -413,6 +413,10 @@
   .lg-leave{ margin-top:12px; background:none; border:1px solid var(--line2); color:var(--muted);
         border-radius:8px; padding:7px 12px; font:inherit; font-size:.82rem; cursor:pointer }
   .lg-leave:hover{ border-color:var(--tangerine); color:var(--tangerine) }
+  .lg-delete{ display:block; color:#e2564a; border-color:rgba(226,86,74,.4) }
+  .lg-delete[hidden]{ display:none }
+  .lg-delete:hover{ border-color:#e2564a; color:#e2564a; background:rgba(226,86,74,.08) }
+  .lg-delete:disabled{ opacity:.5; cursor:default }
   .lg-post{ display:flex; gap:8px; margin:0 0 14px }
   .lg-post textarea{ flex:1; background:var(--surface); border:1px solid var(--line); border-radius:10px;
         color:var(--ink); font:inherit; font-size:.9rem; padding:9px 12px; resize:vertical }
@@ -630,6 +634,7 @@
             <h4>Members</h4>
             <div id="lgMembers"></div>
             <button class="lg-leave" id="lgLeave">Leave this league</button>
+            <button class="lg-leave lg-delete" id="lgDelete" hidden>Delete this league</button>
           </div>
 
           <div class="lg-board">
@@ -1373,6 +1378,7 @@ async function renderLeague(){
       if (r&&r.ok){ lgStatus("Removed.","ok"); loadLeagues(lg.id); } else lgStatus((r&&r.error)||"Couldn't remove.","err"); };
   });
   $("lgLeave").style.display = meCommish ? "none" : "";
+  $("lgDelete").hidden = !meCommish;
   renderMessages(lg.messages || []);
 
   const isKeepers = lg.mode === "keepers";
@@ -1838,6 +1844,16 @@ $("lgLeave").onclick = async ()=>{
   if (!curLeagueId || !confirm("Leave this league?")) return;
   const r=await GyojiGuide.leagueLeave(curLeagueId);
   if (r&&r.ok){ curLeagueId=null; loadLeagues(); }
+};
+$("lgDelete").onclick = async ()=>{
+  if (!curLeagueId) return;
+  const lg = leaguesCache.find(l=>l.id===curLeagueId);
+  const nm = lg ? lg.name : "this league";
+  if (!confirm(`Delete "${nm}"? This permanently removes the league, every member's roster and draft, all trades, and the whole message board. This can't be undone.`)) return;
+  const btn = $("lgDelete"); btn.disabled = true;
+  const r = await GyojiGuide.leagueDelete(curLeagueId);
+  if (r&&r.ok){ curLeagueId=null; loadLeagues(); }
+  else { btn.disabled=false; alert((r&&r.error)||"Couldn't delete the league."); }
 };
 $("lgCtaLogin").onclick = ()=> openAuth("login");
 

@@ -184,6 +184,7 @@
   GG.leagueLeave   = function (id){ return GG.apiPost(authed({ action:"leaveLeague", id: id })); };
   GG.leagueKick    = function (id, member){ return GG.apiPost(authed({ action:"removeMember", id: id, member: member })); };
   GG.leagueRename  = function (id, name){ return GG.apiPost(authed({ action:"renameLeague", id: id, name: name })); };
+  GG.leagueDelete  = function (id){ return GG.apiPost(authed({ action:"deleteLeague", id: id })); };
   GG.msgPost       = function (id, body, parentId){ return GG.apiPost(authed({ action:"postMessage", id: id, body: body, parentId: parentId || "" })); };
   GG.msgDelete     = function (msgId){ return GG.apiPost(authed({ action:"deleteMessage", msgId: msgId })); };
   GG.saveLeagueTeam = function (id, team){ return GG.apiPost(authed({ action:"saveLeagueTeam", id: id, team: JSON.stringify(team || {}) })); };
