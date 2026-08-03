@@ -1014,13 +1014,15 @@
         text-shadow:0 0 6px rgba(var(--sun-rgb),.6) }
   .bout__name.is-mine{ color:var(--sun) }
   .bout.mine-e, .bout.mine-w{ border-color:rgba(var(--sun-rgb),.4) }
-  .bout.won-e .bout__e .bout__name,
-  .bout.won-w .bout__w .bout__name{ color:var(--win); font-weight:600 }
-  body.hide-results .bout.won-e .bout__e .bout__name,
-  body.hide-results .bout.won-w .bout__w .bout__name{ color:var(--ink); font-weight:400 }
+  /* results are hidden per-bout until that bout is revealed (as it's fought,
+     or immediately for a day already played through). The winner's name only
+     colours, and the kimarite only shows, on a .revealed bout. */
+  .bout.revealed.won-e .bout__e .bout__name,
+  .bout.revealed.won-w .bout__w .bout__name{ color:var(--win); font-weight:600 }
   .bout__mid{ text-align:center; font-size:11px; letter-spacing:.1em; color:var(--dim) }
   .bout__mid span{ display:block; font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--faint) }
-  body.hide-results .bout__mid{ visibility:hidden }
+  .bout.won-e:not(.revealed) .bout__mid,
+  .bout.won-w:not(.revealed) .bout__mid{ visibility:hidden }
 
   /* roster */
   .grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); gap:14px }
@@ -1467,7 +1469,6 @@
         </div>
       </div>
       <div class="menu__actions">
-        <button class="ghost" id="spoiler" aria-pressed="false" title="Hide results"><i class="ico">◉</i><span class="lbl">Hide results</span></button>
         <button class="ghost" id="reroll" title="Re-roll the tournament"><i class="ico">↻</i><span class="lbl">Re-roll</span></button>
         <button class="ghost" id="play" title="Play the day"><i class="ico">▶</i><span class="lbl">Play Day 1</span></button>
       </div>
@@ -1648,6 +1649,10 @@ let division = "makuuchi";     // the one on screen — and the one Play runs
 let current  = null;           // {div, i}
 let suspense = false;          // during playback: matchup up, result held back
 let playing  = false;
+// which day/division pairs have been played through (so their results stay
+// visible on return). A day not in here starts blank and reveals bout-by-bout.
+const revealedDivs = new Set();
+const divKey = (d, div) => d + ":" + div;
 let gyojiSet = false;          // is the gyōji up on the clay for this bout?
 
 
@@ -1846,7 +1851,7 @@ function loadBout(div, i){
 function showResult(celebrate){
   const b = card[current.div][current.i];
   const decided = !!b[2];
-  const hidden  = !decided || suspense || document.body.classList.contains("hide-results");
+  const hidden  = !decided || suspense;
 
 
   for (const [side, name] of [["east", b[1]], ["west", b[5]]]) {   // light today's line
@@ -2369,7 +2374,7 @@ async function play(){
     if (!await announce(card[div][i], div, i)) return;    // the names go up first
     suspense = decided;  loadBout(div, i);                // they set at the shikiri-sen…
     stage.classList.add("facing");                        // …step up to their lines and glare
-    await wait(still ? 0 : 1150);                          // the approach, then a stare-down beat
+    await wait(still ? 0 : 1150);                         // the approach, then a stare-down beat
     if (!playing) { stage.classList.remove("facing"); return; }
     stage.classList.remove("facing");                     // release, and away they go
     if (!still) hakkeyoi();                               // the call comes as they go…
@@ -2379,11 +2384,20 @@ async function play(){
     if (!playing) { endClash(); return; }
     if (!decided) { endClash(); continue; }              // nothing to reveal — it hasn't happened
     suspense = false; showResult(true);                   // he goes down from where they're locked
+    revealBout(div, i);                                   // …and his result posts to the card list
     endClash();                                           // (only now — the hold must not snap back)
     await wait(still ? 600 : 5000);                       // fall, call, bow, then the gunbai
   }
+  if (decided) revealedDivs.add(divKey(day, div));        // day fully played — keep it revealed
   stop();
   if (decided) showDayModal();                            // the day is done — show the banzuke
+}
+
+/* reveal one bout's result in the card list — the winner colours and the
+   kimarite appears, exactly as that bout is decided during playback. */
+function revealBout(div, i){
+  const row = document.querySelector(`#l-${div} .bout[data-i="${i}"]`);
+  if (row) row.classList.add("revealed");
 }
 function stop(){
   if (!playing) return;
@@ -2430,7 +2444,8 @@ function mountDay(d){
     card[div].forEach((b, i) => {
       const el = document.createElement("button");
       const me = c => mine.has(c) ? " is-mine" : "";
-      el.className = "bout" + (b[2] ? ` won-${b[2]}` : "") + (mine.has(b[1]) ? " mine-e" : "") + (mine.has(b[5]) ? " mine-w" : "");
+      const shown = revealedDivs.has(divKey(d, div));       // past plays stay revealed
+      el.className = "bout" + (b[2] ? ` won-${b[2]}` : "") + (shown ? " revealed" : "") + (mine.has(b[1]) ? " mine-e" : "") + (mine.has(b[5]) ? " mine-w" : "");
       el.dataset.i = i;
       el.setAttribute("aria-current", "false");
       el.innerHTML = `
@@ -2439,7 +2454,7 @@ function mountDay(d){
           b[2] ? `<span>${b[2] === "e" ? "East wins" : "West wins"}</span>` : ""}</span>
         <span class="bout__w"><span class="bout__name${me(b[5])}">${b[5]}${mine.has(b[5]) ? `<i class="bout__star">★</i>` : ""}</span><span class="bout__rank">${b[4]}</span></span>
         <span class="bout__past" title="Head-to-head, east–west">${b[6]}</span>`;
-      el.onclick = () => { stop(); loadBout(div, i); };
+      el.onclick = () => { stop(); revealBout(div, i); loadBout(div, i); };
       list.appendChild(el);
     });
   }
@@ -2485,7 +2500,7 @@ grid.addEventListener("click", e => {
   paint();
 });
 
-/* ── tabs + spoilers ──────────────────────────────────────── */
+/* ── tabs ─────────────────────────────────────────────────── */
 function selectTab(name){
   document.querySelectorAll('[role="tab"]').forEach(x =>
     x.setAttribute("aria-selected", String(x.dataset.tab === name)));
@@ -2499,16 +2514,6 @@ function selectTab(name){
 }
 document.querySelectorAll('[role="tab"]').forEach(t =>
   t.onclick = () => { stop(); selectTab(t.dataset.tab); });
-
-const spoiler = document.getElementById("spoiler");
-spoiler.onclick = () => {
-  const on = spoiler.getAttribute("aria-pressed") !== "true";
-  spoiler.setAttribute("aria-pressed", String(on));
-  setBtn(spoiler, on ? "◎" : "◉", on ? "Show results" : "Hide results");
-  spoiler.title = on ? "Show results" : "Hide results";   // the words may be hidden
-  document.body.classList.toggle("hide-results", on);
-  if (current) showResult(false);
-};
 
 /* ══ projection engine ═══════════════════════════════════════
    Fills the rest of the basho from the real data on screen.
@@ -2695,6 +2700,7 @@ function applyProjection(seed){
   refreshDaySel();
   const champ = championOf(st, rng32(seed ^ 0x9e3779b9));
   seasonChamp = { name: champ, w: st[champ].w, l: st[champ].l };   // held back until senshūraku
+  revealedDivs.clear();                               // a new draw hides every result again
   if (typeof teamDay === "number") teamDay = 0;        // a new draw, a new basho to run
   if (typeof paintTeam === "function" && !document.getElementById("p-team").hidden) paintTeam();
 }
@@ -3283,8 +3289,11 @@ function enter(){
   mountDay(daySel.value);                        // rebuild the matchups now the team is set
   document.getElementById("divTabs").hidden = watchDiv !== "both";  // only "both" needs a switch
   if (runChoice === "sim") {
-    teamDay = BASHO_LEN;                        // straight to the finish
-    selectTab("team");                          // the final scores, no playback
+    // opted out of the drama — reveal every day's bouts up front
+    Object.keys(DAYS).forEach(d => { revealedDivs.add(divKey(d, "makuuchi")); revealedDivs.add(divKey(d, "juryo")); });
+    mountDay(daySel.value);                       // re-mount so the revealed classes apply
+    teamDay = BASHO_LEN;                          // straight to the finish
+    selectTab("team");                            // the final scores, no playback
   } else {
     teamDay = 0;
     selectTab(watchDiv === "juryo" ? "juryo" : "makuuchi");   // "both" starts on Makuuchi
