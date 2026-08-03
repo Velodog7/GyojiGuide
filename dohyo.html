@@ -3615,8 +3615,88 @@ applyFit();                 // and once at start, before the first paint settles
     var sum = GGRoster.applyTo(ROSTER, res.ranks, { codeField:"code", divField:"d", addNewcomers:false });
     ROSTER_BY_DIV.makuuchi.length = 0; ROSTER_BY_DIV.juryo.length = 0;
     for (var n in ROSTER){ if (ROSTER.hasOwnProperty(n) && ROSTER_BY_DIV[ROSTER[n].d]) ROSTER_BY_DIV[ROSTER[n].d].push(n); }
+    // stash each wrestler's real sumo-api id for head-to-head lookups
+    for (var nm in res.ranks){ if (res.ranks.hasOwnProperty(nm) && ROSTER[nm]) ROSTER[nm].rid = res.ranks[nm].rikishiId; }
     try { paintIntroSlots(); syncIntro(); } catch(e){}
+    enrichHeadToHead();
   });
+
+  /* Replace each bout's bundled head-to-head with the real all-time record
+     between the two wrestlers, pulled from sumo-api. One fetch per unique
+     pair (cached), gently throttled. Bouts whose wrestlers we can't map to a
+     real id keep their bundled figure, so nothing regresses when offline. */
+  var h2hCache = {};        // "ridA:ridB" -> "a-b" from the east wrestler's POV
+  function enrichHeadToHead(){
+    if (!GGRoster.headToHead) return;
+    // gather every unique (east,west) pairing across every day, both divisions
+    var jobs = [], seen = {};
+    var dayOrder = Object.keys(DAYS);
+    // put the day currently on screen first, so its records resolve soonest
+    if (typeof day !== "undefined" && DAYS[day]){
+      dayOrder = [day].concat(dayOrder.filter(function(d){ return d !== day; }));
+    }
+    dayOrder.forEach(function(d){
+      ["makuuchi","juryo"].forEach(function(div){
+        (DAYS[d][div] || []).forEach(function(b){
+          var e = ROSTER[b[1]], w = ROSTER[b[5]];
+          if (!e || !w || !e.rid || !w.rid) return;
+          var key = e.rid + ":" + w.rid;
+          if (seen[key]) return; seen[key] = 1;
+          jobs.push({ eName:b[1], wName:b[5], eRid:e.rid, wRid:w.rid, key:key });
+        });
+      });
+    });
+    var i = 0;
+    (function nextJob(){
+      if (i >= jobs.length) return;
+      var job = jobs[i++];
+      GGRoster.headToHead(job.eRid, job.wRid).then(function(h){
+        if (h){ h2hCache[job.key] = h.a + "-" + h.b; applyPairRecord(job.eName, job.wName, h2hCache[job.key]); }
+        setTimeout(nextJob, 120);       // be polite to the free API
+      });
+    })();
+  }
+  /* write a real record onto every bout of this exact pairing, in whichever
+     orientation the bout lists them (the API record is east-POV: a-b). */
+  function applyPairRecord(eName, wName, rec){
+    var flipped = rec.split("-").reverse().join("-");
+    var touched = false;
+    Object.keys(DAYS).forEach(function(d){
+      ["makuuchi","juryo"].forEach(function(div){
+        (DAYS[d][div] || []).forEach(function(b){
+          if (b[1] === eName && b[5] === wName){ b[6] = rec; touched = true; }
+          else if (b[1] === wName && b[5] === eName){ b[6] = flipped; touched = true; }
+        });
+      });
+    });
+    // keep the pristine snapshot in step so a re-roll/reset still shows real data
+    Object.keys(REAL_SNAP).forEach(function(d){
+      ["makuuchi","juryo"].forEach(function(div){
+        (REAL_SNAP[d] && REAL_SNAP[d][div] || []).forEach(function(b){
+          if (b[1] === eName && b[5] === wName) b[6] = rec;
+          else if (b[1] === wName && b[5] === eName) b[6] = flipped;
+        });
+      });
+    });
+    // if the current bout on screen is this pairing, refresh its H2H display
+    if (touched && current){
+      var cb = card[current.div] && card[current.div][current.i];
+      if (cb && ((cb[1]===eName && cb[5]===wName) || (cb[1]===wName && cb[5]===eName))){
+        try { renderSplit(cb[6], suspense ? "" : cb[2]); } catch(e){}
+      }
+    }
+    // update the head-to-head text already rendered in the mounted bout lists
+    if (touched && card){
+      ["makuuchi","juryo"].forEach(function(div){
+        (card[div] || []).forEach(function(b, idx){
+          if ((b[1]===eName && b[5]===wName) || (b[1]===wName && b[5]===eName)){
+            var span = document.querySelector('#l-'+div+' .bout[data-i="'+idx+'"] .bout__past');
+            if (span) span.textContent = b[6];
+          }
+        });
+      });
+    }
+  }
 })();
 </script>
 <script src="taiko-radio.js" defer></script>

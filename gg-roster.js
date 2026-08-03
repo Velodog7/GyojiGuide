@@ -170,8 +170,43 @@
     return summary;
   }
 
+  /* Head-to-head record between two rikishi, from sumo-api's
+   * /rikishi/:id/matches/:oppId endpoint. Returns { a, b, total } where
+   * a = wins for idA, b = wins for idB — or null if it can't be fetched.
+   * The endpoint's win-count keys have varied across versions, so we read
+   * defensively (rikishiWins/opponentWins, and a matches[] fallback). */
+  function headToHead(idA, idB) {
+    if (!idA || !idB) return Promise.resolve(null);
+    var url = API_BASE + "/rikishi/" + encodeURIComponent(idA) + "/matches/" + encodeURIComponent(idB);
+    return fetch(url, { headers: { "Accept": "application/json" } })
+      .then(function (res) { if (!res.ok) throw new Error("h2h " + res.status); return res.json(); })
+      .then(function (d) {
+        if (!d) return null;
+        var a = pickNum(d, ["rikishiWins", "kachi", "aWins", "wins"]);
+        var b = pickNum(d, ["opponentWins", "make", "bWins", "losses"]);
+        // fall back to counting the matches[] array by winnerId
+        if ((a == null || b == null) && Array.isArray(d.matches)) {
+          var ca = 0, cb = 0, sA = String(idA);
+          d.matches.forEach(function (m) {
+            var w = String(m.winnerId || m.winnerID || m.winner_id || "");
+            if (!w) return;
+            if (w === sA) ca++; else cb++;
+          });
+          a = ca; b = cb;
+        }
+        if (a == null && b == null) return null;
+        a = a || 0; b = b || 0;
+        return { a: a, b: b, total: (typeof d.total === "number" ? d.total : a + b) };
+      })
+      .catch(function () { return null; });
+  }
+  function pickNum(obj, keys) {
+    for (var i = 0; i < keys.length; i++) if (typeof obj[keys[i]] === "number") return obj[keys[i]];
+    return null;
+  }
+
   window.GGRoster = {
-    load: load, applyTo: applyTo,
+    load: load, applyTo: applyTo, headToHead: headToHead,
     bashoCandidates: bashoCandidates, deriveFromRank: deriveFromRank, label: label,
     _fetchBanzuke: fetchBanzuke
   };

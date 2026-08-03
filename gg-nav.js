@@ -28,7 +28,10 @@
     nav.innerHTML =
       '<div class="ggn-inner">' +
       '<a class="ggn-brand" href="index.html">'+GGN_LOGO+'</a>' +
-      '<div class="ggn-links">' +
+      '<button type="button" class="ggn-burger" id="ggnBurger" aria-label="Menu" aria-expanded="false" aria-controls="ggnLinks">' +
+        '<span></span><span></span><span></span>' +
+      '</button>' +
+      '<div class="ggn-links" id="ggnLinks">' +
       LINKS.map(function (l) {
         var active = l.match.indexOf(here) >= 0;
         return '<a class="ggn-link' + (active ? " active" : "") + '" href="' + l.href + '"' +
@@ -44,6 +47,31 @@
     document.body.classList.add("has-gg-nav");
     var hb = document.getElementById("ggnHelp");
     if (hb) hb.onclick = openHelp;
+    wireBurger();
+  }
+
+  /* the hamburger toggles the links panel open on narrow screens; it closes
+     on outside-click, on Escape, on link tap, and whenever the viewport
+     grows back past the breakpoint. */
+  function wireBurger() {
+    var burger = document.getElementById("ggnBurger");
+    var nav = document.getElementById("gg-nav");
+    if (!burger || !nav) return;
+    function setOpen(open) {
+      nav.classList.toggle("ggn-open", open);
+      burger.setAttribute("aria-expanded", String(open));
+    }
+    burger.onclick = function (e) { e.stopPropagation(); setOpen(!nav.classList.contains("ggn-open")); };
+    document.getElementById("ggnLinks").addEventListener("click", function (e) {
+      if (e.target.closest(".ggn-link")) setOpen(false);   // navigating away
+    });
+    document.addEventListener("click", function (e) {
+      if (nav.classList.contains("ggn-open") && !e.target.closest("#gg-nav")) setOpen(false);
+    });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") setOpen(false); });
+    window.addEventListener("resize", function () {
+      if (window.innerWidth > 820 && nav.classList.contains("ggn-open")) setOpen(false);
+    });
   }
 
   var CSS =
@@ -61,15 +89,35 @@
       'text-decoration:none;color:#c7cbd9;padding:0 18px;border-radius:10px;transition:color .15s,background .15s}' +
     '.ggn-link:hover{color:#f4ecd8;background:rgba(255,255,255,.07)}' +
     '.ggn-link.active{color:#0f1118;background:linear-gradient(180deg,#f0d590,#d8b25a);font-weight:400}' +
-    '@media(max-width:640px){.ggn-inner{grid-template-columns:1fr;justify-items:center;gap:4px;padding:6px 12px}' +
-      '.ggn-brand{grid-column:1}.ggn-links{grid-column:1;flex-wrap:wrap;justify-content:center}' +
-      '.ggn-link{padding:7px 13px;font-size:.86rem;height:auto}.ggn-right{grid-column:1}}' +
+    /* hamburger button — hidden on desktop, shown when the links collapse */
+    '.ggn-burger{display:none;grid-column:2;justify-self:center;flex-direction:column;justify-content:center;gap:5px;' +
+      'width:42px;height:40px;padding:0 10px;box-sizing:border-box;background:none;border:1px solid #39404f;border-radius:10px;cursor:pointer}' +
+    '.ggn-burger span{display:block;height:2px;width:100%;background:#c7cbd9;border-radius:2px;transition:transform .2s,opacity .2s}' +
+    '.ggn-burger:hover span{background:#f4ecd8}' +
+    '#gg-nav.ggn-open .ggn-burger span:nth-child(1){transform:translateY(7px) rotate(45deg)}' +
+    '#gg-nav.ggn-open .ggn-burger span:nth-child(2){opacity:0}' +
+    '#gg-nav.ggn-open .ggn-burger span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}' +
     /* right wrapper + help button */
     '.ggn-right{grid-column:3;justify-self:end;display:flex;align-items:center;gap:10px}' +
     '.ggn-help{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid #39404f;background:rgba(255,255,255,.03);' +
       'color:#c7cbd9;font-family:"Space Grotesk",system-ui,sans-serif;font-weight:700;font-size:.95rem;line-height:1;cursor:pointer;' +
       'display:grid;place-items:center;transition:color .15s,border-color .15s,background .15s}' +
     '.ggn-help:hover{color:#e0a23a;border-color:#e0a23a}' +
+    /* ── narrow layout: collapse links into a hamburger dropdown ── */
+    '@media(max-width:820px){' +
+      '.ggn-inner{grid-template-columns:auto 1fr auto;gap:10px;padding:0 14px;min-height:60px}' +
+      '.ggn-brand{grid-column:1}' +
+      '.ggn-brand svg,.ggn-brand img{height:52px}' +
+      '.ggn-burger{display:flex;justify-self:start}' +
+      '.ggn-right{grid-column:3}' +
+      '.ggn-links{grid-column:1 / -1;flex-direction:column;align-items:stretch;gap:4px;' +
+        'position:absolute;left:0;right:0;top:100%;padding:8px 14px 14px;' +
+        'background:rgba(20,22,30,.98);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);' +
+        'border-bottom:1px solid rgba(216,178,90,.25);box-shadow:0 18px 40px rgba(0,0,0,.5);' +
+        'max-height:0;overflow:hidden;opacity:0;pointer-events:none;transition:max-height .25s ease,opacity .2s ease}' +
+      '#gg-nav.ggn-open .ggn-links{max-height:60vh;opacity:1;pointer-events:auto}' +
+      '.ggn-link{height:auto;justify-content:flex-start;padding:12px 14px;font-size:1rem}' +
+    '}' +
     /* help modal */
     '.ggh-ov{position:fixed;inset:0;z-index:1100;display:none;align-items:center;justify-content:center;background:rgba(6,7,11,.72);' +
       'backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);padding:18px;font-family:"Space Grotesk","Zen Kaku Gothic New",system-ui,sans-serif}' +
