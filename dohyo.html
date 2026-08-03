@@ -65,6 +65,8 @@
     container-type:size;
     container-name:stage;
   }
+  /* pause freezes every running keyframe animation on the clay in place */
+  .stage.is-paused, .stage.is-paused *{ animation-play-state:paused !important }
   .stage__bg{                       /* the dohyō, bottom-anchored, full width */
     position:absolute; bottom:0; left:0;
     width:100%; height:auto;
@@ -1470,7 +1472,10 @@
       </div>
       <div class="menu__actions">
         <button class="ghost" id="reroll" title="Re-roll the tournament"><i class="ico">↻</i><span class="lbl">Re-roll</span></button>
-        <button class="ghost" id="play" title="Play the day"><i class="ico">▶</i><span class="lbl">Play Day 1</span></button>
+        <button class="ghost" id="prevBout" title="Previous bout"><i class="ico">⏮</i></button>
+        <button class="ghost" id="play" title="Play"><i class="ico">▶</i><span class="lbl">Play</span></button>
+        <button class="ghost" id="nextBout" title="Next bout"><i class="ico">⏭</i></button>
+        <button class="ghost" id="replayBout" title="Replay this bout"><i class="ico">↺</i></button>
       </div>
     </nav>
   </div>
@@ -2012,7 +2017,34 @@ next.onclick = () => { stop(); current && loadBout(current.div, current.i + 1); 
 
 /* ── play the day ─────────────────────────────────────────── */
 const playBtn = document.getElementById("play");
-const wait = ms => new Promise(r => setTimeout(r, ms));
+const prevBtn = document.getElementById("prevBout");
+const nextBtn = document.getElementById("nextBout");
+const replayBtn = document.getElementById("replayBout");
+/* a pausable sleep. While `paused` is set, the countdown freezes; resume()
+   continues it from the remaining time. Every live wait registers itself so
+   pause/resume/abort can reach it. */
+let paused = false;
+const liveWaits = new Set();
+function wait(ms){
+  return new Promise(resolve => {
+    const w = { remaining: ms, resolve, timer: null, start: 0, done: false };
+    w.tick = () => {
+      w.start = Date.now();
+      w.timer = setTimeout(() => { w.done = true; liveWaits.delete(w); resolve(); }, w.remaining);
+    };
+    w.freeze = () => {
+      if (w.done || w.timer === null) return;
+      clearTimeout(w.timer); w.timer = null;
+      w.remaining = Math.max(0, w.remaining - (Date.now() - w.start));
+    };
+    w.abort = () => { clearTimeout(w.timer); liveWaits.delete(w); };  // resolve is left dangling on purpose (loop already exited)
+    liveWaits.add(w);
+    if (!paused) w.tick();     // if we're paused when this wait begins, it holds until resume
+  });
+}
+function freezeWaits(){ liveWaits.forEach(w => w.freeze()); }
+function resumeWaits(){ liveWaits.forEach(w => { if (w.timer === null && !w.done) w.tick(); }); }
+function abortWaits(){ liveWaits.forEach(w => w.abort()); liveWaits.clear(); }
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const fought = d => card[d].some(b => b[2]);   // has this card been decided? (Play vs Preview)
 
@@ -2231,7 +2263,10 @@ function dressFinish(kim, winnerEl, loserEl, loserSide){
 }
 const endClash = () => stage.classList.remove("clashing");
 
-playBtn.onclick = () => playing ? stop() : play();
+playBtn.onclick = () => togglePlay();
+prevBtn.onclick = () => prevBout();
+nextBtn.onclick = () => nextBout();
+replayBtn.onclick = () => replayBout();
 
 /* the yobidashi has the ring first: he calls east, then turns and calls west.
    Both names stay up for the bout — they only come down once it's decided. */
@@ -2360,38 +2395,118 @@ function clearCall(){
   clearCalls();
 }
 
-async function play(){
-  const div = division;                                   // whichever card is open
-  const decided = fought(div);
-  playing = true;
-  selectTab(div);
-  syncPlayBtn();                                          // ▶ Play becomes ■ Stop
-  window.scrollTo({ top:0, behavior:"smooth" });          // eyes on the dohyō
+/* ── playback transport ───────────────────────────────────────
+   playing  : a run is active (may be paused)
+   paused   : the current match is frozen mid-animation
+   playIdx  : the bout index currently on the clay
+   A monotonically-increasing runToken lets any new transport action
+   (pause is not one; next/prev/replay/stop are) abort the bout loop
+   that's in flight without it stomping on the new one. */
+let playIdx = 0;
+let runToken = 0;
 
-  for (let i = 0; i < card[div].length; i++) {
-    if (!playing) return;
-    if (watchScope === "mine" && !boutHasMine(card[div][i])) continue;   // only my seven
-    if (!await announce(card[div][i], div, i)) return;    // the names go up first
-    suspense = decided;  loadBout(div, i);                // they set at the shikiri-sen…
-    stage.classList.add("facing");                        // …step up to their lines and glare
-    await wait(still ? 0 : 1150);                         // the approach, then a stare-down beat
-    if (!playing) { stage.classList.remove("facing"); return; }
-    stage.classList.remove("facing");                     // release, and away they go
-    if (!still) hakkeyoi();                               // the call comes as they go…
-    if (decided && !still) clash(card[div][i]);           // …the tachiai, on the same beat
-    await wait(still ? 400 : decided ? 3200 : 3600);      // …until the bout is over
-    endShout();
-    if (!playing) { endClash(); return; }
-    if (!decided) { endClash(); continue; }              // nothing to reveal — it hasn't happened
-    suspense = false; showResult(true);                   // he goes down from where they're locked
-    revealBout(div, i);                                   // …and his result posts to the card list
-    endClash();                                           // (only now — the hold must not snap back)
-    await wait(still ? 600 : 5000);                       // fall, call, bow, then the gunbai
-  }
-  if (decided) revealedDivs.add(divKey(day, div));        // day fully played — keep it revealed
-  stop();
-  if (decided) showDayModal();                            // the day is done — show the banzuke
+/* indices in the current division that we actually play (respects "my team") */
+function playableIdx(){
+  const out = [];
+  card[division].forEach((b, i) => {
+    if (watchScope === "mine" && !boutHasMine(b)) return;
+    out.push(i);
+  });
+  return out;
 }
+
+/* Play one bout fully (announce → stare-down → tachiai → result), then,
+   if it still owns the run, auto-advance to the next. */
+async function playBout(i){
+  const div = division;
+  const token = ++runToken;                               // claim the run
+  const decided = fought(div);
+  playing = true; paused = false;
+  playIdx = i;
+  selectTab(div);
+  syncPlayBtn();
+
+  if (!await announce(card[div][i], div, i)) return;      // names go up
+  if (token !== runToken) return;
+  suspense = decided; loadBout(div, i);
+  stage.classList.add("facing");
+  await wait(still ? 0 : 1150);
+  if (token !== runToken) return;
+  stage.classList.remove("facing");
+  if (!still) hakkeyoi();
+  if (decided && !still) clash(card[div][i]);
+  await wait(still ? 400 : decided ? 3200 : 3600);
+  if (token !== runToken) { endClash(); return; }
+  endShout();
+  if (decided) {
+    suspense = false; showResult(true);                   // the loser goes out
+    revealBout(div, i);                                   // …and posts to the list
+    endClash();
+    await wait(still ? 600 : 5000);                       // fall, call, bow, gunbai
+    if (token !== runToken) return;
+  } else {
+    endClash();                                           // not yet fought — nothing to reveal
+  }
+
+  // auto-advance to the next playable bout in this division
+  const seq = playableIdx();
+  const at = seq.indexOf(i);
+  if (at >= 0 && at < seq.length - 1) { playBout(seq[at + 1]); return; }
+
+  // reached the end of the day
+  if (decided) revealedDivs.add(divKey(day, div));
+  finishRun();
+  if (decided) showDayModal();
+}
+
+/* start (or restart) the day from its first playable bout */
+async function play(){
+  const seq = playableIdx();
+  if (!seq.length) return;
+  const start = (current && current.div === division && seq.includes(current.i)) ? current.i : seq[0];
+  playBout(start);
+}
+
+/* pause the current match in place — animations freeze, timers hold */
+function pausePlay(){
+  if (!playing || paused) return;
+  paused = true;
+  freezeWaits();
+  stage.classList.add("is-paused");     // CSS freezes the running keyframes
+  syncPlayBtn();
+}
+/* resume the frozen match from exactly where it stopped */
+function resumePlay(){
+  if (!playing || !paused) return;
+  paused = false;
+  stage.classList.remove("is-paused");
+  resumeWaits();
+  syncPlayBtn();
+}
+function togglePlay(){
+  if (!playing) return play();
+  return paused ? resumePlay() : pausePlay();
+}
+
+/* jump to a specific bout and play it (used by next / prev / replay / list-click) */
+function jumpTo(i){
+  const n = card[division].length;
+  if (i < 0 || i >= n) return;
+  abortWaits();                          // drop whatever bout is mid-flight
+  clearTimeout(callT); clearTimeout(bowT); clearRites();
+  endKimCall(); endClash(); endShout(); endKachi();
+  stage.classList.remove("awarding", "facing", "is-paused");
+  playBout(i);
+}
+function nextBout(){
+  const seq = playableIdx(), at = seq.indexOf(playIdx);
+  if (at >= 0 && at < seq.length - 1) jumpTo(seq[at + 1]);
+}
+function prevBout(){
+  const seq = playableIdx(), at = seq.indexOf(playIdx);
+  if (at > 0) jumpTo(seq[at - 1]);
+}
+function replayBout(){ jumpTo(playIdx); }
 
 /* reveal one bout's result in the card list — the winner colours and the
    kimarite appears, exactly as that bout is decided during playback. */
@@ -2399,38 +2514,50 @@ function revealBout(div, i){
   const row = document.querySelector(`#l-${div} .bout[data-i="${i}"]`);
   if (row) row.classList.add("revealed");
 }
+
+/* the run reached the end of the day on its own — settle to a clean stop */
+function finishRun(){
+  playing = false; paused = false; suspense = false;
+  stage.classList.remove("is-paused");
+  syncPlayBtn();
+}
+
+/* hard teardown — used when leaving playback entirely (tab change, day
+   change, direct list click that isn't a jump). Kills the current run. */
 function stop(){
-  if (!playing) return;
-  playing = false; suspense = false;
-  clearTimeout(callT); clearTimeout(bowT); clearRites();  // nothing left hanging mid-bout
-  stage.classList.remove("awarding");
-  endKimCall();
-  endClash();
-  endShout();
-  endKachi();
-  stage.classList.remove("facing");
+  if (!playing && !paused) { syncPlayBtn(); return; }
+  playing = false; paused = false; suspense = false;
+  runToken++;                                            // orphan any in-flight bout loop
+  abortWaits();
+  clearTimeout(callT); clearTimeout(bowT); clearRites();
+  stage.classList.remove("awarding", "facing", "is-paused");
+  endKimCall(); endClash(); endShout(); endKachi();
   clearCall();
-  syncPlayBtn();                                          // ■ Stop goes back to ▶ Play
+  syncPlayBtn();
   if (current) showResult(false);
 }
 const DIV_NAME = { makuuchi:"Makuuchi", juryo:"Jūryō" };
-const playLabel = () =>
-  `${fought(division) ? "Play" : "Preview"} ${DIV_NAME[division]}`;
 
-/* The button is Play or Stop — never both, and never stale. Everything that
-   could change it goes through here. The glyph and the words live in separate
-   spans so a narrow bar can keep the glyph and drop the words. */
+/* transport buttons: play/pause is the primary; prev/next/replay flank it.
+   The glyph and words live in separate spans so a narrow bar keeps just the
+   glyph. */
 function setBtn(btn, ico, lbl){
   btn.querySelector(".ico").textContent = ico;
-  btn.querySelector(".lbl").textContent = lbl;
+  const l = btn.querySelector(".lbl"); if (l) l.textContent = lbl;
 }
 function syncPlayBtn(){
-  setBtn(playBtn, playing ? "■" : "▶", playing ? "Stop" : playLabel());
-  playBtn.classList.toggle("playing", playing);
-  playBtn.title = playing ? "Stop"
-    : fought(division) ? playLabel()
-    : `${DIV_NAME[division]} hasn't been fought on ${card.label}`;
+  const ico = !playing ? "▶" : paused ? "▶" : "⏸";
+  const lbl = !playing ? "Play" : paused ? "Resume" : "Pause";
+  setBtn(playBtn, ico, lbl);
+  playBtn.classList.toggle("playing", playing && !paused);
+  playBtn.title = lbl;
+  // prev/next/replay only make sense once a run exists
+  const seq = playableIdx(), at = seq.indexOf(playIdx);
+  if (prevBtn) prevBtn.disabled = !playing || at <= 0;
+  if (nextBtn) nextBtn.disabled = !playing || at < 0 || at >= seq.length - 1;
+  if (replayBtn) replayBtn.disabled = !playing;
 }
+
 
 /* ── mounting a day ───────────────────────────────────────── */
 function mountDay(d){
