@@ -52,6 +52,15 @@
       "font-size:.8rem;color:#e0a23a;flex:none}"+
     ".gga-chip__ava svg{width:100%;height:100%;display:block;transform:scale(1.331);transform-origin:center}"+
     ".gga-chip__nm{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"+
+    /* very thin: match gg-nav's tight breakpoint — smaller chip, name hidden
+       so the account control never crowds out the burger and help button */
+    "@media(max-width:430px){"+
+      ".ggn-acct{gap:6px}"+
+      ".gga-btn{height:34px;padding:0 10px;font-size:.76rem}"+
+      ".gga-chip{height:34px;padding:0 8px 0 4px;gap:0}"+
+      ".gga-chip__ava{width:24px;height:24px}"+
+      ".gga-chip__nm{display:none}"+
+    "}"+
     /* modal */
     ".gga-ov{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;"+
       "background:rgba(6,7,11,.72);backdrop-filter:blur(3px);padding:18px}"+

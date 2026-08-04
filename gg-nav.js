@@ -121,6 +121,16 @@
       '#gg-nav.ggn-open .ggn-links{max-height:60vh;opacity:1;pointer-events:auto}' +
       '.ggn-link{height:auto;justify-content:flex-start;padding:12px 14px;font-size:1rem}' +
     '}' +
+    /* ── very thin: shrink the logo further so burger, help, and the account
+       control all still fit on one row without crowding or overflow ── */
+    '@media(max-width:430px){' +
+      '.ggn-inner{gap:6px;padding:0 10px;min-height:52px}' +
+      '.ggn-brand svg,.ggn-brand img{height:34px}' +
+      '.ggn-beta{display:none}' +
+      '.ggn-burger{width:34px;height:34px;padding:0 8px}' +
+      '.ggn-right{gap:6px}' +
+      '.ggn-help{width:34px;height:34px;font-size:.85rem}' +
+    '}' +
     /* help modal */
     '.ggh-ov{position:fixed;inset:0;z-index:1100;display:none;align-items:center;justify-content:center;background:rgba(6,7,11,.72);' +
       'backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);padding:18px;font-family:"Space Grotesk","Zen Kaku Gothic New",system-ui,sans-serif}' +
