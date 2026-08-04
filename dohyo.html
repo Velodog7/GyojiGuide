@@ -466,12 +466,6 @@
   }
   .slot:focus-visible{ outline:2px solid var(--ink); outline-offset:6px; border-radius:4px }
 
-  /* a soft gold halo marks a wrestler from your team on the clay */
-  .slot.mine::after{ content:""; position:absolute; left:50%; bottom:1cqw; z-index:-1;
-        width:20cqw; height:20cqw; transform:translateX(-50%); border-radius:50%;
-        background:radial-gradient(closest-side, rgba(var(--sun-rgb),.34), rgba(var(--sun-rgb),0) 72%);
-        pointer-events:none; }
-
   /* ── how the bout ends ────────────────────────────────────────
      The loser's exit is chosen by the kimarite. --dir points toward his own
      side of the ring (east loses to the left, west to the right) and --edge is
