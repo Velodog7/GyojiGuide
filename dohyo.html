@@ -1481,8 +1481,8 @@
     <span class="stage__title-sub">Build your team · simulate the tournament</span>
   </div>
   <div class="hud is-empty" id="hud">
-    <em class="hud__label" id="hudLabel">Head to head</em>
     <div class="hud__h2h">
+      <em class="hud__label" id="hudLabel">Head to head</em>
       <div class="hud__record" id="record"></div>
       <div class="split" id="split" hidden>
         <div class="split__bar"><div class="split__e" id="splitE"></div><div class="split__w" id="splitW"></div></div>
@@ -2793,7 +2793,7 @@ function runSeason(rng, fill){
     const day = REAL_SNAP[String(D)]                            // real announced opening cards where known
       ? realDay(D, st, rng)
       : { makuuchi: matchDay("makuuchi", st, met, rng), juryo: matchDay("juryo", st, met, rng) };
-    if (fill) days[String(D)] = { label:`Day ${D}`, sub:`Day ${D}`,
+    if (fill) days[String(D)] = { label:`Day ${D}`, sub:`Day ${D} · Simulation`,
                                   makuuchi:day.makuuchi, juryo:day.juryo };
   }
   return { st, days };
