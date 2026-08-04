@@ -169,6 +169,7 @@ function doGet(e) {
     if (action === 'adminStats')    { var g1 = adminGate(e.parameter.adminKey); if (g1) return json(g1); return json(adminStats()); }
     if (action === 'adminUsers')    { var g2 = adminGate(e.parameter.adminKey); if (g2) return json(g2); return json(adminUsers()); }
     if (action === 'adminMessages') { var g3 = adminGate(e.parameter.adminKey); if (g3) return json(g3); return json(adminMessages()); }
+    if (action === 'adminFeedback') { var g4 = adminGate(e.parameter.adminKey); if (g4) return json(g4); return json(adminFeedback()); }
     return json({ ok: true, users: readUsers(), results: readResults(), meta: readMeta() });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -213,6 +214,8 @@ function doPost(e) {
     if (body.action === 'adminUnbanUser')     return json(adminUnbanUser(body));
     if (body.action === 'adminDeleteUser')    return json(adminDeleteUser(body));
     if (body.action === 'adminDeleteMessage') return json(adminDeleteMessageFn(body));
+    if (body.action === 'adminSetFeedbackStatus') return json(adminSetFeedbackStatus(body));
+    if (body.action === 'adminDeleteFeedback')    return json(adminDeleteFeedback(body));
     return json({ ok: false, error: 'unknown action' });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -1140,9 +1143,11 @@ function accountSummary(handle) {
 /* ============================================================
    ADMIN DASHBOARD
    Backs the private admin.html page: site/API connectivity, pageview
-   analytics, user moderation (warn/ban/delete), and a read-only feed of
-   every message-board post across all leagues. Every admin action here
-   requires body.adminKey (or ?adminKey= on GETs) to match ADMIN_KEY above.
+   analytics, user moderation (warn/ban/delete), a read-only feed of every
+   message-board post across all leagues, and incoming Feedback (FAQ
+   questions, suggestions, bug reports, user reports). Every admin action
+   here requires body.adminKey (or ?adminKey= on GETs) to match ADMIN_KEY
+   above.
    ============================================================ */
 function adminGate(key) {
   if (ADMIN_KEY && String(key || '') === String(ADMIN_KEY)) return null;
@@ -1295,6 +1300,60 @@ function adminDeleteMessageFn(body) {
     if (String(v[r][0]) === String(body.msgId)) { sh.deleteRow(r + 1); return { ok: true }; }
   }
   return { ok: false, error: 'Message not found.' };
+}
+
+/* Feedback sheet has no id column of its own — rows are only ever appended,
+   never reordered, so a row's timestamp plus its current row number makes a
+   stable-enough id: it still resolves correctly after other rows are deleted,
+   and simply fails to match (rather than hitting the wrong row) if the row
+   it names is gone. */
+function feedbackRowId_(ts, r) {
+  var ms = ts instanceof Date ? ts.getTime() : Date.parse(ts);
+  return String(ms) + ':' + r;
+}
+function findFeedbackRow_(id) {
+  var v = sh_(SHEET_FEEDBACK).getDataRange().getValues();
+  for (var r = 1; r < v.length; r++) {
+    if (feedbackRowId_(v[r][0], r) === String(id)) return r + 1;
+  }
+  return 0;
+}
+
+/* every incoming message to the admin — FAQ questions, suggestions, bug
+   reports, and user reports — read straight off the Feedback sheet. */
+function adminFeedback() {
+  var v = sh_(SHEET_FEEDBACK).getDataRange().getValues();
+  var out = [];
+  for (var r = 1; r < v.length; r++) {
+    if (!String(v[r][1] || '').trim()) continue;               // skip blank rows
+    var ts = v[r][0];
+    out.push({
+      id: feedbackRowId_(ts, r),
+      created: ts instanceof Date ? ts.toISOString() : String(ts),
+      kind: String(v[r][1] || ''), handle: String(v[r][2] || ''),
+      subject: String(v[r][3] || ''), message: String(v[r][4] || ''),
+      targetUser: String(v[r][5] || ''), page: String(v[r][6] || ''),
+      status: String(v[r][7] || 'new') || 'new'
+    });
+  }
+  out.sort(function (a, b) { return new Date(b.created) - new Date(a.created); });
+  return { ok: true, feedback: out };
+}
+
+function adminSetFeedbackStatus(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var status = String(body.status || '').toLowerCase();
+  if (['new', 'read', 'resolved'].indexOf(status) < 0) return { ok: false, error: 'bad status' };
+  var row = findFeedbackRow_(body.id); if (!row) return { ok: false, error: 'Not found — try refreshing.' };
+  sh_(SHEET_FEEDBACK).getRange(row, 8, 1, 1).setValue(status);
+  return { ok: true };
+}
+
+function adminDeleteFeedback(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var row = findFeedbackRow_(body.id); if (!row) return { ok: false, error: 'Not found — try refreshing.' };
+  sh_(SHEET_FEEDBACK).deleteRow(row);
+  return { ok: true };
 }
 
 /* ---------- JSON helper ----------

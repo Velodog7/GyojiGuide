@@ -165,6 +165,11 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
         <span class="n" id="boardN">0</span>
         <span class="tab-lab">Message Boards</span>
       </button>
+      <button class="tab" id="tab-feedback" role="tab" aria-selected="false" onclick="setView('feedback')" aria-label="Feedback" title="Feedback">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v14H7l-3 3V4z"/><path d="M8 9h8M8 13h5"/></svg>
+        <span class="n" id="feedbackN">0</span>
+        <span class="tab-lab">Feedback</span>
+      </button>
     </div>
   </nav>
 
@@ -230,6 +235,34 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
         <table>
           <thead><tr><th>League</th><th>Author</th><th>Posted</th><th>Message</th><th>Actions</th></tr></thead>
           <tbody id="boardsTable"><tr class="load-row"><td colspan="5"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="view" id="v-feedback">
+      <h2 class="v-title">Feedback</h2>
+      <p class="v-sub">Everything sent to the admin through the Help modal — FAQ questions, suggestions, bug reports, and user reports — newest first.</p>
+      <div class="toolbar">
+        <input class="filter" id="feedbackFilter" placeholder="Filter by handle, subject, or text…" />
+        <select class="filter" id="feedbackKind" style="width:150px">
+          <option value="">All kinds</option>
+          <option value="question">Question</option>
+          <option value="suggestion">Suggestion</option>
+          <option value="bug">Bug report</option>
+          <option value="abuse">User report</option>
+        </select>
+        <select class="filter" id="feedbackStatus" style="width:130px">
+          <option value="">All statuses</option>
+          <option value="new">New</option>
+          <option value="read">Read</option>
+          <option value="resolved">Resolved</option>
+        </select>
+        <button class="btn" id="feedbackRefresh">Refresh</button>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Kind</th><th>From</th><th>Message</th><th>Page</th><th>Received</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="feedbackTable"><tr class="load-row"><td colspan="7"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr></tbody>
         </table>
       </div>
     </section>
@@ -317,6 +350,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
     $("tab-"+v).setAttribute("aria-selected","true");
     if (v === "users" && !state.loaded.users) loadUsers();
     if (v === "boards" && !state.loaded.boards) loadBoards();
+    if (v === "feedback" && !state.loaded.feedback) loadFeedback();
   };
 
   /* ---------- connectivity ---------- */
@@ -450,6 +484,68 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
     if (!text) return;
     var res = await aPost("adminEditBoardMessage", { msgId: id, body: text });
     if (res && res.ok) loadBoards(); else alert((res && res.error) || "Couldn\u2019t save that edit.");
+  };
+
+  /* ---------- feedback ---------- */
+  var allFeedback = [];
+  var FEEDBACK_KIND = { question:"Question", suggestion:"Suggestion", bug:"Bug report", abuse:"User report" };
+  function feedbackStatusBadge(status){
+    if (status === "resolved") return '<span class="badge up"><span class="dot"></span>Resolved</span>';
+    if (status === "read")     return '<span class="badge neutral"><span class="dot"></span>Read</span>';
+    return '<span class="badge warn"><span class="dot"></span>New</span>';
+  }
+  function renderFeedback(){
+    var q = ($("feedbackFilter").value || "").toLowerCase();
+    var kind = $("feedbackKind").value;
+    var status = $("feedbackStatus").value;
+    var rows = allFeedback.filter(function(f){
+      if (kind && f.kind !== kind) return false;
+      if (status && f.status !== status) return false;
+      return !q || f.handle.toLowerCase().indexOf(q) >= 0 || f.subject.toLowerCase().indexOf(q) >= 0 ||
+        f.message.toLowerCase().indexOf(q) >= 0 || f.targetUser.toLowerCase().indexOf(q) >= 0;
+    }).map(function(f){
+      var who = f.handle ? "@" + esc(f.handle) : '<span style="color:var(--muted)">anonymous</span>';
+      if (f.targetUser) who += "<small>re: @" + esc(f.targetUser) + "</small>";
+      var body = (f.subject ? "<b>" + esc(f.subject) + "</b><br>" : "") + esc(f.message);
+      var actions = "";
+      if (f.status !== "read")     actions += '<button class="btn sm" onclick="adminFeedbackStatus(\'' + f.id + '\',\'read\')">Mark read</button>';
+      if (f.status !== "resolved") actions += '<button class="btn sm" onclick="adminFeedbackStatus(\'' + f.id + '\',\'resolved\')">Resolve</button>';
+      if (f.status !== "new")      actions += '<button class="btn sm" onclick="adminFeedbackStatus(\'' + f.id + '\',\'new\')">Reopen</button>';
+      actions += '<button class="btn sm danger" onclick="adminFeedbackDelete(\'' + f.id + '\')">Delete</button>';
+      return "<tr><td>" + esc(FEEDBACK_KIND[f.kind] || f.kind) + "</td>" +
+        "<td class=\"handle\">" + who + "</td>" +
+        "<td class=\"msg-body\">" + body + "</td>" +
+        "<td>" + esc(f.page) + "</td>" +
+        "<td>" + fmtDate(f.created) + "</td>" +
+        "<td>" + feedbackStatusBadge(f.status) + "</td>" +
+        "<td class=\"actions\">" + actions + "</td></tr>";
+    }).join("");
+    $("feedbackTable").innerHTML = rows || '<tr class="empty-row"><td colspan="7">No feedback matches.</td></tr>';
+  }
+  async function loadFeedback(){
+    $("feedbackTable").innerHTML = '<tr class="load-row"><td colspan="7"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr>';
+    var res = await aGet("adminFeedback");
+    if (res && res.ok){
+      allFeedback = res.feedback || [];
+      state.loaded.feedback = true;
+      $("feedbackN").textContent = allFeedback.filter(function(f){ return f.status === "new"; }).length;
+      renderFeedback();
+    } else {
+      $("feedbackTable").innerHTML = '<tr class="empty-row"><td colspan="7">Couldn\u2019t load feedback.</td></tr>';
+    }
+  }
+  $("feedbackRefresh").onclick = function(){ loadFeedback(); };
+  $("feedbackFilter").addEventListener("input", renderFeedback);
+  $("feedbackKind").addEventListener("change", renderFeedback);
+  $("feedbackStatus").addEventListener("change", renderFeedback);
+  window.adminFeedbackStatus = async function(id, status){
+    var res = await aPost("adminSetFeedbackStatus", { id: id, status: status });
+    if (res && res.ok) loadFeedback(); else alert((res && res.error) || "Couldn\u2019t update that.");
+  };
+  window.adminFeedbackDelete = async function(id){
+    if (!confirm("Delete this feedback entry? This can\u2019t be undone.")) return;
+    var res = await aPost("adminDeleteFeedback", { id: id });
+    if (res && res.ok) loadFeedback(); else alert((res && res.error) || "Couldn\u2019t delete that.");
   };
 
   /* ---------- boot: skip the gate if we still have a session key ---------- */
