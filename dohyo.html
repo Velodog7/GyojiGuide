@@ -2426,7 +2426,7 @@ async function playBout(i){
   if (!still) hakkeyoi();
   if (decided && !still) clash(card[div][i]);
   const isHenka = decided && kimFamily(card[div][i][3]) === "henka";
-  const clashWait = still ? 400 : !decided ? 3600 : isHenka ? (HENKA_MS + 60) : 3200;
+  const clashWait = still ? 400 : !decided ? 3600 : isHenka ? (HENKA_MS + 60) : (CLASH_MS + 300);
   await wait(clashWait);
   if (token !== runToken) { endClash(); return; }
   endShout();
@@ -3571,6 +3571,15 @@ async function oneYokozuna(y, style){
     yoisho();                                                       // よいしょ！on the stomp
     await cSleep(430);
   }
+  if (!ceremonyOn) return;
+  // still low in the squat, he scoots his feet forward a couple of steps before rising
+  for (let s = 0; s < 3; s++){
+    if (!ceremonyOn) return;
+    cSet(yo, { sc: .86 + (s + 1) * .012, ly:.3, bob:-.7, t:260 }); await cSleep(300);
+    cSet(yo, { bob:0, t:220 }); await cSleep(260);
+  }
+  if (!ceremonyOn) return;
+  await cSleep(500);                                                // a beat, settled low
   if (sh) { yo.src = RIKISHI[y].src; yo.style.setProperty("--h", RIKISHI[y].h); }  // rise, stand tall again
   await cSleep(650);
   cSet(tsuyu, { x:34, sc:.5, ly:-5, t:1000, op:0 });     // file off
