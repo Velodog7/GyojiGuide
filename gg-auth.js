@@ -48,6 +48,10 @@
       "border:1px solid #39404f;background:rgba(255,255,255,.03);color:#f1f2f6;font:inherit;font-weight:600;font-size:.84rem;"+
       "box-sizing:border-box;height:40px}"+
     ".gga-chip:hover{border-color:#e0a23a}"+
+    ".gga-chip{position:relative}"+
+    ".gga-chip__dm{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;line-height:18px;padding:0 5px;"+
+      "box-sizing:border-box;text-align:center;background:#e0554a;color:#fff;border-radius:9px;font-size:.66rem;"+
+      "font-weight:700;border:2px solid #0d0f15}"+
     ".gga-chip__ava{width:28px;height:28px;border-radius:50%;overflow:hidden;background:#222633;display:grid;place-items:center;"+
       "font-size:.8rem;color:#e0a23a;flex:none}"+
     ".gga-chip__ava svg{width:100%;height:100%;display:block;transform:scale(1.331);transform-origin:center}"+
@@ -118,6 +122,45 @@
       "font-size:.9rem;padding:11px 13px;border-radius:10px;cursor:pointer;margin-top:8px}"+
     ".gga-menu-btn:hover{border-color:#e0a23a}"+
     ".gga-menu-btn.danger{color:#f0655a}.gga-menu-btn.danger:hover{border-color:#f0655a}"+
+    /* compact action grid (Messages / Avatar / Log out) — even, tidy buttons
+       instead of full-width stacked bars */
+    ".gga-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-top:14px}"+
+    ".gga-act{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;"+
+      "background:#1b1e27;border:1px solid #2a2d38;color:#e9eaf0;font:inherit;font-size:.78rem;font-weight:600;"+
+      "padding:12px 8px;border-radius:11px;cursor:pointer;transition:border-color .12s,background .12s}"+
+    ".gga-act:hover{border-color:#e0a23a;background:#20232d}"+
+    ".gga-act__ico{font-size:1.15rem;line-height:1;color:#e0a23a}"+
+    ".gga-act.danger{color:#f0655a}.gga-act.danger .gga-act__ico{color:#f0655a}"+
+    ".gga-act.danger:hover{border-color:#f0655a}"+
+    ".gga-act .gga-dm-badge{position:absolute;top:6px;right:8px;margin:0}"+
+    /* ---- direct messages ---- */
+    ".gga-dm-badge{display:inline-block;min-width:18px;padding:0 5px;height:18px;line-height:18px;text-align:center;"+
+      "background:#e0554a;color:#fff;border-radius:9px;font-size:.68rem;font-weight:700;margin-left:6px;vertical-align:1px}"+
+    ".gga-threads{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;margin:0 0 10px}"+
+    ".gga-thread{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#1b1e27;border:1px solid #2a2d38;"+
+      "color:#e9eaf0;font:inherit;font-size:.88rem;padding:9px 11px;border-radius:10px;cursor:pointer}"+
+    ".gga-thread:hover{border-color:#e0a23a}"+
+    ".gga-thread__nm{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"+
+    ".gga-thread__nm small{display:block;font-weight:400;color:#878da0;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"+
+    ".gga-newdm{display:flex;gap:7px;margin-bottom:6px}"+
+    ".gga-newdm input{flex:1;background:#1b1e27;border:1px solid #2a2d38;color:#e9eaf0;border-radius:9px;font:inherit;font-size:.86rem;padding:9px 11px}"+
+    ".gga-newdm input:focus{outline:none;border-color:#e0a23a}"+
+    ".gga-newdm button{flex:none;background:#1b1e27;border:1px solid #2a2d38;color:#e9eaf0;border-radius:9px;font:inherit;font-size:.86rem;padding:9px 13px;cursor:pointer}"+
+    ".gga-newdm button:hover{border-color:#e0a23a}"+
+    ".gga-convo{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;padding:2px 2px 6px}"+
+    ".gga-back{background:none;border:0;color:#878da0;font:inherit;font-size:.8rem;cursor:pointer;padding:0;margin-bottom:10px}"+
+    ".gga-back:hover{color:#e0a23a}"+
+    ".gga-bubble{max-width:80%;padding:8px 11px;border-radius:12px;font-size:.88rem;line-height:1.4;word-break:break-word;white-space:pre-wrap}"+
+    ".gga-bubble.them{align-self:flex-start;background:#22262f;border-bottom-left-radius:4px}"+
+    ".gga-bubble.me{align-self:flex-end;background:#e0a23a;color:#141620;border-bottom-right-radius:4px}"+
+    ".gga-bubble time{display:block;font-size:.64rem;opacity:.6;margin-top:3px}"+
+    ".gga-dm-compose{display:flex;gap:7px;margin-top:10px}"+
+    ".gga-dm-compose textarea{flex:1;background:#1b1e27;border:1px solid #2a2d38;color:#e9eaf0;border-radius:9px;font:inherit;"+
+      "font-size:.88rem;padding:9px 11px;resize:vertical;min-height:40px;max-height:120px}"+
+    ".gga-dm-compose textarea:focus{outline:none;border-color:#e0a23a}"+
+    ".gga-dm-compose button{flex:none;background:#e0a23a;border:1px solid #e0a23a;color:#141620;font:inherit;font-weight:700;"+
+      "border-radius:9px;padding:0 15px;cursor:pointer}"+
+    ".gga-dm-compose button:hover{filter:brightness(1.08)}.gga-dm-compose button:disabled{opacity:.5;cursor:default;filter:none}"+
     "#ggaMount{margin-top:6px}";
 
   function ensureCSS(){
@@ -150,8 +193,10 @@
         '<button type="button" class="gga-chip" id="ggaChip" aria-label="Account">'+
           '<span class="gga-chip__ava">'+avaInner(a)+'</span>'+
           '<span class="gga-chip__nm">'+esc(a.name || a.handle)+'</span>'+
+          '<span class="gga-chip__dm" id="ggaChipDm" hidden>0</span>'+
         '</button>';
       slot.querySelector("#ggaChip").onclick = function(){ A.open("account"); };
+      pollNavUnread();
     } else {
       slot.innerHTML =
         '<button type="button" class="gga-btn" id="ggaLogin">Log in</button>'+
@@ -159,6 +204,24 @@
       slot.querySelector("#ggaLogin").onclick = function(){ A.open("login"); };
       slot.querySelector("#ggaSignup").onclick = function(){ A.open("signup"); };
     }
+  }
+
+  /* nav chip unread badge: poll the cheap dmUnread endpoint on a light loop
+     while signed in, so a reply shows up without needing a page reload. */
+  var navUnreadTimer = null;
+  async function pollNavUnread(){
+    if (navUnreadTimer){ clearTimeout(navUnreadTimer); navUnreadTimer = null; }
+    if (!acct() || !GG.dmUnread) return;
+    try {
+      var res = await GG.dmUnread();
+      var b = slot && slot.querySelector("#ggaChipDm");
+      if (b){
+        var n = (res && res.ok) ? (res.unread || 0) : 0;
+        if (n > 0){ b.textContent = n > 99 ? "99+" : String(n); b.hidden = false; }
+        else b.hidden = true;
+      }
+    } catch (e){}
+    if (acct()) navUnreadTimer = setTimeout(pollNavUnread, 45000);   // re-check every 45s
   }
 
   function mountNav(tries){
@@ -198,13 +261,18 @@
           '<div class="gga-status" id="ggaHandleStatus"></div>'+
         '</div>'+
         '<div class="gga-summary" id="ggaSummary"><p class="gga-empty"><span class="gg-spin"></span>Loading your stats\u2026</p></div>'+
-        (window.MawashiDesigner ? '<button class="gga-menu-btn" id="ggaEdit">Edit mawashi avatar</button>' : '')+
-        '<button class="gga-menu-btn danger" id="ggaLogout">Log out</button>';
+        '<div class="gga-actions">'+
+          '<button class="gga-act" id="ggaMessages"><span class="gga-act__ico">\u2709</span><span class="gga-act__lab">Messages</span><span class="gga-dm-badge" id="ggaDmBadge" hidden>0</span></button>'+
+          (window.MawashiDesigner ? '<button class="gga-act" id="ggaEdit"><span class="gga-act__ico">\u25c9</span><span class="gga-act__lab">Avatar</span></button>' : '')+
+          '<button class="gga-act danger" id="ggaLogout"><span class="gga-act__ico">\u23fb</span><span class="gga-act__lab">Log out</span></button>'+
+        '</div>';
       modal.querySelector(".gga-x").onclick = A.close;
       var eb = modal.querySelector("#ggaEdit"); if (eb) eb.onclick = openAvatar;
       modal.querySelector("#ggaLogout").onclick = function(){ GG.logout(); refresh(); fire(); A.close(); };
+      modal.querySelector("#ggaMessages").onclick = function(){ openMessages(a); };
       wireHandleEdit(a);
       loadSummary(a);
+      refreshDmBadge(a);
       return;
     }
     // login / signup
@@ -327,6 +395,107 @@
   }
 
   /* ---------------- avatar editor (optional) ---------------- */
+  /* ---------------- account modal: direct messages ---------------- */
+  var dmBadgeTimer = null;
+  async function refreshDmBadge(a){
+    if (!a || !GG.dmUnread) return;
+    var badge = modal.querySelector("#ggaDmBadge");
+    try {
+      var res = await GG.dmUnread();
+      badge = modal.querySelector("#ggaDmBadge"); if (!badge) return;   // modal moved on
+      var n = (res && res.ok) ? (res.unread || 0) : 0;
+      if (n > 0){ badge.textContent = n > 99 ? "99+" : String(n); badge.hidden = false; }
+      else badge.hidden = true;
+    } catch (e){}
+  }
+
+  function dmTime(iso){
+    var t = Date.parse(iso || ""); if (isNaN(t)) return "";
+    var d = new Date(t), now = new Date();
+    var sameDay = d.toDateString() === now.toDateString();
+    return sameDay ? d.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" })
+                   : d.toLocaleDateString(undefined, { month:"short", day:"numeric" }) + " " +
+                     d.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
+  }
+
+  function openMessages(a){
+    modal.innerHTML =
+      '<button class="gga-x" aria-label="Close">\u2715</button>'+
+      '<button class="gga-back" id="ggaDmBack">\u2039 Back to account</button>'+
+      '<h2 class="gga-title">Messages</h2>'+
+      '<div class="gga-newdm"><input id="ggaDmTo" placeholder="Message a handle\u2026" maxlength="40" autocomplete="off"><button id="ggaDmStart">Start</button></div>'+
+      '<div id="ggaDmList"><p class="gga-empty"><span class="gg-spin"></span>Loading\u2026</p></div>';
+    modal.querySelector(".gga-x").onclick = A.close;
+    modal.querySelector("#ggaDmBack").onclick = function(){ mode = "account"; renderModal(); };
+    modal.querySelector("#ggaDmStart").onclick = function(){
+      var to = (modal.querySelector("#ggaDmTo").value || "").trim();
+      if (to) openConvo(a, to, to);
+    };
+    modal.querySelector("#ggaDmTo").addEventListener("keydown", function(e){
+      if (e.key === "Enter"){ var to = (e.target.value || "").trim(); if (to) openConvo(a, to, to); }
+    });
+    loadThreads(a);
+  }
+
+  async function loadThreads(a){
+    var list = modal.querySelector("#ggaDmList"); if (!list) return;
+    var res; try { res = await GG.dmThreads(); } catch (e){ res = null; }
+    list = modal.querySelector("#ggaDmList"); if (!list) return;
+    if (!res || !res.ok){ list.innerHTML = '<p class="gga-empty">Couldn\u2019t load messages.</p>'; return; }
+    var threads = res.threads || [];
+    if (!threads.length){ list.innerHTML = '<p class="gga-empty">No messages yet. Start one above.</p>'; return; }
+    list.innerHTML = '<div class="gga-threads">'+threads.map(function(t){
+      var last = t.messages.length ? t.messages[t.messages.length-1] : null;
+      var preview = last ? (last.mine ? "You: " : "") + last.body : "";
+      var badge = t.unread ? '<span class="gga-dm-badge">'+(t.unread>99?"99+":t.unread)+'</span>' : "";
+      return '<button class="gga-thread" data-h="'+esc(t.handle)+'" data-n="'+esc(t.name)+'">'+
+        '<span class="gga-thread__nm">'+esc(t.name)+badge+'<small>'+esc(preview)+'</small></span>'+
+        '<span style="color:#66697a;font-size:.72rem">'+esc(dmTime(t.lastAt))+'</span></button>';
+    }).join("")+'</div>';
+    Array.prototype.forEach.call(list.querySelectorAll(".gga-thread"), function(btn){
+      btn.onclick = function(){ openConvo(a, btn.getAttribute("data-h"), btn.getAttribute("data-n")); };
+    });
+  }
+
+  async function openConvo(a, otherHandle, otherName){
+    modal.innerHTML =
+      '<button class="gga-x" aria-label="Close">\u2715</button>'+
+      '<button class="gga-back" id="ggaDmBack">\u2039 All messages</button>'+
+      '<h2 class="gga-title">'+esc(otherName || otherHandle)+'</h2>'+
+      '<div class="gga-convo" id="ggaConvo"><p class="gga-empty"><span class="gg-spin"></span>Loading\u2026</p></div>'+
+      '<div class="gga-dm-compose"><textarea id="ggaDmText" placeholder="Write a message\u2026" maxlength="2000" rows="1"></textarea><button id="ggaDmSend">Send</button></div>'+
+      '<div class="gga-status" id="ggaDmStatus"></div>';
+    modal.querySelector(".gga-x").onclick = A.close;
+    modal.querySelector("#ggaDmBack").onclick = function(){ openMessages(a); };
+    var send = modal.querySelector("#ggaDmSend"), text = modal.querySelector("#ggaDmText");
+    async function doSend(){
+      var body = (text.value || "").trim(); if (!body) return;
+      send.disabled = true;
+      var res; try { res = await GG.dmSend(otherHandle, body); } catch (e){ res = null; }
+      if (res && res.ok){ text.value = ""; await paintConvo(a, otherHandle); }
+      else { var st = modal.querySelector("#ggaDmStatus"); if (st){ st.textContent = (res && res.error) || "Couldn\u2019t send."; st.className = "gga-status err"; } }
+      send.disabled = false;
+    }
+    send.onclick = doSend;
+    text.addEventListener("keydown", function(e){ if (e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); doSend(); } });
+    await paintConvo(a, otherHandle);
+    // mark this thread read, then refresh the nav/account badge silently
+    try { await GG.dmMarkRead(otherHandle); } catch (e){}
+  }
+
+  async function paintConvo(a, otherHandle){
+    var res; try { res = await GG.dmThreads(); } catch (e){ res = null; }
+    var box = modal.querySelector("#ggaConvo"); if (!box) return;
+    if (!res || !res.ok){ box.innerHTML = '<p class="gga-empty">Couldn\u2019t load this conversation.</p>'; return; }
+    var thread = (res.threads || []).filter(function(t){ return t.handle.toLowerCase() === String(otherHandle).toLowerCase(); })[0];
+    var msgs = thread ? thread.messages : [];
+    if (!msgs.length){ box.innerHTML = '<p class="gga-empty">No messages yet \u2014 say hello.</p>'; }
+    else box.innerHTML = msgs.map(function(m){
+      return '<div class="gga-bubble '+(m.mine?"me":"them")+'">'+esc(m.body)+'<time>'+esc(dmTime(m.created))+'</time></div>';
+    }).join("");
+    box.scrollTop = box.scrollHeight;
+  }
+
   function openAvatar(){
     if (!window.MawashiDesigner) return;
     modal.classList.add("wide");
