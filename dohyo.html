@@ -2074,6 +2074,31 @@ const CLASH_MS = 2100;
 const HENKA_MS = 650;             // a henka is a quick sidestep — the dodge and lunge snap
 stage.style.setProperty("--clashT", CLASH_MS + "ms");
 
+/* per-bout grapple length. Set in clash(); read by playBout() so the wait
+   before the finishing move always matches the actual animation. */
+let clashDur = CLASH_MS;
+
+/* Pick how long this bout's grapple runs. The great majority land in a brisk
+   window; a long, even lock-up is the rare exception, not the norm.
+     - a lopsided matchup (even≈0) is quick: ~1.1–1.5s
+     - an even matchup (even≈1) usually still resolves around ~1.6–2.0s
+       but has a ~1-in-6 chance of a real grind up toward ~3s
+   Pulls end fast; throws can run slightly long. */
+function boutDuration(fam, even){
+  const QUICK = 1150, LONG = 3000;
+  // base scales with how evenly matched they are, but stays modest…
+  let base = QUICK + (LONG - QUICK) * (0.15 + 0.4 * even);   // even=1 → ~1.9s, even=0 → ~1.4s
+  // …with a small random wobble so no two feel metronomic
+  base += (Math.random() - 0.5) * 300;
+  // a rare true grind, only for close bouts
+  if (even > 0.55 && Math.random() < 0.16) base = LONG - Math.random() * 250;
+  // family tweaks: pulls snap, throws hang a touch
+  if (fam === "pull")  base *= 0.7;
+  if (fam === "twist") base *= 0.82;
+  if (fam === "throw") base *= 1.08;
+  return Math.round(Math.max(QUICK, Math.min(LONG, base)));
+}
+
 /* which family a kimarite belongs to — it decides how the loser goes down.
    Everything not listed is a plain force-out (much the commonest ending). */
 const KIM_DOWN  = new Set(["oshitaoshi","yoritaoshi","tsukitaoshi","abisetaoshi"]);
@@ -2132,10 +2157,11 @@ function clash(b){
     winSlot.style.setProperty("--hstep", (winSide === "east" ? -7 : 7) + "cqw");
     loseSlot.style.setProperty("--hmid", (loseSide === "east" ? 16 : -16) + "cqw");
     stage.style.setProperty("--clashT", HENKA_MS + "ms");     // a quick dodge, not a 3s grind
+    clashDur = HENKA_MS;
     stage.classList.remove("clashing"); void stage.offsetWidth; stage.classList.add("clashing");
     return;
   }
-  stage.style.setProperty("--clashT", CLASH_MS + "ms");        // everything else keeps the full clash
+  stage.style.setProperty("--clashT", CLASH_MS + "ms");        // default; overridden per-bout below
   const gap = Math.abs((ROSTER[b[1]]?.elo || 2200) - (ROSTER[b[5]]?.elo || 2200));
   const eloF = Math.min(1.4, 0.7 + gap / 500);
   const mag = (FAMILY_MAG[fam] ?? 1) * eloF;
@@ -2146,17 +2172,27 @@ function clash(b){
   const even = 1 - Math.min(1, gap / 420);                           // 1 = evenly matched
   const sway = sign * (0.35 + 2.6 * even * even) * (FAMILY_SWAY[fam] ?? 1);
   stage.style.setProperty("--sway", sway);                           // …but not without a fight
+
+  /* how long the grapple runs. Most bouts settle briskly; only a genuinely
+     even matchup drags into a long lock-up, and even then only sometimes.
+     `even` (0 = mismatch, 1 = dead even) sets the baseline, and a little
+     randomness keeps two similar bouts from feeling identical. Pulls and
+     henka-ish quick endings shorten it; a throw can run a touch longer. */
+  clashDur = boutDuration(fam, even);
+  stage.style.setProperty("--clashT", clashDur + "ms");
   stage.classList.remove("clashing");
   void stage.offsetWidth;                       // restart the animation each bout
   stage.classList.add("clashing");
-  // a jolt at the tachiai itself — the two bodies meeting (12% into the clash)
+  // a jolt at the tachiai itself — the two bodies meeting. Fire it a touch
+  // before the 12% keyframe: the eased motion has them visually colliding
+  // just ahead of the mark, so 12% felt a beat late.
   if (!still) {
     clearTimeout(tachiaiT);
     tachiaiT = setTimeout(() => {
       stage.classList.remove("impact"); void stage.offsetWidth;
       stage.classList.add("impact");
       setTimeout(() => stage.classList.remove("impact"), 380);
-    }, CLASH_MS * 0.12);
+    }, clashDur * 0.08);
   }
 }
 
@@ -2426,7 +2462,13 @@ async function playBout(i){
   if (!still) hakkeyoi();
   if (decided && !still) clash(card[div][i]);
   const isHenka = decided && kimFamily(card[div][i][3]) === "henka";
-  const clashWait = still ? 400 : !decided ? 3600 : isHenka ? (HENKA_MS + 60) : (CLASH_MS + 300);
+  // wait exactly as long as the grapple actually runs, so the finishing move
+  // flows straight out of it with no frozen beat. clashDur is set by clash();
+  // henka sets its own short timing.
+  const clashWait = still ? 400
+                  : !decided ? 3600
+                  : isHenka ? (HENKA_MS + 40)
+                  : clashDur;
   await wait(clashWait);
   if (token !== runToken) { endClash(); return; }
   endShout();
