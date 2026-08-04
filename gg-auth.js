@@ -188,7 +188,7 @@
           '<div class="gga-handleform__btns"><button class="gga-primary" id="ggaSaveHandle">Save handle</button><button class="gga-menu-btn" id="ggaCancelHandle">Cancel</button></div>'+
           '<div class="gga-status" id="ggaHandleStatus"></div>'+
         '</div>'+
-        '<div class="gga-summary" id="ggaSummary"><p class="gga-empty">Loading your stats\u2026</p></div>'+
+        '<div class="gga-summary" id="ggaSummary"><p class="gga-empty"><span class="gg-spin"></span>Loading your stats\u2026</p></div>'+
         (window.MawashiDesigner ? '<button class="gga-menu-btn" id="ggaEdit">Edit mawashi avatar</button>' : '')+
         '<button class="gga-menu-btn danger" id="ggaLogout">Log out</button>';
       modal.querySelector(".gga-x").onclick = A.close;

@@ -117,6 +117,10 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
 .warn-msg{ display:block; margin-top:3px; font-size:.74rem; color:#e0a23a }
 .empty-row td{ text-align:center; color:var(--muted); padding:24px }
 .load-row td{ text-align:center; color:var(--muted); padding:24px; font-family:"IBM Plex Mono",monospace; font-size:.8rem }
+.ld-row{ display:inline-flex; align-items:center; justify-content:center; gap:10px }
+.ld-ring{ width:16px; height:16px; border-radius:50%; flex:none; border:2px solid rgba(216,178,90,.18); border-top-color:var(--sun); animation:ld-spin .8s linear infinite }
+@keyframes ld-spin{ to{ transform:rotate(360deg) } }
+@media (prefers-reduced-motion:reduce){ .ld-ring{ animation-duration:2s } }
 </style>
 </head>
 <body>
@@ -194,7 +198,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>Page</th><th class="num">Total views</th><th class="num">Unique visitors</th></tr></thead>
-          <tbody id="pvTable"><tr class="load-row"><td colspan="3">Loading…</td></tr></tbody>
+          <tbody id="pvTable"><tr class="load-row"><td colspan="3"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr></tbody>
         </table>
       </div>
     </section>
@@ -209,7 +213,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>Handle</th><th>Status</th><th class="num">Team</th><th class="num">Leagues</th><th class="num">Posts</th><th>Last active</th><th>Actions</th></tr></thead>
-          <tbody id="usersTable"><tr class="load-row"><td colspan="7">Loading…</td></tr></tbody>
+          <tbody id="usersTable"><tr class="load-row"><td colspan="7"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr></tbody>
         </table>
       </div>
     </section>
@@ -224,7 +228,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>League</th><th>Author</th><th>Posted</th><th>Message</th><th>Actions</th></tr></thead>
-          <tbody id="boardsTable"><tr class="load-row"><td colspan="5">Loading…</td></tr></tbody>
+          <tbody id="boardsTable"><tr class="load-row"><td colspan="5"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr></tbody>
         </table>
       </div>
     </section>
@@ -378,7 +382,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
     $("usersTable").innerHTML = rows || '<tr class="empty-row"><td colspan="7">No users match.</td></tr>';
   }
   async function loadUsers(){
-    $("usersTable").innerHTML = '<tr class="load-row"><td colspan="7">Loading…</td></tr>';
+    $("usersTable").innerHTML = '<tr class="load-row"><td colspan="7"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr>';
     var res = await aGet("adminUsers");
     if (res && res.ok){ allUsers = res.users || []; state.loaded.users = true; $("userN").textContent = allUsers.length; renderUsers(); }
     else $("usersTable").innerHTML = '<tr class="empty-row"><td colspan="7">Couldn\u2019t load users.</td></tr>';
@@ -424,7 +428,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
     $("boardsTable").innerHTML = rows || '<tr class="empty-row"><td colspan="5">No posts match.</td></tr>';
   }
   async function loadBoards(){
-    $("boardsTable").innerHTML = '<tr class="load-row"><td colspan="5">Loading…</td></tr>';
+    $("boardsTable").innerHTML = '<tr class="load-row"><td colspan="5"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr>';
     var res = await aGet("adminMessages");
     if (res && res.ok){ allMsgs = res.messages || []; state.loaded.boards = true; $("boardN").textContent = allMsgs.length; renderBoards(); }
     else $("boardsTable").innerHTML = '<tr class="empty-row"><td colspan="5">Couldn\u2019t load messages.</td></tr>';

@@ -154,7 +154,22 @@
     '.ggh-send:hover{filter:brightness(1.08)}.ggh-send:disabled{opacity:.5;cursor:default;filter:none}' +
     '.ggh-status{min-height:18px;font-size:.83rem;margin-top:10px;color:#878da0}' +
     '.ggh-status.err{color:#f0655a}.ggh-status.ok{color:#43c08a}' +
-    '.ggh-note{font-size:.78rem;color:#878da0;margin:-4px 0 12px}';
+    '.ggh-note{font-size:.78rem;color:#878da0;margin:-4px 0 12px}' +
+    /* shared loading spinner — site-wide (see spinner.html). Block form fills any
+       positioned container (position:relative + height); inline form (.gg-spin)
+       sits next to status text. */
+    '.gg-spinner{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;' +
+      'align-items:center;justify-content:center;gap:14px;pointer-events:none;z-index:5}' +
+    '.gg-spinner__ring{width:44px;height:44px;border-radius:50%;border:3px solid rgba(216,178,90,.16);' +
+      'border-top-color:#d8b25a;animation:gg-spin .85s linear infinite}' +
+    '.gg-spinner__label{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.62rem;' +
+      'letter-spacing:.22em;text-transform:uppercase;color:#878da0;animation:gg-pulse 1.4s ease-in-out infinite}' +
+    '.gg-spin{display:inline-block;width:14px;height:14px;border-radius:50%;flex:none;' +
+      'border:2px solid rgba(216,178,90,.18);border-top-color:#d8b25a;animation:gg-spin .8s linear infinite;' +
+      'vertical-align:-2px;margin-right:8px}' +
+    '@keyframes gg-spin{to{transform:rotate(360deg)}}' +
+    '@keyframes gg-pulse{0%,100%{opacity:.45}50%{opacity:1}}' +
+    '@media (prefers-reduced-motion:reduce){.gg-spinner__ring,.gg-spin{animation-duration:2s}.gg-spinner__label{animation:none}}';
 
   function ensureFont() {
     if (document.getElementById("gg-nav-font")) return;   // once per page

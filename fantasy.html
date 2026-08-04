@@ -290,6 +290,8 @@
   .authswitch a{ color:var(--sun); cursor:pointer; text-decoration:underline }
   .status{ font-size:.82rem; color:var(--muted); min-height:1em; text-align:center }
   .status.ok{ color:#43c08a } .status.err{ color:var(--tangerine) }
+  .status.loading::before{ content:""; display:inline-block; width:12px; height:12px; margin-right:7px; vertical-align:-2px;
+    border-radius:50%; border:2px solid rgba(216,178,90,.18); border-top-color:#d8b25a; animation:gg-spin .8s linear infinite }
   .acctview__head{ display:flex; align-items:center; gap:12px; margin-bottom:4px }
   .acct-badge.lg{ width:46px; height:46px; font-size:20px }
   .acctview__name{ font-weight:700; font-size:1.05rem } .acctview__handle{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.8rem }
@@ -1123,7 +1125,7 @@ function togglePin(h){
 }
 
 async function loadBoard(){
-  $("lbBody").innerHTML = `<p class="empty-lb">Loading…</p>`;
+  $("lbBody").innerHTML = `<p class="empty-lb"><span class="gg-spin"></span>Loading…</p>`;
   let data = null;
   try { data = await apiGet(); } catch (e) {}
   if (!data || !data.ok){
@@ -1325,7 +1327,7 @@ async function loadLeagues(preferId){
   $("lgLocked").hidden=true; $("lgMain").hidden=false;
   if (!hasAPI()){ $("lgEmpty").hidden=false; $("lgEmpty").innerHTML="<p>Leagues need the shared Sheet API. Deploy the Apps Script and set <code>API_URL</code> to enable leagues, invites, and the message board.</p>"; $("lgPanel").hidden=true; $("lgSwitch").innerHTML=""; $("lgN").textContent="0"; return; }
   if (!cache.meta || !cache.meta.basho) loadBoard();   // fire off in parallel so league scores have results to work with
-  lgStatus("Loading…");
+  lgStatus("Loading…","loading");
   let res=null; try{ res=await GyojiGuide.leagues(acct.handle); }catch(e){}
   leaguesCache = (res && res.leagues) || [];
   $("lgN").textContent = leaguesCache.length;
@@ -1350,7 +1352,7 @@ async function renderLeague(){
   const lg = leaguesCache.find(l=>l.id===curLeagueId);
   if (!lg){ $("lgPanel").hidden=true; return; }
 
-  lgStatus("Loading league…");
+  lgStatus("Loading league…","loading");
   let d = null; try { d = await GyojiGuide.leagueDetail(lg.id); } catch(e){}
   if (d && d.ok){
     lg.members = d.members || []; lg.messages = d.messages || [];
@@ -1440,7 +1442,7 @@ async function renderKeepers(lg, meCommish){
   if (lg.draftStatus === "active") {
     el.innerHTML = `<div class="lg-draftroom">
       <h4>Snake draft — live</h4>
-      <div class="lg-draft-turn" id="lgDraftTurn">Loading…</div>
+      <div class="lg-draft-turn" id="lgDraftTurn"><span class="gg-spin"></span>Loading…</div>
       <div class="lg-draft-grid" id="lgDraftGrid"></div>
       <h4 style="margin-top:14px">Picks so far</h4>
       <div class="lg-draft-board" id="lgDraftBoard"></div>
@@ -1591,7 +1593,7 @@ function wireTradeAndWaiverForms(lg, members){
 }
 async function loadTradesList(id){
   const box = $("lgTradesList"); if (!box) return;
-  box.innerHTML = "Loading…";
+  box.innerHTML = '<span class="gg-spin"></span>Loading…';
   let res=null; try { res = await GyojiGuide.myTrades(id); } catch(e){}
   const trades = (res && res.trades) || [];
   if (!trades.length){ box.innerHTML = `<p class="lg-locked-note">No trades yet.</p>`; return; }
