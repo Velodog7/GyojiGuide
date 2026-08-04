@@ -53,17 +53,61 @@ var SHEET_FEEDBACK = 'Feedback';
 var SHEET_PAGEVIEWS = 'PageViews';
 var SHEET_BOARD = 'LeaderboardBoard';
 var SHEET_BOARD_VOTES = 'LeaderboardVotes';
+var SHEET_DMS = 'DirectMessages';
 
 // Label for the current tournament (shown in the app).
 var BASHO_LABEL   = 'Aki 2026';
 
 // Password for the private /admin.html dashboard (connectivity, analytics,
-// user moderation, message-board review). Change this to your own string
-// before deploying, then enter the SAME string into admin.html when it
-// asks — the page doesn't store it anywhere on its own. Same game-grade
-// security note as the PIN system above: fine for keeping the dashboard
-// away from casual visitors, not a hardened secret store.
-var ADMIN_KEY = '06011990';
+// user moderation, message-board review).
+//
+// The secret itself is NOT stored in this source file anymore — it lives only
+// in the Apps Script project's Script Properties, so this .gs can be zipped,
+// backed up, or shared without leaking the key. To set (or rotate) it:
+//   Apps Script editor → Project Settings (gear) → Script Properties →
+//   Add property:  ADMIN_KEY = <your long random string>
+// Then enter that SAME string into admin.html's unlock prompt. If the property
+// is unset, ADMIN_KEY is "" and adminGate() below fails closed (rejects
+// everything), so a misconfiguration locks the dashboard rather than opening it.
+var ADMIN_KEY = (function () {
+  try { return PropertiesService.getScriptProperties().getProperty('ADMIN_KEY') || ''; }
+  catch (e) { return ''; }
+})();
+
+// The handle/name that admin-sent direct messages appear to come from. It's a
+// reserved handle: register()/changeHandle() below block anyone else from
+// taking it, so a DM from "Sumo Slapdown" is always genuinely from the admin.
+var ADMIN_HANDLE = 'gyoji';
+var ADMIN_NAME   = 'Sumo Slapdown';
+
+/* ---- league scoring: the default rules, and a normalizer that clamps a
+   commissioner's custom values into safe ranges. Shared by front and back;
+   the client mirrors these defaults so scoring always agrees. ----
+   winPoint      : points per match won            (default 1, capped 1..6)
+   sanyakuBonus  : points per rank-gap step when beating a higher-ranked
+                   sanyaku opponent (loserLevel - winnerLevel)  (default 1, 0..6)
+   sansho        : points per special prize         (default 5, 0..20)
+   yusho         : points for the Makuuchi yusho     (default 5, 0..20) */
+function defaultScoring() {
+  return { winPoint: 1, sanyakuBonus: 1, sansho: 5, yusho: 5 };
+}
+function normalizeScoring(raw) {
+  var d = defaultScoring(), s = raw || {};
+  function clamp(v, lo, hi, dflt) {
+    var n = Number(v); if (isNaN(n)) n = dflt;
+    return Math.max(lo, Math.min(hi, Math.round(n)));
+  }
+  return {
+    winPoint:     clamp(s.winPoint,     1, 6,  d.winPoint),   // cap point-per-win at 6
+    sanyakuBonus: clamp(s.sanyakuBonus, 0, 6,  d.sanyakuBonus),
+    sansho:       clamp(s.sansho,       0, 20, d.sansho),
+    yusho:        clamp(s.yusho,        0, 20, d.yusho)
+  };
+}
+function parseScoring(cell) {
+  var raw = null; try { raw = JSON.parse(cell || '{}'); } catch (e) { raw = {}; }
+  return normalizeScoring(raw);
+}
 
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
@@ -79,7 +123,7 @@ function setup() {
   migrateUsersV3(users);                       // upgrades a v1/v2/v3 sheet (no status/warnMsg columns) in place
   ensureSheet(ss, SHEET_RESULTS, ['day', 'division', 'east', 'west', 'winner', 'kimarite']);
   var leagues = ensureSheet(ss, SHEET_LEAGUES, ['id', 'name', 'commissioner', 'created', 'inviteCode',
-    'mode', 'rosterSize', 'draftStatus', 'draftOrder', 'draftPickIdx', 'draftPhase']);
+    'mode', 'rosterSize', 'draftStatus', 'draftOrder', 'draftPickIdx', 'draftPhase', 'scoring', 'draftDate', 'draftAgree']);
   migrateLeaguesV2(leagues);   // upgrades an older Leagues sheet (no keeper columns) in place
   ensureSheet(ss, SHEET_MEMBERS, ['leagueId', 'handle', 'joined']);
   ensureSheet(ss, SHEET_MESSAGES, ['id', 'leagueId', 'handle', 'name', 'body', 'parentId', 'created']);
@@ -92,6 +136,7 @@ function setup() {
   ensureSheet(ss, SHEET_PAGEVIEWS, ['ts', 'page', 'visitorId']);
   ensureSheet(ss, SHEET_BOARD, ['id', 'handle', 'name', 'body', 'parentId', 'created', 'updated', 'editedByAdmin']);
   ensureSheet(ss, SHEET_BOARD_VOTES, ['msgId', 'handle', 'value', 'votedAt']);
+  ensureSheet(ss, SHEET_DMS, ['id', 'fromHandle', 'fromName', 'toHandle', 'body', 'created', 'readByRecipient']);
   var meta = ensureSheet(ss, SHEET_META, ['key', 'value']);
   if (meta.getLastRow() < 2) {
     meta.appendRow(['basho', BASHO_LABEL]);
@@ -149,6 +194,11 @@ function migrateLeaguesV2(sh) {
   if (String(head[5] || '').toLowerCase() !== 'mode') {
     sh.getRange(1, 6, 1, 6).setValues([['mode', 'rosterSize', 'draftStatus', 'draftOrder', 'draftPickIdx', 'draftPhase']]);
   }
+  // v3: custom scoring, scheduled draft date, and per-member date agreement
+  head = sh.getRange(1, 1, 1, Math.max(11, sh.getLastColumn())).getValues()[0];
+  if (String(head[11] || '').toLowerCase() !== 'scoring') {
+    sh.getRange(1, 12, 1, 3).setValues([['scoring', 'draftDate', 'draftAgree']]);
+  }
 }
 
 /* ---------- GET: hand back leaderboard data ---------- */
@@ -166,10 +216,16 @@ function doGet(e) {
     if (action === 'trades')  return json({ ok: true, trades: myTrades(e.parameter.id, e.parameter.handle) });
     if (action === 'board')   return json({ ok: true, messages: boardMessages(e.parameter.handle) });
     if (action === 'accountSummary') return json(accountSummary(e.parameter.handle));
-    if (action === 'adminStats')    { var g1 = adminGate(e.parameter.adminKey); if (g1) return json(g1); return json(adminStats()); }
-    if (action === 'adminUsers')    { var g2 = adminGate(e.parameter.adminKey); if (g2) return json(g2); return json(adminUsers()); }
-    if (action === 'adminMessages') { var g3 = adminGate(e.parameter.adminKey); if (g3) return json(g3); return json(adminMessages()); }
-    if (action === 'adminFeedback') { var g4 = adminGate(e.parameter.adminKey); if (g4) return json(g4); return json(adminFeedback()); }
+    // NOTE: admin reads (adminStats/adminUsers/adminMessages/adminFeedback/
+    // adminDmThreads) used to live here as GET actions, which put ?adminKey=...
+    // in the URL — and URLs land in browser history, referer headers, and Apps
+    // Script's own execution logs. They're now POST-only (see doPost), so the
+    // key travels in the request body instead. A stray GET to one of those
+    // actions now just falls through to the public default below (which never
+    // includes the auth column), so nothing admin-only leaks.
+    if (action === 'dmThreads') return json(dmThreads(e.parameter.handle));
+    if (action === 'dmUnread')  return json(dmUnread(e.parameter.handle));
+    if (action === 'dmDirectory') return json(dmDirectory(e.parameter.handle));
     return json({ ok: true, users: readUsers(), results: readResults(), meta: readMeta() });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -193,6 +249,9 @@ function doPost(e) {
     if (body.action === 'deleteLeague') return json(deleteLeague(body));
     if (body.action === 'postMessage')  return json(postMessage(body));
     if (body.action === 'setLeagueMode') return json(setLeagueMode(body));
+    if (body.action === 'setLeagueScoring') return json(setLeagueScoring(body));
+    if (body.action === 'setDraftDate')  return json(setDraftDate(body));
+    if (body.action === 'agreeDraftDate') return json(agreeDraftDate(body));
     if (body.action === 'startDraft')    return json(startDraft(body));
     if (body.action === 'makePick')      return json(makePick(body));
     if (body.action === 'proposeTrade')  return json(proposeTrade(body));
@@ -205,6 +264,13 @@ function doPost(e) {
     if (body.action === 'editBoardMessage')      return json(editBoardMessage(body));
     if (body.action === 'deleteBoardMessage')    return json(deleteBoardMessage(body));
     if (body.action === 'voteBoardMessage')      return json(voteBoardMessage(body));
+    // Admin READS — moved here from doGet so the key rides in the POST body,
+    // not the URL. adminGated() runs the gate and only calls the reader on pass.
+    if (body.action === 'adminStats')     return json(adminGated(body.adminKey, adminStats));
+    if (body.action === 'adminUsers')     return json(adminGated(body.adminKey, adminUsers));
+    if (body.action === 'adminMessages')  return json(adminGated(body.adminKey, adminMessages));
+    if (body.action === 'adminFeedback')  return json(adminGated(body.adminKey, adminFeedback));
+    if (body.action === 'adminDmThreads') return json(adminDmThreads(body.adminKey));
     if (body.action === 'adminEditBoardMessage') return json(adminEditBoardMessage(body));
     if (body.action === 'adminDeleteBoardMsg')   return json(adminDeleteBoardMsg(body));
     if (body.action === 'feedback')    return json(submitFeedback(body));
@@ -216,6 +282,11 @@ function doPost(e) {
     if (body.action === 'adminDeleteMessage') return json(adminDeleteMessageFn(body));
     if (body.action === 'adminSetFeedbackStatus') return json(adminSetFeedbackStatus(body));
     if (body.action === 'adminDeleteFeedback')    return json(adminDeleteFeedback(body));
+    if (body.action === 'dmSend')       return json(dmSend(body));
+    if (body.action === 'dmMarkRead')   return json(dmMarkRead(body));
+    if (body.action === 'dmDelete')     return json(dmDelete(body));
+    if (body.action === 'adminDmSend')     return json(adminDmSend(body));
+    if (body.action === 'adminDmMarkRead') return json(adminDmMarkRead(body));
     return json({ ok: false, error: 'unknown action' });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -239,13 +310,19 @@ function submitFeedback(body) {
   if (!message) return { ok: false, error: 'Please add some detail.' };
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_FEEDBACK);
   if (!sh) return { ok: false, error: 'not set up' };
+  // handle + targetUser are account handles: run them through the same
+  // charset filter accounts use (cleanHandle -> [A-Za-z0-9_.-] or '').
+  // Feedback can be submitted anonymously and was NOT validated before, so a
+  // crafted handle could carry quotes/script into the admin dashboard's
+  // action buttons. cleanHandle blanks anything malformed; a blank handle just
+  // means "anonymous" (no Reply button), which is the safe default.
   sh.appendRow([
     new Date(),
     kind,
-    String(body.handle || '').slice(0, 40),
+    cleanHandle(body.handle),
     String(body.subject || '').trim().slice(0, 160),
     message,
-    String(body.targetUser || '').trim().slice(0, 40),
+    cleanHandle(body.targetUser),
     String(body.page || '').slice(0, 200),
     'new'
   ]);
@@ -257,6 +334,7 @@ function submitFeedback(body) {
 function register(body) {
   var handle = cleanHandle(body.handle);
   if (!handle) return { ok: false, error: 'Handle: 2\u201340 letters, digits, _ . -' };
+  if (handle.toLowerCase() === ADMIN_HANDLE) return { ok: false, error: 'That handle is reserved \u2014 pick another.' };
   var auth = String(body.auth || '').slice(0, 80);
   if (!auth) return { ok: false, error: 'missing auth' };
   var name = String(body.name || handle).trim().slice(0, 60);
@@ -311,6 +389,7 @@ function changeHandle(body) {
   var u = verifyAuth(body.handle, body.auth); if (!u) return { ok: false, error: 'Not authorised.' };
   var newHandle = cleanHandle(body.newHandle);
   if (!newHandle) return { ok: false, error: 'Handle: 2\u201340 letters, digits, _ . -' };
+  if (newHandle.toLowerCase() === ADMIN_HANDLE) return { ok: false, error: 'That handle is reserved \u2014 pick another.' };
   if (newHandle.toLowerCase() === u.handle.toLowerCase()) return { ok: false, error: 'That\u2019s already your handle.' };
   var newAuth = String(body.newAuth || '').slice(0, 80);
   if (!newAuth) return { ok: false, error: 'Missing new PIN hash.' };
@@ -486,7 +565,10 @@ function leagueRow(id){
     draftStatus: String(v[r][7]||'none') || 'none',
     draftOrder: (function(){ try { return JSON.parse(v[r][8]||'[]'); } catch(e){ return []; } })(),
     draftPickIdx: Number(v[r][9]||0) || 0,
-    draftPhase: String(v[r][10]||'')
+    draftPhase: String(v[r][10]||''),
+    scoring: parseScoring(v[r][11]),
+    draftDate: String(v[r][12]||''),
+    draftAgree: (function(){ try { return JSON.parse(v[r][13]||'{}'); } catch(e){ return {}; } })()
   };
   return null;
 }
@@ -544,9 +626,19 @@ function leagueDetail(id, handle){
       roster: ros };
   });
   var msgs = messagesOf(id);
+  // draft-date agreement: which members have agreed to the scheduled date
+  var agree = L.draftAgree || {};
+  var agreedCount = 0;
+  mem.forEach(function(m){
+    m.agreedDraft = !!agree[m.handle.toLowerCase()];
+    if (m.agreedDraft) agreedCount++;
+  });
   return { ok:true, league:{ id:L.id, name:L.name, commissioner:L.commissioner, inviteCode:L.inviteCode,
     mode:L.mode, rosterSize:L.rosterSize, draftStatus:L.draftStatus,
+    scoring:L.scoring, draftDate:L.draftDate,
+    draftAgreedCount:agreedCount, draftMemberCount:mem.length,
     isCommissioner: handle && L.commissioner.toLowerCase()===handle.toLowerCase(),
+    iAgreedDraft: handle ? !!agree[handle.toLowerCase()] : false,
     isMember: handle ? isMember(id, handle) : false },
     members:mem, messages:msgs };
 }
@@ -565,13 +657,15 @@ function createLeague(body){
   var name = String(body.name||'').trim().slice(0,60); if (!name) return { ok:false, error:'Name your league first.' };
   var mode = (body.mode === 'keepers') ? 'keepers' : 'classic';
   var rosterSize = Math.max(5, Math.min(10, Number(body.rosterSize) || 6));
+  var scoring = normalizeScoring(body.scoring);
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var id = newId('lg_'), code = inviteCode(), when = new Date().toISOString();
-    // full row incl. mode columns so a keepers league is never momentarily classic
-    sh_(SHEET_LEAGUES).appendRow([id, name, u.handle, when, code, mode, rosterSize, 'none', '', 0, 'makuuchi']);
+    // full row incl. mode + scoring columns so a league is never momentarily default
+    sh_(SHEET_LEAGUES).appendRow([id, name, u.handle, when, code, mode, rosterSize, 'none', '', 0, 'makuuchi',
+      JSON.stringify(scoring), '', '{}']);
     sh_(SHEET_MEMBERS).appendRow([id, u.handle, when]);
-    return { ok:true, id:id, inviteCode:code, mode:mode, rosterSize:rosterSize };
+    return { ok:true, id:id, inviteCode:code, mode:mode, rosterSize:rosterSize, scoring:scoring };
   } finally { lock.releaseLock(); }
 }
 
@@ -796,6 +890,167 @@ function adminDeleteBoardMsg(body){
   return { ok:true };
 }
 
+/* ============================================================
+   DIRECT MESSAGES  ·  user <-> user (and admin <-> user)
+   One flat DirectMessages sheet; a "thread" is just every row between
+   two handles. Rows: [id, fromHandle, fromName, toHandle, body, created,
+   readByRecipient]. Reads are auth'd so you only ever see your own
+   threads; the admin variants below are adminKey-gated and impersonate
+   ADMIN_HANDLE so replies to feedback come from "Sumo Slapdown".
+   ============================================================ */
+
+/* the messaging directory: every real account except yourself and the
+   reserved admin handle, as { handle, name, avatar }. Used by the account
+   modal's "new message" picker so you can only ever address a verified
+   user (search happens client-side over this list). */
+function dmDirectory(handle) {
+  var meKey = String(handle || '').toLowerCase();
+  var v = sh_(SHEET_USERS).getDataRange().getValues();
+  var out = [];
+  for (var r = 1; r < v.length; r++) {
+    var h = String(v[r][0] || '').trim();
+    if (!h) continue;
+    var k = h.toLowerCase();
+    if (k === meKey || k === ADMIN_HANDLE) continue;       // not yourself, not the reserved admin row
+    if (String(v[r][6] || '') === 'banned') continue;      // hide banned accounts
+    out.push({ handle: h, name: String(v[r][1] || h), avatar: String(v[r][5] || '') });
+  }
+  out.sort(function (a, b) { return String(a.name).toLowerCase().localeCompare(String(b.name).toLowerCase()); });
+  return { ok: true, users: out };
+}
+
+/* every DM that involves `handle` (sent or received), oldest first,
+   grouped into threads keyed by the OTHER participant's handle. */
+function dmThreads(handle) {
+  handle = cleanHandle(handle);
+  if (!handle) return { ok: false, error: 'Bad handle.' };
+  var key = handle.toLowerCase();
+  var v = sh_(SHEET_DMS).getDataRange().getValues();
+  var byOther = {}, order = [];
+  for (var r = 1; r < v.length; r++) {
+    var from = String(v[r][1] || ''), to = String(v[r][3] || '');
+    if (!from && !to) continue;
+    var fromKey = from.toLowerCase(), toKey = to.toLowerCase();
+    if (fromKey !== key && toKey !== key) continue;
+    var otherKey = fromKey === key ? toKey : fromKey;
+    var otherHandle = fromKey === key ? to : from;
+    if (!byOther[otherKey]) {
+      byOther[otherKey] = { handle: otherHandle, name: otherHandle, messages: [], unread: 0, lastAt: '' };
+      order.push(otherKey);
+    }
+    var t = byOther[otherKey];
+    var mine = fromKey === key;
+    if (!mine && t.handle.toLowerCase() !== ADMIN_HANDLE) t.name = String(v[r][2] || t.handle); // remember their display name
+    if (fromKey === ADMIN_HANDLE) t.name = ADMIN_NAME;
+    var unread = !mine && String(v[r][6] || '') !== '1';
+    if (unread) t.unread++;
+    t.lastAt = String(v[r][5] || '');
+    t.messages.push({
+      id: String(v[r][0]), fromHandle: from, fromName: String(v[r][2] || from),
+      mine: mine, body: String(v[r][4] || ''), created: String(v[r][5] || ''), read: !unread
+    });
+  }
+  var threads = order.map(function (k) { return byOther[k]; })
+    .sort(function (a, b) { return new Date(b.lastAt) - new Date(a.lastAt); });
+  var totalUnread = 0; threads.forEach(function (t) { totalUnread += t.unread; });
+  return { ok: true, threads: threads, unread: totalUnread, admin: ADMIN_HANDLE };
+}
+
+/* lightweight unread count only — cheap enough for the nav badge to poll. */
+function dmUnread(handle) {
+  handle = cleanHandle(handle);
+  if (!handle) return { ok: false, unread: 0 };
+  var key = handle.toLowerCase();
+  var v = sh_(SHEET_DMS).getDataRange().getValues(), n = 0;
+  for (var r = 1; r < v.length; r++) {
+    if (String(v[r][3] || '').toLowerCase() === key && String(v[r][6] || '') !== '1') n++;
+  }
+  return { ok: true, unread: n };
+}
+
+function dmSend(body) {
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok: false, error: 'Sign in first.' };
+  var to = cleanHandle(body.to); if (!to) return { ok: false, error: 'Who to?' };
+  if (to.toLowerCase() === u.handle.toLowerCase()) return { ok: false, error: 'You can\u2019t message yourself.' };
+  var target = findUser(to); if (!target) return { ok: false, error: 'No user with that handle.' };
+  var text = String(body.body || '').trim().slice(0, 2000); if (!text) return { ok: false, error: 'Empty message.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var id = newId('dm_');
+    sh_(SHEET_DMS).appendRow([id, u.handle, u.name, target.handle, text, new Date().toISOString(), '']);
+    return { ok: true, id: id };
+  } finally { lock.releaseLock(); }
+}
+
+/* mark every message the OTHER handle sent to me as read. */
+function dmMarkRead(body) {
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok: false, error: 'Sign in first.' };
+  var other = cleanHandle(body.other); if (!other) return { ok: false, error: 'Which thread?' };
+  var myKey = u.handle.toLowerCase(), otherKey = other.toLowerCase();
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = sh_(SHEET_DMS), v = sh.getDataRange().getValues(), n = 0;
+    for (var r = 1; r < v.length; r++) {
+      if (String(v[r][3] || '').toLowerCase() === myKey &&
+          String(v[r][1] || '').toLowerCase() === otherKey &&
+          String(v[r][6] || '') !== '1') {
+        sh.getRange(r + 1, 7, 1, 1).setValue('1'); n++;
+      }
+    }
+    return { ok: true, marked: n };
+  } finally { lock.releaseLock(); }
+}
+
+function dmDelete(body) {
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok: false, error: 'Sign in first.' };
+  var sh = sh_(SHEET_DMS), v = sh.getDataRange().getValues(), key = u.handle.toLowerCase();
+  for (var r = 1; r < v.length; r++) {
+    if (String(v[r][0]) === String(body.msgId)) {
+      // you can only delete a message you sent
+      if (String(v[r][1] || '').toLowerCase() !== key) return { ok: false, error: 'You can only delete your own messages.' };
+      sh.deleteRow(r + 1); return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Message not found.' };
+}
+
+/* ---- admin side: send/read DMs as ADMIN_HANDLE, adminKey-gated ---- */
+function adminDmSend(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var to = cleanHandle(body.to); if (!to) return { ok: false, error: 'Who to?' };
+  var target = findUser(to); if (!target) return { ok: false, error: 'No user with that handle.' };
+  var text = String(body.body || '').trim().slice(0, 2000); if (!text) return { ok: false, error: 'Empty message.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var id = newId('dm_');
+    sh_(SHEET_DMS).appendRow([id, ADMIN_HANDLE, ADMIN_NAME, target.handle, text, new Date().toISOString(), '']);
+    return { ok: true, id: id };
+  } finally { lock.releaseLock(); }
+}
+
+/* the admin's own inbox: every thread ADMIN_HANDLE is part of. */
+function adminDmThreads(adminKey) {
+  var bad = adminGate(adminKey); if (bad) return bad;
+  return dmThreads(ADMIN_HANDLE);
+}
+function adminDmMarkRead(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var other = cleanHandle(body.other); if (!other) return { ok: false, error: 'Which thread?' };
+  var otherKey = other.toLowerCase();
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = sh_(SHEET_DMS), v = sh.getDataRange().getValues(), n = 0;
+    for (var r = 1; r < v.length; r++) {
+      if (String(v[r][3] || '').toLowerCase() === ADMIN_HANDLE &&
+          String(v[r][1] || '').toLowerCase() === otherKey &&
+          String(v[r][6] || '') !== '1') {
+        sh.getRange(r + 1, 7, 1, 1).setValue('1'); n++;
+      }
+    }
+    return { ok: true, marked: n };
+  } finally { lock.releaseLock(); }
+}
+
 /* save a member's team for one specific league (independent of their
    global team, and independent of any other league they're in) */
 function saveLeagueTeam(body){
@@ -870,6 +1125,53 @@ function setLeagueMode(body){
   var rosterSize = Math.max(5, Math.min(10, Number(body.rosterSize) || 6));
   sh_(SHEET_LEAGUES).getRange(L.row, 6, 1, 2).setValues([[mode, rosterSize]]);
   return { ok:true, mode:mode, rosterSize:rosterSize };
+}
+
+/* commissioner edits the league's scoring rules (both classic & keepers).
+   Values are clamped by normalizeScoring (point-per-win capped at 6). Locked
+   once a draft has started or results exist, so standings can't shift under
+   players mid-basho. */
+function setLeagueScoring(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can change scoring.' };
+  var scoring = normalizeScoring(body.scoring);
+  sh_(SHEET_LEAGUES).getRange(L.row, 12, 1, 1).setValue(JSON.stringify(scoring));
+  return { ok:true, scoring:scoring };
+}
+
+/* commissioner sets/updates the scheduled draft date (ISO string, or '' to
+   clear). Changing the date resets everyone's agreement — a new date needs
+   fresh sign-off. The commissioner is counted as agreeing to their own date. */
+function setDraftDate(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can set the draft date.' };
+  var when = String(body.draftDate || '').slice(0, 40);   // ISO-ish; the client sends a datetime-local value
+  var agree = {};
+  if (when) agree[L.commissioner.toLowerCase()] = true;   // proposing it counts as agreeing to it
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    sh_(SHEET_LEAGUES).getRange(L.row, 13, 1, 2).setValues([[when, JSON.stringify(agree)]]);
+    return { ok:true, draftDate:when };
+  } finally { lock.releaseLock(); }
+}
+
+/* a member agrees to (or withdraws agreement from) the scheduled draft date. */
+function agreeDraftDate(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (!isMember(L.id, u.handle)) return { ok:false, error:'Join the league first.' };
+  if (!L.draftDate) return { ok:false, error:'No draft date has been set yet.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    L = leagueRow(body.id);                                // re-read under lock
+    var agree = L.draftAgree || {};
+    if (body.agree === false) delete agree[u.handle.toLowerCase()];
+    else agree[u.handle.toLowerCase()] = true;
+    sh_(SHEET_LEAGUES).getRange(L.row, 14, 1, 1).setValue(JSON.stringify(agree));
+    return { ok:true, agreed: body.agree !== false };
+  } finally { lock.releaseLock(); }
 }
 
 function startDraft(body){
@@ -1149,9 +1451,40 @@ function accountSummary(handle) {
    here requires body.adminKey (or ?adminKey= on GETs) to match ADMIN_KEY
    above.
    ============================================================ */
+/* Gate every admin action. Returns null when the key is correct, or an
+   {ok:false,error} object to short-circuit with when it isn't.
+
+   Brute-force protection: Apps Script doesn't hand us a reliable per-visitor
+   IP, so this is a GLOBAL counter in the script cache — after MAX_FAILS bad
+   keys inside FAIL_WINDOW, all unlock attempts are refused for LOCKOUT_SECS.
+   Crude but it turns "guess forever" into "guess 8, then wait 5 minutes,"
+   which (with a long random key) puts brute force out of reach. Tradeoff:
+   a stranger spamming wrong keys can briefly lock YOU out too — acceptable
+   for a single-admin site, and the window is short. A correct key clears the
+   counter immediately. */
 function adminGate(key) {
-  if (ADMIN_KEY && String(key || '') === String(ADMIN_KEY)) return null;
+  var MAX_FAILS = 8, FAIL_WINDOW = 600, LOCKOUT_SECS = 300;
+  var cache = CacheService.getScriptCache();
+  var LOCK = 'admin_lockout', FAILS = 'admin_fails';
+
+  if (cache.get(LOCK)) return { ok: false, error: 'Too many attempts \u2014 try again in a few minutes.' };
+
+  if (ADMIN_KEY && String(key || '') === String(ADMIN_KEY)) {
+    cache.remove(FAILS);                       // good key wipes the fail streak
+    return null;
+  }
+
+  var n = (parseInt(cache.get(FAILS), 10) || 0) + 1;
+  if (n >= MAX_FAILS) { cache.put(LOCK, '1', LOCKOUT_SECS); cache.remove(FAILS); }
+  else { cache.put(FAILS, String(n), FAIL_WINDOW); }
   return { ok: false, error: 'Not authorised.' };
+}
+
+/* Run an admin read behind the gate: returns the gate's rejection object if
+   the key is bad/locked, otherwise the reader's result. Keeps doPost tidy. */
+function adminGated(key, reader) {
+  var bad = adminGate(key);
+  return bad ? bad : reader();
 }
 
 /* record one pageview; called from every public page via gg-nav.js.

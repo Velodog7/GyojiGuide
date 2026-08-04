@@ -49,7 +49,8 @@ nav.tabs{ position:sticky; top:0; z-index:30; background:rgba(14,15,20,.92); bac
 .tab{ flex:1 1 0; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
       background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); padding:9px 0; cursor:pointer; transition:color .12s }
 .tab svg{ width:20px; height:20px; display:block }
-.tab-lab{ font-size:.6rem; font-weight:500; letter-spacing:.01em; line-height:1; white-space:nowrap }
+.tab-lab{ font-size:.8rem; font-weight:600; letter-spacing:.01em; line-height:1.15; text-align:center }
+@media(max-width:640px){ .tab svg{ width:17px; height:17px } .tab-lab{ font-size:.62rem; font-weight:500; line-height:1.1 } }
 .tab:hover{ color:var(--dim) }
 .tab[aria-selected="true"]{ color:var(--sun); border-bottom-color:var(--red) }
 .tab .n{ position:absolute; top:6px; left:50%; transform:translateX(4px); font-family:"IBM Plex Mono",monospace; font-size:.58rem;
@@ -316,17 +317,21 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
 
   function $(id){ return document.getElementById(id); }
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
+  // Handles get inlined into onclick="fn('...')" JS-string context, where esc()
+  // is NOT enough — it doesn't touch the single quote you'd break out with, and
+  // HTML-entity-encoding it wouldn't help (the browser decodes the attribute
+  // before the JS parser sees it). So for anything going into an inline handler
+  // we strip to the same charset accounts are limited to. Backend now validates
+  // feedback handles too, but this also defuses any bad rows already stored.
+  function safeHandle(s){ return String(s == null ? "" : s).replace(/[^A-Za-z0-9_.\-]/g, ""); }
   function fmtDate(iso){
     var t = Date.parse(iso || "");
     if (isNaN(t)) return "—";
     return new Date(t).toLocaleString(undefined, { month:"short", day:"numeric", year:"numeric", hour:"numeric", minute:"2-digit" });
   }
 
-  async function aGet(action, extra){
-    if (!GG || !GG.hasAPI || !GG.hasAPI()) return null;
-    var params = Object.assign({ adminKey: state.key }, extra || {});
-    try { return await GG.apiGetQ(action, params); } catch(e){ return null; }
-  }
+  // Admin actions (reads included) all POST now, so the admin key travels in
+  // the request body, never in a URL/query string that could be logged.
   async function aPost(action, extra){
     if (!GG || !GG.hasAPI || !GG.hasAPI()) return null;
     var payload = Object.assign({ action: action, adminKey: state.key }, extra || {});
@@ -348,7 +353,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
       if (!GG || !GG.hasAPI || !GG.hasAPI()){
         err.textContent = "Couldn\u2019t reach the backend \u2014 check that gg-config.js sits next to admin.html and its API_URL is set.";
       } else {
-        res = await GG.apiGetQ("adminStats", { adminKey: key });
+        res = await GG.apiPost({ action: "adminStats", adminKey: key });
         if (res && res.ok){
           sessionStorage.setItem(KEYNAME, key);
           $("gate").hidden = true;
@@ -407,7 +412,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   }
   $("recheckBtn").onclick = async function(){
     $("recheckBtn").disabled = true; $("recheckBtn").textContent = "Checking…";
-    var res = await aGet("adminStats");
+    var res = await aPost("adminStats");
     if (res && res.ok) { renderConnectivity(res); loadAnalytics(res); }
     $("recheckBtn").disabled = false; $("recheckBtn").textContent = "Recheck now";
   };
@@ -437,12 +442,13 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
     var rows = allUsers.filter(function(u){
       return !q || u.handle.toLowerCase().indexOf(q) >= 0 || (u.name||"").toLowerCase().indexOf(q) >= 0;
     }).map(function(u){
-      var actions = '<button class="btn sm" onclick="adminReply(\'' + u.handle + '\')">Message</button>';
-      actions += '<button class="btn sm" onclick="adminWarn(\'' + u.handle + '\')">Warn</button>';
+      var h = safeHandle(u.handle);
+      var actions = '<button class="btn sm" onclick="adminReply(\'' + h + '\')">Message</button>';
+      actions += '<button class="btn sm" onclick="adminWarn(\'' + h + '\')">Warn</button>';
       actions += u.status === "banned"
-        ? '<button class="btn sm" onclick="adminUnban(\'' + u.handle + '\')">Unban</button>'
-        : '<button class="btn sm danger" onclick="adminBan(\'' + u.handle + '\')">Ban</button>';
-      actions += '<button class="btn sm danger" onclick="adminDelete(\'' + u.handle + '\')">Delete</button>';
+        ? '<button class="btn sm" onclick="adminUnban(\'' + h + '\')">Unban</button>'
+        : '<button class="btn sm danger" onclick="adminBan(\'' + h + '\')">Ban</button>';
+      actions += '<button class="btn sm danger" onclick="adminDelete(\'' + h + '\')">Delete</button>';
       var warnLine = u.warnMsg ? '<span class="warn-msg">' + esc(u.warnMsg) + '</span>' : "";
       return "<tr><td class=\"handle\">@" + esc(u.handle) + "<small>" + esc(u.name) + "</small></td>" +
         "<td>" + statusBadge(u.status) + warnLine + "</td>" +
@@ -456,7 +462,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   }
   async function loadUsers(){
     $("usersTable").innerHTML = '<tr class="load-row"><td colspan="7"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr>';
-    var res = await aGet("adminUsers");
+    var res = await aPost("adminUsers");
     if (res && res.ok){ allUsers = res.users || []; state.loaded.users = true; $("userN").textContent = allUsers.length; renderUsers(); }
     else $("usersTable").innerHTML = '<tr class="empty-row"><td colspan="7">Couldn\u2019t load users.</td></tr>';
   }
@@ -502,7 +508,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   }
   async function loadBoards(){
     $("boardsTable").innerHTML = '<tr class="load-row"><td colspan="5"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr>';
-    var res = await aGet("adminMessages");
+    var res = await aPost("adminMessages");
     if (res && res.ok){ allMsgs = res.messages || []; state.loaded.boards = true; $("boardN").textContent = allMsgs.length; renderBoards(); }
     else $("boardsTable").innerHTML = '<tr class="empty-row"><td colspan="5">Couldn\u2019t load messages.</td></tr>';
   }
@@ -546,7 +552,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
       if (f.targetUser) who += "<small>re: @" + esc(f.targetUser) + "</small>";
       var body = (f.subject ? "<b>" + esc(f.subject) + "</b><br>" : "") + esc(f.message);
       var actions = "";
-      if (f.handle) actions += '<button class="btn sm" onclick="adminReply(\'' + esc(f.handle) + '\')">Reply</button>';
+      if (f.handle) actions += '<button class="btn sm" onclick="adminReply(\'' + safeHandle(f.handle) + '\')">Reply</button>';
       if (f.status !== "read")     actions += '<button class="btn sm" onclick="adminFeedbackStatus(\'' + f.id + '\',\'read\')">Mark read</button>';
       if (f.status !== "resolved") actions += '<button class="btn sm" onclick="adminFeedbackStatus(\'' + f.id + '\',\'resolved\')">Resolve</button>';
       if (f.status !== "new")      actions += '<button class="btn sm" onclick="adminFeedbackStatus(\'' + f.id + '\',\'new\')">Reopen</button>';
@@ -563,7 +569,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   }
   async function loadFeedback(){
     $("feedbackTable").innerHTML = '<tr class="load-row"><td colspan="7"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr>';
-    var res = await aGet("adminFeedback");
+    var res = await aPost("adminFeedback");
     if (res && res.ok){
       allFeedback = res.feedback || [];
       state.loaded.feedback = true;
@@ -599,7 +605,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   }
   async function paintDmConvo(){
     var box = $("dmConvo"); if (!box) return;
-    var res = await aGet("adminDmThreads");
+    var res = await aPost("adminDmThreads");
     box = $("dmConvo"); if (!box) return;
     if (!res || !res.ok){ box.innerHTML = '<div class="empty-row">Couldn\u2019t load this conversation.</div>'; return; }
     var thread = (res.threads || []).filter(function(t){ return t.handle.toLowerCase() === dmOther.toLowerCase(); })[0];

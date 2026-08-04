@@ -43,7 +43,7 @@ Netlify Drop, etc.). No bundler, no npm.
 **Private admin dashboard** (deliberately not linked anywhere — see below)
 | File | What it is |
 |---|---|
-| `admin.html` | Connectivity to sumo-api, pageview analytics, user moderation (warn/ban/delete), and a read-only feed of every message-board post across all leagues. Password-gated by `ADMIN_KEY` in `sumo-fantasy.gs`. |
+| `admin.html` | Connectivity to sumo-api, pageview analytics, user moderation (warn/ban/delete), and a read-only feed of every message-board post across all leagues. Password-gated by the `ADMIN_KEY` Script Property (with a brute-force lockout on the backend). |
 
 `admin.html` isn't added to `gg-nav.js`'s link list and isn't referenced from any other page, so a visitor won't stumble onto it from the site itself — but like every other file here it's still a public URL on a static host. That's obscurity, not real access control. Don't put anything in it you'd be upset to see leaked, and don't reuse `ADMIN_KEY` anywhere else.
 
@@ -70,8 +70,14 @@ here as backup/reference. To update the live backend:
 
 1. Open your Apps Script project at **script.google.com**.
 2. Paste in the contents of `sumo-fantasy.gs`.
-3. **Set your own `ADMIN_KEY`** near the top of the file (it ships with a
-   placeholder value) — this is the password `admin.html` asks for.
+3. **Set your own `ADMIN_KEY` as a Script Property.** The key is no longer
+   stored in `sumo-fantasy.gs` — the file only *reads* it, so the secret never
+   lives in a file you zip or share. In the Apps Script editor go to
+   **Project Settings (gear) → Script Properties → Add script property**, name
+   it `ADMIN_KEY`, and paste a long random string (32+ chars). This is the
+   password `admin.html` asks for. If the property is unset the dashboard fails
+   closed (rejects every key) rather than opening up. Rotate it any time by
+   editing that property — no code change or redeploy needed.
 4. **Run `setup()` once.** This creates/updates the Sheets, including the
    **Feedback** sheet used by the Help modal (FAQ questions, suggestions, bug
    reports, user reports), the **PageViews** sheet the admin dashboard reads
@@ -92,7 +98,7 @@ here as backup/reference. To update the live backend:
 The site currently points at:
 
 ```
-https://script.google.com/macros/s/AKfycbxgOx3ZLsfAXBYDoYIMRY3LhXvkOApDhraNA9z7BG6Sh576EP7x84rBSXlFn1SKJGCCHA/exec
+https://script.google.com/macros/s/AKfycbxY9s2600bfUvhT-2Qfp5N5Gnxb6IinI_I_lYLSt063MLOQrTnXo2gU_h5P2W9nyEeFQw/exec
 ```
 
 This lives in **`gg-config.js`** (`GyojiGuide.API_URL`) — the single source of
