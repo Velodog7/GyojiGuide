@@ -31,6 +31,16 @@ button,input,textarea{ font-family:inherit }
 .gate-card p{ color:var(--muted); font-size:.86rem; margin:0 0 18px; line-height:1.5 }
 .gate-card input{ width:100%; background:var(--surface-2); border:1px solid var(--line); color:var(--ink); border-radius:var(--radius-sm); padding:11px 13px; font-size:.95rem }
 .gate-card input:focus{ outline:none; border-color:var(--sun) }
+.gate-card .pw-wrap{ position:relative }
+.gate-card .pw-wrap input{ padding-right:66px }
+.gate-card .pw-toggle{
+  position:absolute; top:50%; right:6px; transform:translateY(-50%);
+  width:auto; margin:0; padding:6px 10px;
+  background:transparent; border:1px solid var(--line); border-radius:var(--radius-sm);
+  color:var(--muted); font-weight:600; font-size:.7rem; letter-spacing:.04em;
+  text-transform:uppercase; cursor:pointer;
+}
+.gate-card .pw-toggle:hover{ filter:none; color:var(--ink); border-color:var(--sun) }
 .gate-card button{ width:100%; margin-top:12px; background:var(--sun); border:1px solid var(--sun); color:#141620; font-weight:700; font-size:.92rem; padding:11px; border-radius:var(--radius-sm); cursor:pointer }
 .gate-card button:hover{ filter:brightness(1.08) }
 .gate-err{ min-height:18px; margin-top:10px; font-size:.82rem; color:var(--down) }
@@ -154,7 +164,10 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   <div class="gate-card">
     <h1>Sumo Slapdown <span>Admin</span></h1>
     <p>This dashboard isn't linked from the site and isn't meant for players — connectivity, traffic, accounts, and message-board moderation live here.</p>
-    <input id="gateKey" type="password" placeholder="Admin key" autocomplete="off" />
+    <div class="pw-wrap">
+      <input id="gateKey" type="password" placeholder="Admin key" autocomplete="off" />
+      <button id="pwToggle" type="button" class="pw-toggle" aria-label="Show admin key">Show</button>
+    </div>
     <button id="gateGo">Unlock dashboard</button>
     <div class="gate-err" id="gateErr"></div>
   </div>
@@ -310,7 +323,24 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
 <script>
 (function(){
   "use strict";
-  var GG = window.GyojiGuide;
+  var GG = window.GyojiGuide || {};
+  // admin.html is a standalone, unlinked page — keep it working even if the
+  // gg-config.js sitting next to it on the host is stale or missing. If
+  // gg-config.js IS present and current, its URL wins; otherwise we fall back
+  // to this hardcoded /exec (same pattern fantasy.html uses). Update BOTH this
+  // and gg-config.js if you ever redeploy to a new URL.
+  var ADMIN_API_URL = GG.API_URL ||
+    "https://script.google.com/macros/s/AKfycbxY9s2600bfUvhT-2Qfp5N5Gnxb6IinI_I_lYLSt063MLOQrTnXo2gU_h5P2W9nyEeFQw/exec";
+  // Local POST helper so we don't depend on gg-config.js's functions either.
+  // CORS-safelisted content type => no preflight, the pattern Apps Script needs.
+  async function apiPost(payload){
+    var r = await fetch(ADMIN_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload || {})
+    });
+    return await r.json();
+  }
   var KEYNAME = "adm.key";
   var state = { key: sessionStorage.getItem(KEYNAME) || "", loaded: {} };
   var allUsers = [], allMsgs = [];
@@ -333,9 +363,9 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   // Admin actions (reads included) all POST now, so the admin key travels in
   // the request body, never in a URL/query string that could be logged.
   async function aPost(action, extra){
-    if (!GG || !GG.hasAPI || !GG.hasAPI()) return null;
+    if (!ADMIN_API_URL) return null;
     var payload = Object.assign({ action: action, adminKey: state.key }, extra || {});
-    try { return await GG.apiPost(payload); } catch(e){ return null; }
+    try { return await apiPost(payload); } catch(e){ return null; }
   }
 
   /* ---------- gate ---------- */
@@ -350,10 +380,10 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
     state.key = key;
     try {
       var res = null;
-      if (!GG || !GG.hasAPI || !GG.hasAPI()){
-        err.textContent = "Couldn\u2019t reach the backend \u2014 check that gg-config.js sits next to admin.html and its API_URL is set.";
+      if (!ADMIN_API_URL){
+        err.textContent = "No backend endpoint is set \u2014 check ADMIN_API_URL near the top of this file (or that gg-config.js sits next to admin.html).";
       } else {
-        res = await GG.apiPost({ action: "adminStats", adminKey: key });
+        res = await apiPost({ action: "adminStats", adminKey: key });
         if (res && res.ok){
           sessionStorage.setItem(KEYNAME, key);
           $("gate").hidden = true;
@@ -377,6 +407,13 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   }
   $("gateGo").onclick = function(){ tryUnlock(($("gateKey").value || "").trim()); };
   $("gateKey").addEventListener("keydown", function(e){ if (e.key === "Enter") tryUnlock(($("gateKey").value || "").trim()); });
+  $("pwToggle").onclick = function(){
+    var inp = $("gateKey"), reveal = inp.type === "password";
+    inp.type = reveal ? "text" : "password";
+    this.textContent = reveal ? "Hide" : "Show";
+    this.setAttribute("aria-label", reveal ? "Hide admin key" : "Show admin key");
+    inp.focus();
+  };
   $("lockBtn").onclick = function(){
     sessionStorage.removeItem(KEYNAME);
     state.key = ""; state.loaded = {};
