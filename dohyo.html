@@ -357,9 +357,10 @@
   .shout--kim b{ font-size:3cqw; color:var(--win) }
   .shout--kim span{ letter-spacing:.3em }
   .shout--kim.on{ animation:kimCall 2.4s cubic-bezier(.2,.9,.3,1) both }
-  /* よいしょ — called out on each of the yokozuna's shiko stomps. Sits lower,
-     down by his feet, so it never collides with the ceremony caption above. */
-  .shout--yoisho{ bottom:calc(26cqw + 30px) }
+  /* よいしょ — called out on each of the yokozuna's shiko stomps. Sits just
+     above his head mid-squat, low enough to stay clear of the ceremony
+     caption above. */
+  .shout--yoisho{ bottom:calc(35cqw + 30px) }
   .shout--yoisho b{ color:var(--sun) }
   .shout--yoisho.on{ animation:yoisho .85s cubic-bezier(.2,.9,.3,1) both }
   @keyframes yoisho{
@@ -1341,10 +1342,10 @@
   /* ── end-of-day banzuke modal ──────────────────────────────── */
   .modal{ position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
           background:rgba(0,0,0,.72); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);
-          padding:24px; animation:modalIn .35s ease both; }
+          padding:88px 24px 24px; overflow:hidden; animation:modalIn .35s ease both; }
   .modal[hidden]{ display:none }
   @keyframes modalIn{ from{ opacity:0 } }
-  .modal__card{ width:min(920px,96vw); max-height:90vh; display:flex; flex-direction:column;
+  .modal__card{ width:min(920px,96vw); max-height:min(90vh,calc(100vh - 132px)); display:flex; flex-direction:column;
           background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden;
           box-shadow:0 20px 80px rgba(0,0,0,.6); animation:cardIn .4s cubic-bezier(.2,.9,.3,1) both; }
   @keyframes cardIn{ from{ transform:translateY(10px) scale(.98); opacity:0 } }
