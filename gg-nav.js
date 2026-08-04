@@ -27,7 +27,7 @@
     nav.setAttribute("aria-label", "Sumo Slapdown sections");
     nav.innerHTML =
       '<div class="ggn-inner">' +
-      '<a class="ggn-brand" href="index.html">'+GGN_LOGO+'</a>' +
+      '<a class="ggn-brand" href="index.html">'+GGN_LOGO+'<span class="ggn-beta">beta</span></a>' +
       '<button type="button" class="ggn-burger" id="ggnBurger" aria-label="Menu" aria-expanded="false" aria-controls="ggnLinks">' +
         '<span></span><span></span><span></span>' +
       '</button>' +
@@ -83,6 +83,8 @@
     '.ggn-brand{grid-column:1;justify-self:start;display:inline-flex;align-items:center;gap:8px;' +
       'text-decoration:none;color:#f4ecd8;font-weight:700;font-size:.98rem;letter-spacing:.01em;white-space:nowrap}' +
     '.ggn-brand svg,.ggn-brand img{height:68px;width:auto;display:block}' +
+    '.ggn-beta{align-self:flex-start;margin-top:14px;margin-left:-2px;font-family:"Space Grotesk",system-ui,sans-serif;' +
+      'font-weight:600;font-size:.62rem;letter-spacing:.14em;text-transform:lowercase;color:#d8b25a;opacity:.85}' +
     '.ggn-links{grid-column:2;justify-self:center;display:flex;gap:6px;align-items:stretch}' +
     '.ggn-link{display:flex;align-items:center;justify-content:center;box-sizing:border-box;height:40px;' +
       'font-family:"Potta One","Space Grotesk",system-ui,sans-serif;font-weight:400;font-size:.9rem;letter-spacing:.05em;text-transform:uppercase;' +
@@ -108,6 +110,7 @@
       '.ggn-inner{grid-template-columns:auto 1fr auto;gap:10px;padding:0 14px;min-height:60px}' +
       '.ggn-brand{grid-column:1}' +
       '.ggn-brand svg,.ggn-brand img{height:52px}' +
+      '.ggn-beta{margin-top:10px;font-size:.56rem}' +
       '.ggn-burger{display:flex;justify-self:start}' +
       '.ggn-right{grid-column:3}' +
       '.ggn-links{grid-column:1 / -1;flex-direction:column;align-items:stretch;gap:4px;' +
@@ -284,7 +287,8 @@
       else if (kind === "abuse"){ pay.targetUser = val("abUser"); pay.message = val("abMsg"); }
       if (!pay.message){ st.className = "ggh-status err"; st.textContent = "Please add a little detail first."; return; }
       if (kind === "abuse" && !pay.targetUser){ st.className = "ggh-status err"; st.textContent = "Please enter the user\u2019s handle."; return; }
-      sendFeedback(kind, pay, sb, st);
+      var apiKind = kind === "faq" ? "question" : kind;   // backend expects 'question', UI tab is 'faq'
+      sendFeedback(apiKind, pay, sb, st);
     };
   }
 

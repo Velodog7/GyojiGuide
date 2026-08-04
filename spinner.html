@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sumo Slapdown · Spinner</title>
+<style>
+  /* ============================================================
+     REUSABLE SPINNER LOADER
+     Drop the .gg-spinner block anywhere. It centres itself both
+     vertically and horizontally inside whatever container holds it
+     (the container just needs a height — position:relative optional).
+     Matches the Sumo Slapdown aesthetic: dark ground, gold accent.
+     ============================================================ */
+  .gg-spinner{
+    /* centre in the container, both axes */
+    position:absolute;
+    top:0; right:0; bottom:0; left:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    pointer-events:none;
+  }
+  /* the ring: a thin track with one bright gold arc sweeping round */
+  .gg-spinner__ring{
+    width:44px;
+    height:44px;
+    border-radius:50%;
+    border:3px solid rgba(216,178,90,.16);   /* faint gold track */
+    border-top-color:#d8b25a;                /* the moving gold arc */
+    animation:gg-spin .85s linear infinite;
+  }
+  .gg-spinner__label{
+    font-family:"IBM Plex Mono", ui-monospace, monospace;
+    font-size:.62rem;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:#878da0;
+    animation:gg-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes gg-spin{ to{ transform:rotate(360deg) } }
+  @keyframes gg-pulse{ 0%,100%{ opacity:.45 } 50%{ opacity:1 } }
+  @media (prefers-reduced-motion:reduce){
+    .gg-spinner__ring{ animation-duration:2s }
+    .gg-spinner__label{ animation:none }
+  }
+
+  /* ---- demo scaffolding only (not part of the component) ---- */
+  body{ margin:0; background:#0d0f15; font-family:"Space Grotesk",system-ui,sans-serif; color:#f1f2f6 }
+  .demo-wrap{ display:flex; gap:24px; padding:40px; flex-wrap:wrap }
+  .demo-box{
+    position:relative;              /* the spinner centres against this */
+    width:320px; height:220px;
+    background:#181a22;
+    border:1px solid #2a2e3a;
+    border-radius:14px;
+  }
+  .demo-note{ padding:0 40px 40px; color:#878da0; font-size:.85rem; line-height:1.6; max-width:640px }
+  .demo-note code{ font-family:"IBM Plex Mono",monospace; color:#d8b25a; font-size:.82em }
+</style>
+</head>
+<body>
+  <div class="demo-wrap">
+    <!-- ▼▼▼ THIS is the component — copy this block into any container ▼▼▼ -->
+    <div class="demo-box">
+      <div class="gg-spinner" role="status" aria-live="polite">
+        <div class="gg-spinner__ring"></div>
+        <span class="gg-spinner__label">Loading</span>
+      </div>
+    </div>
+    <!-- ▲▲▲ end component ▲▲▲ -->
+
+    <!-- a second box showing it centres regardless of container size -->
+    <div class="demo-box" style="width:180px;height:300px">
+      <div class="gg-spinner" role="status" aria-live="polite">
+        <div class="gg-spinner__ring"></div>
+        <span class="gg-spinner__label">Loading</span>
+      </div>
+    </div>
+  </div>
+
+  <p class="demo-note">
+    Copy the <code>.gg-spinner</code> block into any element that has a height.
+    It centres itself with <code>position:absolute; inset:0</code>, so give the
+    parent <code>position:relative</code> if it isn't already positioned. Drop
+    the <code>__label</code> span if you want just the ring. The two boxes above
+    are only a demo — the spinner is the same in both.
+  </p>
+</body>
+</html>
