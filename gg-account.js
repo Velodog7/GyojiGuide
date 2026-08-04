@@ -209,4 +209,11 @@
   GG.boardEdit      = function (msgId, body){ return GG.apiPost(authed({ action:"editBoardMessage", msgId: msgId, body: body })); };
   GG.boardDelete    = function (msgId){ return GG.apiPost(authed({ action:"deleteBoardMessage", msgId: msgId })); };
   GG.boardVote      = function (msgId, value){ return GG.apiPost(authed({ action:"voteBoardMessage", msgId: msgId, value: value })); };
+
+  /* ---- direct messages: user <-> user (and admin <-> user) ---- */
+  GG.dmThreads   = function (){ return GG.apiGetQ("dmThreads", { handle: (GG.account.get()||{}).handle || "" }); };
+  GG.dmUnread    = function (){ return GG.apiGetQ("dmUnread",  { handle: (GG.account.get()||{}).handle || "" }); };
+  GG.dmSend      = function (to, body){ return GG.apiPost(authed({ action:"dmSend", to: to, body: body })); };
+  GG.dmMarkRead  = function (other){ return GG.apiPost(authed({ action:"dmMarkRead", other: other })); };
+  GG.dmDelete    = function (msgId){ return GG.apiPost(authed({ action:"dmDelete", msgId: msgId })); };
 })();

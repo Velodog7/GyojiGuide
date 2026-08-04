@@ -122,6 +122,28 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
 .ld-ring{ width:16px; height:16px; border-radius:50%; flex:none; border:2px solid rgba(216,178,90,.18); border-top-color:var(--sun); animation:ld-spin .8s linear infinite }
 @keyframes ld-spin{ to{ transform:rotate(360deg) } }
 @media (prefers-reduced-motion:reduce){ .ld-ring{ animation-duration:2s } }
+.dm-modal{ position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:24px;
+  background:rgba(0,0,0,.6); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px) }
+.dm-modal[hidden]{ display:none }
+.dm-modal__card{ width:min(520px,96vw); max-height:82vh; display:flex; flex-direction:column;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:20px }
+.dm-modal__head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px }
+.dm-modal__title{ font-family:"Space Grotesk",sans-serif; font-size:1rem; color:var(--ink) }
+.dm-modal__title b{ color:var(--sun) }
+.dm-modal__x{ background:none; border:0; color:var(--muted); font-size:1.1rem; cursor:pointer; padding:2px 6px; border-radius:6px }
+.dm-modal__x:hover{ color:var(--ink); background:var(--surface-2) }
+.dm-convo{ flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding:4px 2px 8px; min-height:80px }
+.dm-convo .empty-row{ color:var(--muted); text-align:center; padding:20px 0 }
+.dm-bubble{ max-width:82%; padding:8px 11px; border-radius:12px; font-size:.88rem; line-height:1.45; word-break:break-word; white-space:pre-wrap }
+.dm-bubble.them{ align-self:flex-start; background:var(--surface-2); border-bottom-left-radius:4px; color:var(--ink) }
+.dm-bubble.me{ align-self:flex-end; background:var(--sun); color:#141620; border-bottom-right-radius:4px }
+.dm-bubble time{ display:block; font-size:.64rem; opacity:.6; margin-top:3px }
+.dm-compose{ display:flex; gap:8px; margin-top:12px }
+.dm-compose textarea{ flex:1; background:var(--surface-2); border:1px solid var(--line); color:var(--ink); border-radius:var(--radius-sm);
+  font:inherit; font-size:.9rem; padding:9px 11px; resize:vertical; min-height:44px; max-height:140px }
+.dm-compose textarea:focus{ outline:none; border-color:var(--sun) }
+.dm-status{ min-height:16px; margin-top:8px; font-size:.8rem; color:var(--muted) }
+.dm-status.err{ color:var(--down) } .dm-status.ok{ color:var(--up) }
 </style>
 </head>
 <body>
@@ -269,6 +291,21 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
   </main>
 </div>
 
+<div id="dmModal" class="dm-modal" hidden>
+  <div class="dm-modal__card">
+    <div class="dm-modal__head">
+      <div class="dm-modal__title">Reply to <b id="dmWho">@user</b></div>
+      <button class="dm-modal__x" id="dmClose" aria-label="Close">✕</button>
+    </div>
+    <div class="dm-convo" id="dmConvo"><div class="ld-row"><span class="ld-ring"></span>Loading…</div></div>
+    <div class="dm-compose">
+      <textarea id="dmText" placeholder="Write a reply… (⌘/Ctrl+Enter to send)" maxlength="2000" rows="2"></textarea>
+      <button class="btn gold" id="dmSend">Send</button>
+    </div>
+    <div class="dm-status" id="dmStatus"></div>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
@@ -400,7 +437,8 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
     var rows = allUsers.filter(function(u){
       return !q || u.handle.toLowerCase().indexOf(q) >= 0 || (u.name||"").toLowerCase().indexOf(q) >= 0;
     }).map(function(u){
-      var actions = '<button class="btn sm" onclick="adminWarn(\'' + u.handle + '\')">Warn</button>';
+      var actions = '<button class="btn sm" onclick="adminReply(\'' + u.handle + '\')">Message</button>';
+      actions += '<button class="btn sm" onclick="adminWarn(\'' + u.handle + '\')">Warn</button>';
       actions += u.status === "banned"
         ? '<button class="btn sm" onclick="adminUnban(\'' + u.handle + '\')">Unban</button>'
         : '<button class="btn sm danger" onclick="adminBan(\'' + u.handle + '\')">Ban</button>';
@@ -508,6 +546,7 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
       if (f.targetUser) who += "<small>re: @" + esc(f.targetUser) + "</small>";
       var body = (f.subject ? "<b>" + esc(f.subject) + "</b><br>" : "") + esc(f.message);
       var actions = "";
+      if (f.handle) actions += '<button class="btn sm" onclick="adminReply(\'' + esc(f.handle) + '\')">Reply</button>';
       if (f.status !== "read")     actions += '<button class="btn sm" onclick="adminFeedbackStatus(\'' + f.id + '\',\'read\')">Mark read</button>';
       if (f.status !== "resolved") actions += '<button class="btn sm" onclick="adminFeedbackStatus(\'' + f.id + '\',\'resolved\')">Resolve</button>';
       if (f.status !== "new")      actions += '<button class="btn sm" onclick="adminFeedbackStatus(\'' + f.id + '\',\'new\')">Reopen</button>';
@@ -547,6 +586,61 @@ td.num{ font-family:"IBM Plex Mono",monospace; text-align:right; white-space:now
     var res = await aPost("adminDeleteFeedback", { id: id });
     if (res && res.ok) loadFeedback(); else alert((res && res.error) || "Couldn\u2019t delete that.");
   };
+
+  /* ---------- direct-message reply drawer ---------- */
+  var dmOther = "";
+  function dmTime(iso){
+    var t = Date.parse(iso || ""); if (isNaN(t)) return "";
+    var d = new Date(t), now = new Date();
+    var sameDay = d.toDateString() === now.toDateString();
+    return sameDay ? d.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" })
+                   : d.toLocaleDateString(undefined, { month:"short", day:"numeric" }) + " " +
+                     d.toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
+  }
+  async function paintDmConvo(){
+    var box = $("dmConvo"); if (!box) return;
+    var res = await aGet("adminDmThreads");
+    box = $("dmConvo"); if (!box) return;
+    if (!res || !res.ok){ box.innerHTML = '<div class="empty-row">Couldn\u2019t load this conversation.</div>'; return; }
+    var thread = (res.threads || []).filter(function(t){ return t.handle.toLowerCase() === dmOther.toLowerCase(); })[0];
+    var msgs = thread ? thread.messages : [];
+    if (!msgs.length){ box.innerHTML = '<div class="empty-row">No messages with @' + esc(dmOther) + ' yet \u2014 send the first one below.</div>'; }
+    else box.innerHTML = msgs.map(function(m){
+      return '<div class="dm-bubble ' + (m.mine ? "me" : "them") + '">' + esc(m.body) + '<time>' + esc(dmTime(m.created)) + '</time></div>';
+    }).join("");
+    box.scrollTop = box.scrollHeight;
+    // clear the unread flag on their messages to us
+    try { await aPost("adminDmMarkRead", { other: dmOther }); } catch(e){}
+  }
+  window.adminReply = async function(handle){
+    dmOther = handle;
+    $("dmWho").textContent = "@" + handle;
+    $("dmText").value = "";
+    $("dmStatus").textContent = ""; $("dmStatus").className = "dm-status";
+    $("dmModal").hidden = false;
+    $("dmConvo").innerHTML = '<div class="ld-row"><span class="ld-ring"></span>Loading…</div>';
+    await paintDmConvo();
+    $("dmText").focus();
+  };
+  function closeDm(){ $("dmModal").hidden = true; dmOther = ""; }
+  $("dmClose").onclick = closeDm;
+  $("dmModal").addEventListener("click", function(e){ if (e.target === $("dmModal")) closeDm(); });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape" && !$("dmModal").hidden) closeDm(); });
+  async function sendDm(){
+    var body = ($("dmText").value || "").trim(); if (!body || !dmOther) return;
+    var btn = $("dmSend"), st = $("dmStatus");
+    btn.disabled = true; st.textContent = "Sending…"; st.className = "dm-status";
+    var res = await aPost("adminDmSend", { to: dmOther, body: body });
+    if (res && res.ok){
+      $("dmText").value = ""; st.textContent = "Sent \u2713"; st.className = "dm-status ok";
+      await paintDmConvo();
+    } else {
+      st.textContent = (res && res.error) || "Couldn\u2019t send."; st.className = "dm-status err";
+    }
+    btn.disabled = false;
+  }
+  $("dmSend").onclick = sendDm;
+  $("dmText").addEventListener("keydown", function(e){ if (e.key === "Enter" && (e.metaKey || e.ctrlKey)){ e.preventDefault(); sendDm(); } });
 
   /* ---------- boot: skip the gate if we still have a session key ---------- */
   if (state.key) tryUnlock(state.key);
