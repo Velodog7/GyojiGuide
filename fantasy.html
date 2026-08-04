@@ -44,6 +44,7 @@
         background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); padding:9px 0; cursor:pointer; transition:color .12s }
   .tab svg{ width:20px; height:20px; display:block }
   .tab-lab{ font-size:.6rem; font-weight:500; letter-spacing:.01em; line-height:1; white-space:nowrap }
+  .tab-lab__sub{ font-family:"IBM Plex Mono",monospace; font-weight:400; font-style:italic; opacity:.6; font-size:.92em }
   .tab:hover{ color:var(--dim) }
   .tab[aria-selected="true"]{ color:var(--sun); border-bottom-color:var(--red) }
   .tab .n{ position:absolute; top:6px; left:50%; transform:translateX(4px); font-family:"IBM Plex Mono",monospace; font-size:.58rem;
@@ -225,6 +226,12 @@
   table.lb tr:hover td{ background:rgba(255,255,255,.02) }
   .lb-rank{ font-family:"Space Grotesk",sans-serif; font-weight:700; color:var(--sun); width:44px }
   .lb-rank.p1{ font-size:1.15rem } 
+  .lb-avacol{ width:44px; padding-right:0 !important }
+  .lb-section{ margin-top:40px; padding-top:28px; border-top:1px solid var(--line) }
+  .lb-section__title{ margin:0 0 2px; font-size:1.15rem }
+  .lb-ava{ display:inline-flex; width:34px; height:34px; border-radius:50%; overflow:hidden; background:var(--surface-2);
+    align-items:center; justify-content:center; font-family:"Noto Serif JP",serif; font-size:.9rem; color:var(--sun); flex:none }
+  .lb-ava svg{ width:100%; height:100%; display:block }
   .lb-name b{ font-weight:600 } .lb-name span{ color:var(--faint); font-size:.8rem; margin-left:6px }
   .lb-you{ color:var(--sun); font-family:"IBM Plex Mono",monospace; font-size:.6rem; letter-spacing:.1em;
         border:1px solid rgba(var(--sun-rgb),.5); border-radius:99px; padding:1px 7px; margin-left:8px }
@@ -493,20 +500,15 @@
 <script src="gg-nav.js"></script><script src="gg-auth.js"></script>
 <nav class="tabs" role="tablist">
   <div class="tabs-inner">
-    <button class="tab" id="tab-team" role="tab" aria-selected="true" onclick="setView('team')" aria-label="My Team" title="My Team">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <span class="n" id="pickN">0/7</span>
-      <span class="tab-lab">My Team</span>
-    </button>
-    <button class="tab" id="tab-board" role="tab" aria-selected="false" onclick="setView('board')" aria-label="Leaderboard" title="Leaderboard">
+    <button class="tab" id="tab-team" role="tab" aria-selected="true" onclick="setView('team')" aria-label="Sumo Slap Down League (public)" title="Sumo Slap Down League (public)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="20" y2="21"/><rect x="5" y="12" width="3.5" height="7" fill="currentColor" stroke="none"/><rect x="10.5" y="8" width="3.5" height="11" fill="currentColor" stroke="none"/><rect x="16" y="4" width="3.5" height="15" fill="currentColor" stroke="none"/></svg>
-      <span class="n" id="lbN">0</span>
-      <span class="tab-lab">Leaderboard</span>
+      <span class="n" id="pickN">0/7</span>
+      <span class="tab-lab">Sumo Slap Down League <span class="tab-lab__sub">(public)</span></span>
     </button>
-    <button class="tab" id="tab-leagues" role="tab" aria-selected="false" onclick="setView('leagues')" aria-label="My Leagues" title="My Leagues">
+    <button class="tab" id="tab-leagues" role="tab" aria-selected="false" onclick="setView('leagues')" aria-label="My Leagues (private, custom)" title="My Leagues (private, custom)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
       <span class="n" id="lgN">0</span>
-      <span class="tab-lab">My Leagues</span>
+      <span class="tab-lab">My Leagues <span class="tab-lab__sub">(private, custom)</span></span>
     </button>
   </div>
 </nav>
@@ -574,12 +576,12 @@
       <p class="history__hint">A new roster every basho — here's how your last ones scored.</p>
       <div id="historyList"></div>
     </div>
-  </section>
 
-  <!-- LEADERBOARD -->
-  <section class="view" id="v-board">
+    <!-- LEADERBOARD (merged into the public-league tab) -->
+    <div class="lb-section">
     <div class="lb-head">
       <div>
+        <h3 class="lb-section__title">Leaderboard</h3>
         <div class="lb-meta" id="lbBasho">—</div>
       </div>
       <button class="btn ghost" id="refreshBtn">Refresh</button>
@@ -606,6 +608,7 @@
         </div>
       </div>
       <div id="boardMsgs" class="lg-msgs"></div>
+    </div>
     </div>
   </section>
 
@@ -963,7 +966,12 @@ async function apiPost(payload){
 
 /* ---------- accounts ---------- */
 function avatarHTML(a){
-  if (a && a.avatar) { try { return MawashiDesigner.renderSVG(a.avatar, { variant:"chip", size:40 }); } catch(e){} }
+  if (a && a.avatar) {
+    // a.avatar may be a parsed design object or a JSON string (from the Sheet)
+    var design = a.avatar;
+    if (typeof design === "string") { try { design = JSON.parse(design); } catch(e){ design = null; } }
+    if (design) { try { return MawashiDesigner.renderSVG(design, { variant:"chip", size:40 }); } catch(e){} }
+  }
   return (a && a.name ? a.name : a && a.handle || "力").slice(0,1).toUpperCase();
 }
 function acctUI(){
@@ -982,7 +990,7 @@ function setAcct(a){
   // keep the leagues tab in sync with sign-in/out
   if (typeof loadLeagues === "function" && $("tab-leagues").getAttribute("aria-selected")==="true") loadLeagues();
   // keep the leaderboard board's own-post/vote state in sync with sign-in/out
-  if (typeof loadLbBoard === "function" && $("tab-board").getAttribute("aria-selected")==="true") loadLbBoard();
+  if (typeof loadLbBoard === "function" && $("tab-team").getAttribute("aria-selected")==="true") loadLbBoard();
   // a just-signed-in user with a pending invite link should auto-join
   if (a && wasOut && typeof handlePendingJoin === "function" && pendingJoin) handlePendingJoin();
   // a just-signed-in user arriving via an account-modal league quick link should land there
@@ -1276,7 +1284,7 @@ function renderBoard(){
   const lastDay = model.lastDay;
   const phase = !model.started ? "  ·  not started" : lastDay>=15 ? "  ·  final" : "  ·  Day " + lastDay + " of 15";
   $("lbBasho").textContent = (model.basho || "Fantasy Sumo") + phase;
-  $("lbN").textContent = cache.users.length;
+  const lbNEl = $("lbN"); if (lbNEl) lbNEl.textContent = cache.users.length;
   $("lbDays").innerHTML = Array.from({length:15}, (_,i)=>{ const d=i+1; return `<i class="${d<=lastDay?"done":""}">${d}</i>`; }).join("");
 
   // rank everyone
@@ -1292,10 +1300,13 @@ function renderBoard(){
     $("lbPinned").innerHTML = `<h4>★ Pinned — gap to leader</h4>` +
       `<table class="lb"><tbody>` + pins.map(r=>{
         const d = r.pts - lead;
+        const mine = acct && String(r.handle||"").toLowerCase()===acct.handle.toLowerCase();
+        const ava = (mine ? avatarHTML(acct) : avatarHTML(r));
         const diff = d===0 ? `<span class="lb-diff lead">▲ leader</span>` : `<span class="lb-diff">${d} pts</span>`;
         return `<tr class="lb-row" data-h="${esc(r.handle)}">
           <td class="lb-pincol"><button class="lb-star on" data-pin="${esc(r.handle)}" title="Unpin">★</button></td>
           <td class="lb-rank">#${r.rank}</td>
+          <td class="lb-avacol"><span class="lb-ava">${ava}</span></td>
           <td class="lb-name"><b>${esc(r.name||r.handle)}</b><span>@${esc(r.handle)}</span></td>
           <td class="lb-score">${r.pts}</td>
           <td style="text-align:right">${diff}</td></tr>`;
@@ -1317,18 +1328,20 @@ function renderBoard(){
   if (!rows.length){ $("lbBody").innerHTML = `<p class="empty-lb">No players match “${esc(lbQuery)}”.</p>`; $("lbFoot").textContent=""; return; }
 
   const me = (acct?acct.handle:"").toLowerCase();
-  let html = `<table class="lb"><thead><tr><th></th><th>#</th><th>Player</th><th style="text-align:right">Wins</th><th style="text-align:right">Score</th></tr></thead><tbody>`;
+  let html = `<table class="lb"><thead><tr><th></th><th>#</th><th></th><th>Player</th><th style="text-align:right">Wins</th><th style="text-align:right">Score</th></tr></thead><tbody>`;
   rows.forEach((r)=>{
     const totW = r.rows.reduce((s,x)=>s+x.w,0);
     const mine = String(r.handle||"").toLowerCase()===me;
     const pin = isPinned(r.handle);
+    const ava = (mine && acct ? avatarHTML(acct) : avatarHTML(r));
     html += `<tr class="lb-row" data-h="${esc(r.handle)}">
       <td class="lb-pincol"><button class="lb-star ${pin?"on":""}" data-pin="${esc(r.handle)}" title="${pin?"Unpin":"Pin"}">${pin?"★":"☆"}</button></td>
       <td class="lb-rank ${r.rank===1?"p1":""}">${r.rank}</td>
+      <td class="lb-avacol"><span class="lb-ava">${ava}</span></td>
       <td class="lb-name"><b>${esc(r.name||r.handle)}</b>${mine?`<span class="lb-you">You</span>`:""}<span>@${esc(r.handle)}</span></td>
       <td class="lb-w">${totW}</td>
       <td class="lb-score">${r.pts}</td></tr>
-      <tr class="expand" data-h="${esc(r.handle)}" hidden><td colspan="5">${expandCards(r.team||{}, r.rows)}</td></tr>`;
+      <tr class="expand" data-h="${esc(r.handle)}" hidden><td colspan="6">${expandCards(r.team||{}, r.rows)}</td></tr>`;
   });
   html += `</tbody></table>`;
   $("lbBody").innerHTML = html;
@@ -2094,11 +2107,14 @@ function handlePendingLeague(){
 
 /* ---------- tabs ---------- */
 function setView(v){
+  // the leaderboard now lives inside the public-league ("team") view; keep a
+  // 'board' alias pointing at it in case anything still calls setView('board')
+  if (v === "board") v = "team";
   document.querySelectorAll(".view").forEach(s=>s.classList.remove("on"));
   document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected","false"));
   $("v-"+v).classList.add("on");
   $("tab-"+v).setAttribute("aria-selected","true");
-  if (v==="board") { loadBoard(); loadLbBoard(); }
+  if (v==="team") { loadBoard(); loadLbBoard(); }
   if (v==="leagues") loadLeagues();
 }
 $("refreshBtn").onclick = loadBoard;
