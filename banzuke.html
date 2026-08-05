@@ -8,29 +8,337 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700;900&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-  :root{ --bg:#000; --ink:#f1f2f6; --muted:#878da0; --gold:#d8b25a; }
+  :root{ --bg:#000; --ink:#f1f2f6; --muted:#878da0; --gold:#d8b25a;
+         --sun:#d8b25a; --red:#e23b2e; --line:#2a2e3a; --dim:#a7adbe; --faint:#6b7180; --surface:#181a22; --surface2:#20232d; }
   *{ box-sizing:border-box }
   html,body{ margin:0 }
   body{ background:var(--bg); color:var(--ink); font-family:"Space Grotesk",system-ui,sans-serif;
         -webkit-font-smoothing:antialiased; min-height:100vh; display:flex; flex-direction:column }
+
+  /* ── subnav / tab bar (matches the other pages) ───────── */
+  nav.tabs{ position:sticky; top:0; z-index:30; background:rgba(14,15,20,.92); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); border-bottom:1px solid var(--line) }
+  .tabs-inner{ max-width:1180px; margin:0 auto; padding:0 6px; display:flex }
+  .tab{ flex:1 1 0; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+        background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); padding:9px 0; cursor:pointer; transition:color .12s; font-family:inherit }
+  .tab svg{ width:20px; height:20px; display:block }
+  .tab-lab{ font-size:.85rem; font-weight:600; letter-spacing:.01em; line-height:1.15; text-align:center }
+  .tab:hover{ color:var(--dim) }
+  .tab[aria-selected="true"]{ color:var(--sun); border-bottom-color:var(--red) }
+  @media (max-width:640px){ .tab svg{ width:17px; height:17px } .tab-lab{ font-size:.62rem; font-weight:500; line-height:1.1 } }
+
+  .view{ display:none }
+  .view.on{ display:block }
+  #v-welcome.on{ display:flex; flex-direction:column; flex:1 1 auto }
+  .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:440px; margin-top:6px }
+  .wrap{ max-width:1000px; margin:0 auto; padding:34px 20px 60px }
+  .view-h{ font-family:"Zen Kaku Gothic New","Space Grotesk",sans-serif; font-weight:900; font-size:1.7rem; margin:0 0 6px }
+  .view-sub{ color:var(--muted); font-size:.95rem; line-height:1.55; margin:0 0 26px; max-width:68ch }
   /* full-page stage the header lives on */
-  .bz-stage{ position:relative; width:100%; flex:1 1 auto;
-        height:calc(100vh - 200px); min-height:460px; margin-top:10px }
   #ggBanzuke{ position:absolute; inset:0 }
   footer{ text-align:center; color:var(--muted); font-family:"IBM Plex Mono",monospace;
         font-size:.72rem; letter-spacing:.12em; padding:14px }
   footer a{ color:var(--gold); text-decoration:none }
+
+  /* ── Learn: interactive guide ─────────────────────────── */
+  .learn-grid{ display:grid; grid-template-columns:220px 1fr; gap:24px; align-items:start }
+  @media (max-width:720px){ .learn-grid{ grid-template-columns:1fr } }
+  .learn-nav{ display:flex; flex-direction:column; gap:4px; position:sticky; top:64px }
+  @media (max-width:720px){ .learn-nav{ position:static; flex-direction:row; flex-wrap:wrap; gap:6px } }
+  .learn-navb{ text-align:left; background:var(--surface); border:1px solid var(--line); color:var(--dim); font:inherit;
+        font-size:.86rem; font-weight:600; padding:11px 13px; border-radius:10px; cursor:pointer; transition:.12s; display:flex; align-items:center; gap:9px }
+  .learn-navb:hover{ border-color:var(--sun); color:var(--ink) }
+  .learn-navb[aria-current="true"]{ border-color:var(--sun); background:var(--surface2); color:var(--sun) }
+  .learn-navb .lb-i{ font-size:1.05rem; flex:none }
+  .learn-panel{ min-height:340px }
+  .learn-step{ display:none; animation:fadein .25s ease }
+  .learn-step.on{ display:block }
+  @keyframes fadein{ from{ opacity:0; transform:translateY(4px) } }
+  .learn-step h3{ font-family:"Zen Kaku Gothic New",sans-serif; font-weight:900; font-size:1.3rem; margin:0 0 4px }
+  .learn-step .jp{ color:var(--sun); font-size:.85rem; letter-spacing:.06em; margin:0 0 14px }
+  .learn-step p{ color:var(--dim); line-height:1.65; margin:0 0 14px }
+  .learn-step b{ color:var(--ink) }
+  .rank-ladder{ display:flex; flex-direction:column; gap:6px; margin:16px 0 20px }
+  .rank-row{ display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:11px 14px; transition:.12s }
+  .rank-row:hover{ border-color:var(--sun); transform:translateX(3px) }
+  .rank-row .rk{ font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--sun); width:34px; flex:none; text-align:center }
+  .rank-row .rn{ font-weight:700 }
+  .rank-row .rd{ color:var(--muted); font-size:.85rem; margin-left:auto; text-align:right }
+  .rank-row.sanyaku{ border-left:3px solid var(--sun) }
+  .kimarite-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin:14px 0 20px }
+  .kimarite{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:12px 14px }
+  .kimarite h4{ margin:0 0 3px; font-size:.92rem }
+  .kimarite .jp{ color:var(--sun); font-size:.76rem; margin:0 0 5px }
+  .kimarite p{ font-size:.8rem; margin:0; color:var(--muted); line-height:1.5 }
+  .quiz{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px; margin-top:8px }
+  .quiz__q{ font-weight:700; font-size:1.05rem; margin:0 0 14px }
+  .quiz__opts{ display:flex; flex-direction:column; gap:8px }
+  .quiz__opt{ text-align:left; background:var(--surface2); border:1px solid var(--line); color:var(--ink); font:inherit; font-size:.9rem;
+        padding:12px 14px; border-radius:10px; cursor:pointer; transition:.12s }
+  .quiz__opt:hover{ border-color:var(--sun) }
+  .quiz__opt.correct{ border-color:#43c08a; background:rgba(67,192,138,.12); color:#43c08a }
+  .quiz__opt.wrong{ border-color:var(--red); background:rgba(226,59,46,.1); color:#f0655a }
+  .quiz__opt:disabled{ cursor:default }
+  .quiz__fb{ margin-top:14px; font-size:.9rem; line-height:1.55; min-height:1.2em }
+  .quiz__fb.ok{ color:#43c08a } .quiz__fb.no{ color:#f0655a }
+  .quiz__next{ margin-top:16px }
+  .learn-cta{ display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; padding-top:20px; border-top:1px solid var(--line) }
+  .btn{ background:var(--sun); color:#141620; border:1px solid var(--sun); font:inherit; font-weight:700; padding:11px 18px;
+        border-radius:10px; cursor:pointer; text-decoration:none; display:inline-block; transition:filter .12s }
+  .btn:hover{ filter:brightness(1.08) }
+  .btn.ghost{ background:none; color:var(--dim); border-color:var(--line) }
+  .btn.ghost:hover{ border-color:var(--sun); color:var(--ink); filter:none }
+
+  /* ── Resources ────────────────────────────────────────── */
+  .res-sec{ margin-bottom:34px }
+  .res-sec__h{ font-family:"Zen Kaku Gothic New",sans-serif; font-weight:900; font-size:1.15rem; margin:0 0 4px; display:flex; align-items:center; gap:9px }
+  .res-sec__h svg{ width:22px; height:22px; flex:none; color:var(--red) }
+  .res-sec__sub{ color:var(--muted); font-size:.86rem; margin:0 0 16px }
+  .res-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px }
+  .res-card{ display:flex; align-items:center; gap:13px; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+        padding:14px 16px; text-decoration:none; color:var(--ink); transition:.14s }
+  .res-card:hover{ border-color:var(--sun); background:var(--surface2); transform:translateY(-2px) }
+  .res-card__ico{ width:38px; height:38px; border-radius:9px; flex:none; display:grid; place-items:center; background:var(--surface2); color:var(--sun) }
+  .res-card__ico svg{ width:22px; height:22px }
+  .res-card__b{ min-width:0; display:flex; flex-direction:column; gap:1px }
+  .res-card__nm{ font-weight:700; font-size:.94rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  .res-card__d{ color:var(--muted); font-size:.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 </style>
 <script src="gg-config.js"></script><script src="gg-account.js"></script>
 </head>
 <body>
 <script src="gg-nav.js"></script><script src="gg-mawashi.js"></script><script src="gg-auth.js"></script>
 
-<div class="bz-stage"><div id="ggBanzuke" aria-hidden="true"></div></div>
+<nav class="tabs" role="tablist">
+  <div class="tabs-inner">
+    <button class="tab" id="tab-welcome" role="tab" aria-selected="true" onclick="setView('welcome')" aria-label="Welcome" title="Welcome">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 8.5V21h14V8.5"/><path d="M9 21v-6h6v6"/></svg>
+      <span class="tab-lab">Welcome</span>
+    </button>
+    <button class="tab" id="tab-learn" role="tab" aria-selected="false" onclick="setView('learn')" aria-label="Learn" title="Learn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="M6 10.5V16c0 1.4 2.7 3 6 3s6-1.6 6-3v-5.5"/></svg>
+      <span class="tab-lab">Learn</span>
+    </button>
+    <button class="tab" id="tab-resources" role="tab" aria-selected="false" onclick="setView('resources')" aria-label="Resources" title="Resources">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span class="tab-lab">Resources</span>
+    </button>
+  </div>
+</nav>
+
+<!-- WELCOME: the banzuke-e crowd -->
+<section class="view on" id="v-welcome">
+  <div class="bz-stage"><div id="ggBanzuke" aria-hidden="true"></div></div>
+</section>
+
+<!-- LEARN: interactive guide -->
+<section class="view" id="v-learn">
+  <div class="wrap">
+    <h2 class="view-h">Learn sumo</h2>
+    <p class="view-sub">A quick, interactive tour of the sport — the ranks, how a bout is won, the winning moves, and a short quiz to test yourself. Pick a chapter, or just work through them in order.</p>
+    <div class="learn-grid">
+      <div class="learn-nav" id="learnNav"></div>
+      <div class="learn-panel" id="learnPanel"></div>
+    </div>
+  </div>
+</section>
+
+<!-- RESOURCES: curated links -->
+<section class="view" id="v-resources">
+  <div class="wrap">
+    <h2 class="view-h">Sumo resources</h2>
+    <p class="view-sub">Creators and shows we love. If you're getting into sumo, start here — these folks make the sport a joy to follow.</p>
+    <div id="resList"></div>
+  </div>
+</section>
 
 <footer>SUMO SLAPDOWN · <a href="index.html">Back to the Guide</a></footer>
 
 <script src="gg-banzuke.js" defer></script>
 <script src="taiko-radio.js" defer></script>
+<script>
+/* ============================================================
+   Welcome-page subnav: Welcome (banzuke) · Learn · Resources
+   ============================================================ */
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var esc = function(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); };
+
+  window.setView = function(v){
+    ["welcome","learn","resources"].forEach(function(k){
+      var sec = $("v-"+k), tab = $("tab-"+k);
+      if (sec) sec.classList.toggle("on", k===v);
+      if (tab) tab.setAttribute("aria-selected", k===v ? "true":"false");
+    });
+    if (v==="learn" && !learnBuilt) buildLearn();
+    if (v==="resources" && !resBuilt) buildResources();
+    try { history.replaceState(null,"","#"+v); } catch(e){}
+  };
+
+  /* ---------------- LEARN ---------------- */
+  var learnBuilt = false, curStep = 0;
+  var CHAPTERS = [
+    { id:"basics", icon:"\u76ee", title:"What is sumo?", jp:"\u76f8\u64b2 \u30fb s\u016dm\u014d",
+      html:
+        "<p>Sumo is Japan\u2019s national sport, with roots going back over 1,500 years to Shinto ritual. Two <b>rikishi</b> (wrestlers) face off in a round clay ring called the <b>dohy\u014d</b>.</p>"+
+        "<p>The rules are beautifully simple. You lose if <b>any part of your body other than the soles of your feet touches the ground</b>, or if you\u2019re forced <b>out of the ring</b>. Most bouts are over in seconds \u2014 but those seconds are pure explosive power and technique.</p>"+
+        "<p>Six <b>honbasho</b> (grand tournaments) are held each year, each lasting <b>15 days</b>. A wrestler fights once per day; the one with the best win\u2013loss record takes the <b>y\u016bsh\u014d</b> (championship).</p>" },
+    { id:"ranks", icon:"\u4f4d", title:"The ranks (banzuke)", jp:"\u756a\u4ed8 \u30fb banzuke",
+      html:
+        "<p>Wrestlers are ranked on the <b>banzuke</b>, a hierarchy they climb (or slide down) based on results. The top division is <b>Makuuchi</b>. Its five highest ranks are collectively the <b>sanyaku</b> \u2014 the elite.</p>"+
+        "<div class='rank-ladder'>"+
+          "<div class='rank-row sanyaku'><span class='rk'>Y</span><span class='rn'>Yokozuna</span><span class='rd'>Grand champion \u2014 the pinnacle, held for life</span></div>"+
+          "<div class='rank-row sanyaku'><span class='rk'>O</span><span class='rn'>\u014czeki</span><span class='rd'>Champion \u2014 one step below yokozuna</span></div>"+
+          "<div class='rank-row sanyaku'><span class='rk'>S</span><span class='rn'>Sekiwake</span><span class='rd'>Junior champion</span></div>"+
+          "<div class='rank-row sanyaku'><span class='rk'>K</span><span class='rn'>Komusubi</span><span class='rd'>The entry to the sanyaku elite</span></div>"+
+          "<div class='rank-row'><span class='rk'>M</span><span class='rn'>Maegashira</span><span class='rd'>The rank-and-file of the top division</span></div>"+
+          "<div class='rank-row'><span class='rk'>J</span><span class='rn'>J\u016bry\u014d</span><span class='rd'>Second division \u2014 also salaried (\u201csekitori\u201d)</span></div>"+
+        "</div>"+
+        "<p>Beating a higher-ranked wrestler when you\u2019re a <b>maegashira</b> earns a <b>kinboshi</b> (gold star) \u2014 a giant-killing upset that follows you for the rest of your career.</p>" },
+    { id:"winning", icon:"\u5df4", title:"Winning a bout", jp:"\u53d6\u7d44 \u30fb torikumi",
+      html:
+        "<p>A bout begins with the <b>tachiai</b> \u2014 the explosive initial charge from a crouch. Everything can be decided in that first collision, or it can settle into a grip battle at the <b>mawashi</b> (belt).</p>"+
+        "<p>The technique that ends the bout is called the <b>kimarite</b> \u2014 there are <b>82 official ones</b>. Here are a few you\u2019ll see constantly:</p>"+
+        "<div class='kimarite-grid'>"+
+          "<div class='kimarite'><h4>Oshidashi</h4><div class='jp'>\u62bc\u3057\u51fa\u3057</div><p>Push out \u2014 shoving the opponent out without gripping the belt.</p></div>"+
+          "<div class='kimarite'><h4>Yorikiri</h4><div class='jp'>\u5bc4\u308a\u5207\u308a</div><p>Force out \u2014 gripping the belt and marching them over the edge.</p></div>"+
+          "<div class='kimarite'><h4>Hatakikomi</h4><div class='jp'>\u306f\u305f\u304d\u8fbc\u307f</div><p>Slap down \u2014 pulling/slapping a charging opponent to the clay. (Our namesake!)</p></div>"+
+          "<div class='kimarite'><h4>Uwatenage</h4><div class='jp'>\u4e0a\u624b\u6295\u3052</div><p>Overarm throw \u2014 a throw using an outside grip on the belt.</p></div>"+
+          "<div class='kimarite'><h4>Tsukidashi</h4><div class='jp'>\u7a81\u304d\u51fa\u3057</div><p>Thrust out \u2014 rapid palm thrusts driving them out.</p></div>"+
+          "<div class='kimarite'><h4>Okuridashi</h4><div class='jp'>\u9001\u308a\u51fa\u3057</div><p>Rear push out \u2014 shoving them out from behind.</p></div>"+
+        "</div>" },
+    { id:"ritual", icon:"\u5869", title:"Ritual & ceremony", jp:"\u5100\u5f0f \u30fb gishiki",
+      html:
+        "<p>Sumo is steeped in Shinto ritual. Before a bout, wrestlers throw <b>salt</b> (shio) into the ring to purify it, and perform <b>shiko</b> \u2014 the iconic high leg stomps that drive away evil spirits.</p>"+
+        "<p>The <b>gy\u014dji</b> (referee) in ornate robes directs the bout, while a <b>yobidashi</b> announces the wrestlers with a fan. A <b>yokozuna</b> gets his own grand <b>dohy\u014d-iri</b> (ring-entering ceremony), wearing the sacred white rope.</p>"+
+        "<p>These aren\u2019t just for show \u2014 they connect a modern sport to centuries of tradition, and they\u2019re a huge part of what makes watching sumo special.</p>" },
+    { id:"quiz", icon:"\u554f", title:"Test yourself", jp:"\u30af\u30a4\u30ba \u30fb quiz", quiz:true }
+  ];
+  var QUIZ = [
+    { q:"How many days does a grand tournament (honbasho) last?", opts:["7","15","30","3"], a:1,
+      fb:"Right \u2014 15 days, one bout per wrestler per day, six times a year." },
+    { q:"Which is the highest rank in sumo?", opts:["\u014czeki","Sekiwake","Yokozuna","Maegashira"], a:2,
+      fb:"Yokozuna \u2014 the grand champion, a rank held for life." },
+    { q:"You lose a bout if\u2026", opts:["You step on the line","Any part of your body but your soles touches down, or you\u2019re pushed out","You throw salt twice","The bout lasts over a minute"], a:1,
+      fb:"Exactly \u2014 touch down with anything but your soles, or leave the ring, and it\u2019s over." },
+    { q:"What is a \u2018kimarite\u2019?", opts:["The referee\u2019s fan","The winning technique","The salt-throwing ritual","The champion\u2019s trophy"], a:1,
+      fb:"The kimarite is the finishing technique \u2014 there are 82 official ones." },
+    { q:"\u2018Hatakikomi\u2019 \u2014 the move this site is named after \u2014 means:", opts:["Force out","Overarm throw","Slap down","Push out"], a:2,
+      fb:"Slap down! Pulling or slapping a charging opponent to the clay." }
+  ];
+  var quizIdx = 0, quizScore = 0;
+
+  function buildLearn(){
+    learnBuilt = true;
+    $("learnNav").innerHTML = CHAPTERS.map(function(c,i){
+      return "<button class='learn-navb' data-i='"+i+"' aria-current='"+(i===0?"true":"false")+"'>"+
+        "<span class='lb-i'>"+c.icon+"</span>"+esc(c.title)+"</button>";
+    }).join("");
+    Array.prototype.forEach.call($("learnNav").querySelectorAll(".learn-navb"), function(btn){
+      btn.onclick = function(){ showStep(+btn.dataset.i); };
+    });
+    $("learnPanel").innerHTML = CHAPTERS.map(function(c,i){
+      return "<div class='learn-step' data-i='"+i+"'>"+ (c.quiz ? "" :
+        "<h3>"+esc(c.title)+"</h3><div class='jp'>"+esc(c.jp)+"</div>"+c.html) +
+        renderNavCta(i) + "</div>";
+    }).join("");
+    showStep(0);
+  }
+  function renderNavCta(i){
+    var prev = i>0 ? "<button class='btn ghost' data-goto='"+(i-1)+"'>\u2039 "+esc(CHAPTERS[i-1].title)+"</button>" : "";
+    var next = i<CHAPTERS.length-1 ? "<button class='btn' data-goto='"+(i+1)+"'>"+esc(CHAPTERS[i+1].title)+" \u203a</button>" : "";
+    return "<div class='learn-cta'>"+prev+next+"</div>";
+  }
+  function showStep(i){
+    curStep = i;
+    Array.prototype.forEach.call($("learnPanel").querySelectorAll(".learn-step"), function(s){
+      s.classList.toggle("on", +s.dataset.i===i);
+    });
+    Array.prototype.forEach.call($("learnNav").querySelectorAll(".learn-navb"), function(b){
+      b.setAttribute("aria-current", +b.dataset.i===i ? "true":"false");
+    });
+    if (CHAPTERS[i].quiz) renderQuiz();
+    // wire the prev/next buttons of the now-visible step
+    var step = $("learnPanel").querySelector(".learn-step[data-i='"+i+"'].on");
+    if (step) Array.prototype.forEach.call(step.querySelectorAll("[data-goto]"), function(btn){
+      btn.onclick = function(){ showStep(+btn.dataset.goto); window.scrollTo({top:0,behavior:"smooth"}); };
+    });
+  }
+  function renderQuiz(){
+    var step = $("learnPanel").querySelector(".learn-step[data-i='"+(CHAPTERS.length-1)+"']");
+    if (quizIdx >= QUIZ.length){
+      step.innerHTML = "<h3>Nice work!</h3><div class='jp'>\u5b8c \u30fb complete</div>"+
+        "<p>You scored <b>"+quizScore+" / "+QUIZ.length+"</b>. You\u2019ve got the basics down \u2014 now go watch some sumo, or jump into the fantasy game and draft a team.</p>"+
+        "<div class='learn-cta'>"+
+          "<button class='btn' onclick='(function(){quizReset();})()'>Try again</button>"+
+          "<a class='btn ghost' href='fantasy.html'>Play fantasy \u203a</a>"+
+        "</div>";
+      // rebind reset without inline hack
+      step.querySelector(".btn").onclick = function(){ quizIdx=0; quizScore=0; renderQuiz(); };
+      return;
+    }
+    var item = QUIZ[quizIdx];
+    step.innerHTML = "<h3>Test yourself</h3><div class='jp'>Question "+(quizIdx+1)+" of "+QUIZ.length+"</div>"+
+      "<div class='quiz'>"+
+        "<p class='quiz__q'>"+esc(item.q)+"</p>"+
+        "<div class='quiz__opts'>"+ item.opts.map(function(o,i){
+          return "<button class='quiz__opt' data-i='"+i+"'>"+esc(o)+"</button>";
+        }).join("") +"</div>"+
+        "<div class='quiz__fb' id='quizFb'></div>"+
+        "<div id='quizNextWrap'></div>"+
+      "</div>";
+    Array.prototype.forEach.call(step.querySelectorAll(".quiz__opt"), function(btn){
+      btn.onclick = function(){ answerQuiz(+btn.dataset.i, item, step); };
+    });
+  }
+  function answerQuiz(choice, item, step){
+    var opts = step.querySelectorAll(".quiz__opt");
+    Array.prototype.forEach.call(opts, function(o,i){
+      o.disabled = true;
+      if (i===item.a) o.classList.add("correct");
+      else if (i===choice) o.classList.add("wrong");
+    });
+    var fb = step.querySelector("#quizFb");
+    if (choice===item.a){ quizScore++; fb.textContent = "\u2713 "+item.fb; fb.className="quiz__fb ok"; }
+    else { fb.textContent = "Not quite \u2014 "+item.fb; fb.className="quiz__fb no"; }
+    step.querySelector("#quizNextWrap").innerHTML = "<button class='btn quiz__next'>"+(quizIdx===QUIZ.length-1?"See results":"Next question")+" \u203a</button>";
+    step.querySelector(".quiz__next").onclick = function(){ quizIdx++; renderQuiz(); };
+  }
+  window.quizReset = function(){ quizIdx=0; quizScore=0; renderQuiz(); };
+
+  /* ---------------- RESOURCES ---------------- */
+  var resBuilt = false;
+  var YT = function(){ return "<svg viewBox='0 0 24 24' fill='currentColor'><path d='M23 12s0-3.8-.5-5.6a2.9 2.9 0 0 0-2-2C18.7 4 12 4 12 4s-6.7 0-8.5.4a2.9 2.9 0 0 0-2 2C1 8.2 1 12 1 12s0 3.8.5 5.6a2.9 2.9 0 0 0 2 2C5.3 20 12 20 12 20s6.7 0 8.5-.4a2.9 2.9 0 0 0 2-2C23 15.8 23 12 23 12zM9.8 15.3V8.7l5.7 3.3-5.7 3.3z'/></svg>"; };
+  var RESOURCES = [
+    { section:"YouTube channels", jp:"\u52d5\u753b \u30fb creators to watch", icon:YT(),
+      items:[
+        { name:"Chris Sumo", desc:"Rewriting the YouTube sumo book", url:"https://www.youtube.com/@ChrisSumo" },
+        { name:"Sumo Spiffy\u2019s Bar & Grill", desc:"Hot sumo yeets & fantasy sumo", url:"https://www.youtube.com/@sumospiffysbarandgrill" },
+        { name:"Sumo Files", desc:"Deep dives into the sport", url:"https://www.youtube.com/@SumoFiles" },
+        { name:"Grand Sumo Breakdown", desc:"Sports-radio style tournament breakdowns", url:"https://www.youtube.com/channel/UCwCKsyGA7lzbcdJ8Jlhqhdw" },
+        { name:"Sumo Kaboom Podcast", desc:"Weekly sumo podcast & BINGO", url:"https://www.youtube.com/@sumokaboom" },
+        { name:"LeoDickinsonSumo", desc:"Live tournament English commentary", url:"https://www.youtube.com/@LeoDickinsonSumo" }
+      ] }
+  ];
+  function buildResources(){
+    resBuilt = true;
+    $("resList").innerHTML = RESOURCES.map(function(sec){
+      return "<div class='res-sec'>"+
+        "<h3 class='res-sec__h'>"+sec.icon+esc(sec.section)+"</h3>"+
+        "<p class='res-sec__sub'>"+esc(sec.jp)+"</p>"+
+        "<div class='res-grid'>"+ sec.items.map(function(it){
+          return "<a class='res-card' href='"+esc(it.url)+"' target='_blank' rel='noopener noreferrer'>"+
+            "<span class='res-card__ico'>"+YT()+"</span>"+
+            "<span class='res-card__b'><span class='res-card__nm'>"+esc(it.name)+"</span>"+
+            "<span class='res-card__d'>"+esc(it.desc)+"</span></span></a>";
+        }).join("") +"</div></div>";
+    }).join("");
+  }
+
+  /* honor a #hash on load (e.g. banzuke.html#learn) */
+  var h = (location.hash||"").replace("#","");
+  if (h==="learn"||h==="resources") setView(h);
+})();
+</script>
 </body>
 </html>
