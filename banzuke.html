@@ -26,12 +26,25 @@
   .tab[aria-selected="true"]{ color:var(--sun); border-bottom-color:var(--red) }
   @media (max-width:640px){ .tab svg{ width:17px; height:17px } .tab-lab{ font-size:.62rem; font-weight:500; line-height:1.1 } }
 
-  .view{ display:none }
-  .view.on{ display:block }
-  #v-welcome.on{ display:flex; flex-direction:column; flex:1 1 auto }
+  /* banzuke is always the backdrop, filling the space under the tab bar */
   .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:440px; margin-top:6px }
-  .wrap{ max-width:1000px; margin:0 auto; padding:34px 20px 60px }
-  .view-h{ font-family:"Zen Kaku Gothic New","Space Grotesk",sans-serif; font-weight:900; font-size:1.7rem; margin:0 0 6px }
+
+  /* Learn / Resources modals layered over the banzuke */
+  .bz-modal{ position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; padding:74px 16px 24px }
+  .bz-modal[hidden]{ display:none }
+  .bz-modal__backdrop{ position:absolute; inset:0; background:rgba(4,5,8,.72); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); animation:bzfade .2s ease }
+  @keyframes bzfade{ from{ opacity:0 } }
+  .bz-modal__card{ position:relative; z-index:1; width:min(1000px,100%); max-height:100%; overflow-y:auto;
+        background:#0f1116; border:1px solid var(--line); border-radius:16px; padding:30px 30px 40px;
+        box-shadow:0 24px 60px rgba(0,0,0,.5); animation:bzpop .22s cubic-bezier(.2,.8,.3,1) }
+  @keyframes bzpop{ from{ opacity:0; transform:translateY(10px) scale(.99) } }
+  @media (max-width:640px){ .bz-modal{ padding:64px 8px 12px } .bz-modal__card{ padding:22px 18px 30px; border-radius:14px } }
+  .bz-modal__x{ position:absolute; top:14px; right:14px; z-index:2; width:34px; height:34px; border-radius:9px; border:1px solid var(--line);
+        background:var(--surface); color:var(--muted); font-size:1rem; cursor:pointer; display:grid; place-items:center; transition:.12s }
+  .bz-modal__x:hover{ color:var(--ink); border-color:var(--sun) }
+  .bz-mv{ display:none }
+  .bz-mv.on{ display:block }
+  .view-h{ font-family:"Zen Kaku Gothic New","Space Grotesk",sans-serif; font-weight:900; font-size:1.7rem; margin:0 40px 6px 0 }
   .view-sub{ color:var(--muted); font-size:.95rem; line-height:1.55; margin:0 0 26px; max-width:68ch }
   /* full-page stage the header lives on */
   #ggBanzuke{ position:absolute; inset:0 }
@@ -42,7 +55,7 @@
   /* ── Learn: interactive guide ─────────────────────────── */
   .learn-grid{ display:grid; grid-template-columns:220px 1fr; gap:24px; align-items:start }
   @media (max-width:720px){ .learn-grid{ grid-template-columns:1fr } }
-  .learn-nav{ display:flex; flex-direction:column; gap:4px; position:sticky; top:64px }
+  .learn-nav{ display:flex; flex-direction:column; gap:4px; position:sticky; top:0 }
   @media (max-width:720px){ .learn-nav{ position:static; flex-direction:row; flex-wrap:wrap; gap:6px } }
   .learn-navb{ text-align:left; background:var(--surface); border:1px solid var(--line); color:var(--dim); font:inherit;
         font-size:.86rem; font-weight:600; padding:11px 13px; border-radius:10px; cursor:pointer; transition:.12s; display:flex; align-items:center; gap:9px }
@@ -125,31 +138,31 @@
   </div>
 </nav>
 
-<!-- WELCOME: the banzuke-e crowd -->
-<section class="view on" id="v-welcome">
-  <div class="bz-stage"><div id="ggBanzuke" aria-hidden="true"></div></div>
-</section>
+<!-- the banzuke crowd is always the backdrop -->
+<div class="bz-stage"><div id="ggBanzuke" aria-hidden="true"></div></div>
 
-<!-- LEARN: interactive guide -->
-<section class="view" id="v-learn">
-  <div class="wrap">
-    <h2 class="view-h">Learn sumo</h2>
-    <p class="view-sub">A quick, interactive tour of the sport — the ranks, how a bout is won, the winning moves, and a short quiz to test yourself. Pick a chapter, or just work through them in order.</p>
-    <div class="learn-grid">
-      <div class="learn-nav" id="learnNav"></div>
-      <div class="learn-panel" id="learnPanel"></div>
+<!-- LEARN + RESOURCES open as modals layered over the banzuke -->
+<div class="bz-modal" id="bzModal" hidden>
+  <div class="bz-modal__backdrop" data-close></div>
+  <div class="bz-modal__card" role="dialog" aria-modal="true" aria-labelledby="bzModalTitle">
+    <button class="bz-modal__x" data-close aria-label="Close">✕</button>
+
+    <div class="bz-mv" id="mv-learn">
+      <h2 class="view-h" id="bzModalTitle">Learn sumo</h2>
+      <p class="view-sub">A quick, interactive tour of the sport — the ranks, how a bout is won, the winning moves, and a short quiz to test yourself. Pick a chapter, or just work through them in order.</p>
+      <div class="learn-grid">
+        <div class="learn-nav" id="learnNav"></div>
+        <div class="learn-panel" id="learnPanel"></div>
+      </div>
+    </div>
+
+    <div class="bz-mv" id="mv-resources">
+      <h2 class="view-h">Sumo resources</h2>
+      <p class="view-sub">Creators and shows we love. If you're getting into sumo, start here — these folks make the sport a joy to follow.</p>
+      <div id="resList"></div>
     </div>
   </div>
-</section>
-
-<!-- RESOURCES: curated links -->
-<section class="view" id="v-resources">
-  <div class="wrap">
-    <h2 class="view-h">Sumo resources</h2>
-    <p class="view-sub">Creators and shows we love. If you're getting into sumo, start here — these folks make the sport a joy to follow.</p>
-    <div id="resList"></div>
-  </div>
-</section>
+</div>
 
 <footer>SUMO SLAPDOWN · <a href="index.html">Back to the Guide</a></footer>
 
@@ -165,15 +178,38 @@
   var esc = function(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); };
 
   window.setView = function(v){
+    // tab highlight
     ["welcome","learn","resources"].forEach(function(k){
-      var sec = $("v-"+k), tab = $("tab-"+k);
-      if (sec) sec.classList.toggle("on", k===v);
+      var tab = $("tab-"+k);
       if (tab) tab.setAttribute("aria-selected", k===v ? "true":"false");
     });
+    if (v==="welcome"){ closeModal(); return; }
+    // learn / resources open a modal over the banzuke
     if (v==="learn" && !learnBuilt) buildLearn();
     if (v==="resources" && !resBuilt) buildResources();
+    $("mv-learn").classList.toggle("on", v==="learn");
+    $("mv-resources").classList.toggle("on", v==="resources");
+    var m = $("bzModal");
+    m.hidden = false;
+    m.querySelector(".bz-modal__card").scrollTop = 0;
+    document.body.style.overflow = "hidden";
     try { history.replaceState(null,"","#"+v); } catch(e){}
   };
+  function closeModal(){
+    $("bzModal").hidden = true;
+    document.body.style.overflow = "";
+    // clicking Welcome or X returns focus to the Welcome tab
+    var wt = $("tab-welcome"); if (wt) wt.setAttribute("aria-selected","true");
+    ["tab-learn","tab-resources"].forEach(function(id){ var t=$(id); if(t) t.setAttribute("aria-selected","false"); });
+    try { history.replaceState(null,"","#welcome"); } catch(e){}
+  }
+  // close interactions: X button, backdrop click, Esc
+  document.addEventListener("click", function(e){
+    if (e.target.closest("[data-close]")) closeModal();
+  });
+  document.addEventListener("keydown", function(e){
+    if (e.key==="Escape" && !$("bzModal").hidden) closeModal();
+  });
 
   /* ---------------- LEARN ---------------- */
   var learnBuilt = false, curStep = 0;
@@ -261,7 +297,7 @@
     // wire the prev/next buttons of the now-visible step
     var step = $("learnPanel").querySelector(".learn-step[data-i='"+i+"'].on");
     if (step) Array.prototype.forEach.call(step.querySelectorAll("[data-goto]"), function(btn){
-      btn.onclick = function(){ showStep(+btn.dataset.goto); window.scrollTo({top:0,behavior:"smooth"}); };
+      btn.onclick = function(){ showStep(+btn.dataset.goto); var c=document.querySelector(".bz-modal__card"); if(c) c.scrollTo({top:0,behavior:"smooth"}); };
     });
   }
   function renderQuiz(){
@@ -312,7 +348,7 @@
   var RESOURCES = [
     { section:"YouTube channels", jp:"\u52d5\u753b \u30fb creators to watch", icon:YT(),
       items:[
-        { name:"Chris Sumo", desc:"Rewriting the YouTube sumo book", url:"https://www.youtube.com/@ChrisSumo" },
+        { name:"Chris Sumo", desc:"Rewriting the YouTube sumo book", url:"https://www.youtube.com/@chrissumo69" },
         { name:"Sumo Spiffy\u2019s Bar & Grill", desc:"Hot sumo yeets & fantasy sumo", url:"https://www.youtube.com/@sumospiffysbarandgrill" },
         { name:"Sumo Files", desc:"Deep dives into the sport", url:"https://www.youtube.com/@SumoFiles" },
         { name:"Grand Sumo Breakdown", desc:"Sports-radio style tournament breakdowns", url:"https://www.youtube.com/channel/UCwCKsyGA7lzbcdJ8Jlhqhdw" },
