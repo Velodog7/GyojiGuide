@@ -70,7 +70,7 @@ var BASHO_LABEL   = 'Aki 2026';
 // is unset, ADMIN_KEY is "" and adminGate() below fails closed (rejects
 // everything), so a misconfiguration locks the dashboard rather than opening it.
 var ADMIN_KEY = (function () {
-  try { return PropertiesService.getScriptProperties().getProperty('ADMIN_KEY') || ''; }
+  try { return (PropertiesService.getScriptProperties().getProperty('ADMIN_KEY') || '').trim(); }
   catch (e) { return ''; }
 })();
 

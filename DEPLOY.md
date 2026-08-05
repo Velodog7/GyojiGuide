@@ -70,14 +70,25 @@ here as backup/reference. To update the live backend:
 
 1. Open your Apps Script project at **script.google.com**.
 2. Paste in the contents of `sumo-fantasy.gs`.
-3. **Set your own `ADMIN_KEY` as a Script Property.** The key is no longer
-   stored in `sumo-fantasy.gs` — the file only *reads* it, so the secret never
-   lives in a file you zip or share. In the Apps Script editor go to
-   **Project Settings (gear) → Script Properties → Add script property**, name
-   it `ADMIN_KEY`, and paste a long random string (32+ chars). This is the
-   password `admin.html` asks for. If the property is unset the dashboard fails
-   closed (rejects every key) rather than opening up. Rotate it any time by
-   editing that property — no code change or redeploy needed.
+3. **Set your `ADMIN_KEY` as a Script Property — do it in code, not by hand.**
+   The key is no longer stored in `sumo-fantasy.gs` (the file only *reads* it),
+   so the secret never lives in a file you zip or share. Setting it by typing
+   into **Project Settings → Script Properties** works in theory, but in
+   practice a stray trailing space — or setting it in the wrong one of your
+   several sumo projects — will make the login reject the correct key. The
+   reliable way is to set it programmatically: temporarily paste this into the
+   project, **Run** it once, confirm the log, then delete it:
+   ```js
+   function setAdminKeyNow() {
+     PropertiesService.getScriptProperties().setProperty('ADMIN_KEY', 'YOUR-KEY-HERE');
+     Logger.log('set; this project serves: ' + ScriptApp.getService().getUrl());
+   }
+   ```
+   The logged "this project serves" URL **must** match the `/exec` URL in
+   `gg-config.js` — if it doesn't, you set the key in the wrong project. This is
+   the password `admin.html` asks for; if the property is unset the dashboard
+   fails closed. Rotate the key the same way (change the value, run, delete) —
+   no redeploy needed, setting a property is instant.
 4. **Run `setup()` once.** This creates/updates the Sheets, including the
    **Feedback** sheet used by the Help modal (FAQ questions, suggestions, bug
    reports, user reports), the **PageViews** sheet the admin dashboard reads
@@ -88,9 +99,13 @@ here as backup/reference. To update the live backend:
    modal's trophy case/history/leagues panel added later reuse these same
    sheets — no new ones, but still redeploy per the next step so the new
    backend actions go live.)
-5. **Deploy → Manage deployments → Edit → New version.** Editing "New version"
-   keeps the same `/exec` URL. (If you instead create a brand-new deployment,
-   the URL changes — see step 4 below.)
+5. **Deploy → Manage deployments → click the ✏️ pencil on your existing
+   deployment → Version: New version → Deploy.** ⚠️ **Always update the
+   existing deployment this way — do _not_ create a *new* deployment.** Editing
+   the current one keeps the same `/exec` URL; creating a new one mints a fresh
+   URL and forces you to update `gg-config.js`, `fantasy.html`, and `admin.html`
+   every time (this is exactly what caused the repeated URL churn). If the URL
+   ever does change, update it in those three files — see §4.
 6. Set access to **Anyone**, or browser calls will be blocked.
 
 ### The `/exec` URL

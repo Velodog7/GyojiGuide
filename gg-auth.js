@@ -143,6 +143,15 @@
     ".gga-thread__nm{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"+
     ".gga-thread__nm small{display:block;font-weight:400;color:#878da0;font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"+
     ".gga-newdm{display:flex;gap:7px;margin-bottom:6px}"+
+    ".gga-newdm-btn{width:100%;text-align:center;background:#1b1e27;border:1px dashed #39404f;color:#e0a23a;font:inherit;"+
+      "font-size:.86rem;font-weight:600;padding:10px;border-radius:10px;cursor:pointer;margin-bottom:10px}"+
+    ".gga-newdm-btn:hover{border-color:#e0a23a;background:#20232d}"+
+    ".gga-picker{display:flex;flex-direction:column;gap:5px;max-height:280px;overflow-y:auto;margin-top:4px}"+
+    ".gga-pick{display:flex;align-items:center;text-align:left;width:100%;background:#1b1e27;border:1px solid #2a2d38;"+
+      "color:#e9eaf0;font:inherit;font-size:.88rem;padding:9px 11px;border-radius:10px;cursor:pointer}"+
+    ".gga-pick:hover{border-color:#e0a23a}"+
+    ".gga-pick__nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"+
+    ".gga-pick__nm small{display:block;font-weight:400;color:#878da0;font-size:.78rem}"+
     ".gga-newdm input{flex:1;background:#1b1e27;border:1px solid #2a2d38;color:#e9eaf0;border-radius:9px;font:inherit;font-size:.86rem;padding:9px 11px}"+
     ".gga-newdm input:focus{outline:none;border-color:#e0a23a}"+
     ".gga-newdm button{flex:none;background:#1b1e27;border:1px solid #2a2d38;color:#e9eaf0;border-radius:9px;font:inherit;font-size:.86rem;padding:9px 13px;cursor:pointer}"+
@@ -423,18 +432,49 @@
       '<button class="gga-x" aria-label="Close">\u2715</button>'+
       '<button class="gga-back" id="ggaDmBack">\u2039 Back to account</button>'+
       '<h2 class="gga-title">Messages</h2>'+
-      '<div class="gga-newdm"><input id="ggaDmTo" placeholder="Message a handle\u2026" maxlength="40" autocomplete="off"><button id="ggaDmStart">Start</button></div>'+
+      '<button class="gga-newdm-btn" id="ggaDmNew">\uff0b New message</button>'+
       '<div id="ggaDmList"><p class="gga-empty"><span class="gg-spin"></span>Loading\u2026</p></div>';
     modal.querySelector(".gga-x").onclick = A.close;
     modal.querySelector("#ggaDmBack").onclick = function(){ mode = "account"; renderModal(); };
-    modal.querySelector("#ggaDmStart").onclick = function(){
-      var to = (modal.querySelector("#ggaDmTo").value || "").trim();
-      if (to) openConvo(a, to, to);
-    };
-    modal.querySelector("#ggaDmTo").addEventListener("keydown", function(e){
-      if (e.key === "Enter"){ var to = (e.target.value || "").trim(); if (to) openConvo(a, to, to); }
-    });
+    modal.querySelector("#ggaDmNew").onclick = function(){ openPicker(a); };
     loadThreads(a);
+  }
+
+  /* searchable directory picker: you can only pick a verified user. */
+  var dirCache = null;
+  async function openPicker(a){
+    modal.innerHTML =
+      '<button class="gga-x" aria-label="Close">\u2715</button>'+
+      '<button class="gga-back" id="ggaDmBack">\u2039 All messages</button>'+
+      '<h2 class="gga-title">New message</h2>'+
+      '<div class="gga-newdm"><input id="ggaDmSearch" placeholder="Search users by name or handle\u2026" autocomplete="off" maxlength="40"></div>'+
+      '<div class="gga-picker" id="ggaPicker"><p class="gga-empty"><span class="gg-spin"></span>Loading users\u2026</p></div>';
+    modal.querySelector(".gga-x").onclick = A.close;
+    modal.querySelector("#ggaDmBack").onclick = function(){ openMessages(a); };
+    var search = modal.querySelector("#ggaDmSearch");
+    var res = dirCache;
+    if (!res){ try { res = await GG.dmDirectory(); dirCache = res; } catch (e){ res = null; } }
+    var list = modal.querySelector("#ggaPicker"); if (!list) return;   // modal moved on
+    var users = (res && res.ok) ? (res.users || []) : null;
+    if (!users){ list.innerHTML = '<p class="gga-empty">Couldn\u2019t load the user list.</p>'; return; }
+    if (!users.length){ list.innerHTML = '<p class="gga-empty">No other users yet.</p>'; return; }
+    function paint(q){
+      q = (q || "").toLowerCase();
+      var rows = users.filter(function(u){
+        return !q || u.handle.toLowerCase().indexOf(q) >= 0 || String(u.name).toLowerCase().indexOf(q) >= 0;
+      });
+      if (!rows.length){ list.innerHTML = '<p class="gga-empty">No users match \u201c'+esc(q)+'\u201d.</p>'; return; }
+      list.innerHTML = rows.slice(0, 60).map(function(u){
+        return '<button class="gga-pick" data-h="'+esc(u.handle)+'" data-n="'+esc(u.name)+'">'+
+          '<span class="gga-pick__nm">'+esc(u.name)+'<small>@'+esc(u.handle)+'</small></span></button>';
+      }).join("");
+      Array.prototype.forEach.call(list.querySelectorAll(".gga-pick"), function(btn){
+        btn.onclick = function(){ openConvo(a, btn.getAttribute("data-h"), btn.getAttribute("data-n")); };
+      });
+    }
+    paint("");
+    search.addEventListener("input", function(){ paint(search.value); });
+    setTimeout(function(){ search.focus(); }, 0);
   }
 
   async function loadThreads(a){

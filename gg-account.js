@@ -31,6 +31,21 @@
   var RANKS = {"Hoshoryu":"Y","Onosato":"Y","Kirishima":"O","Kotozakura":"O","Atamifuji":"S","Kotoshoho":"S","Wakatakakage":"S","Aonishiki":"S","Yoshinofuji":"K","Oho":"K","Fujinokawa":"M","Takanosho":"M","Gonoyama":"M","Churanoumi":"M","Hiradoumi":"M","Hakunofuji":"M","Daieisho":"M","Ichiyamamoto":"M","Ura":"M","Oshoma":"M","Shodai":"M","Fujiseiun":"M","Kotoeiho":"M","Takayasu":"M","Wakamotoharu":"M","Roga":"M","Fujiryoga":"M","Tobizaru":"M","Asanoyama":"M","Chiyoshoma":"M","Wakanosho":"M","Mitakeumi":"M","Asahakuryu":"M","Abi":"M","Nishikifuji":"M","Takerufuji":"M","Kinbozan":"M","Shishi":"M","Onokatsu":"M","Kazuma":"M","Daiseizan":"M","Asakoryu":"M","Asasuiryu":"J","Kyokukaiyu":"J","Tokihayate":"J","Sadanoumi":"J","Ryuden":"J","Dewanoryu":"J","Tomokaze":"J","Toshinofuji":"J","Kitanowaka":"J","Oshoumi":"J","Shonanoumi":"J","Kazekeno":"J","Tamawashi":"J","Meisei":"J","Midorifuji":"J","Hatsuyama":"J","Shirokuma":"J","Nishinoryu":"J","Hitoshi":"J","Tamashoho":"J","Kagayaki":"J","Enho":"J","Tohakuryu":"J","Kayo":"J","Arashifuji":"J","Hakuyozan":"J","Tochitaikai":"J","Nishikigi":"J"};
   var LEVEL = { Y:4, O:3, S:2, K:1, M:0, J:0 };
   GG.RANKS = RANKS;
+
+  /* default league scoring — mirrors normalizeScoring() in the backend.
+     winPoint capped at 6. A per-league scoring object can override any of
+     these; passing none scores by the site defaults (the main leaderboard). */
+  GG.DEFAULT_SCORING = { winPoint:1, sanyakuBonus:1, sansho:5, yusho:5 };
+  GG.normalizeScoring = function (raw) {
+    var d = GG.DEFAULT_SCORING, s = raw || {};
+    function clamp(v, lo, hi, dflt){ var n = Number(v); if (isNaN(n)) n = dflt; return Math.max(lo, Math.min(hi, Math.round(n))); }
+    return {
+      winPoint:     clamp(s.winPoint,     1, 6,  d.winPoint),
+      sanyakuBonus: clamp(s.sanyakuBonus, 0, 6,  d.sanyakuBonus),
+      sansho:       clamp(s.sansho,       0, 20, d.sansho),
+      yusho:        clamp(s.yusho,        0, 20, d.yusho)
+    };
+  };
   // The page can hand us the current banzuke (e.g. from its own roster) so
   // the bonus math always matches what players actually drafted.
   GG.setRanks = function (map) { if (map) { RANKS = {}; for (var k in map) RANKS[k] = map[k]; GG.RANKS = RANKS; } };
@@ -43,9 +58,12 @@
     return String(v).split(/[,;/]+/).map(function (x) { return x.trim(); }).filter(Boolean);
   }
 
-  /* Build a scoring model from the Sheet payload ({ results, meta }). */
-  GG.scoreModel = function (data) {
+  /* Build a scoring model from the Sheet payload ({ results, meta }).
+     Pass an optional per-league scoring object to weight the sanyaku bonus;
+     win/sansho/yusho weights are applied later in teamScore. */
+  GG.scoreModel = function (data, scoring) {
     data = data || {};
+    scoring = GG.normalizeScoring(scoring);
     var results = data.results || [], meta = data.meta || {};
     var wins = {}, bonus = {};
     results.forEach(function (b) {
@@ -53,27 +71,30 @@
       var w = b.winner, loser = (w === b.east) ? b.west : b.east;
       wins[w] = (wins[w] || 0) + 1;
       var diff = levelOf(loser) - levelOf(w);          // + only when the loser outranks in sanyaku
-      if (diff > 0) bonus[w] = (bonus[w] || 0) + diff;
+      if (diff > 0) bonus[w] = (bonus[w] || 0) + diff * scoring.sanyakuBonus;
     });
     var sansho = {}; parseList(meta.sansho).forEach(function (n) { sansho[n] = 1; });
     var yusho = String(meta.yusho || "").trim();
     var lastDay = Number(meta.lastDay || results.reduce(function (m, r) { return Math.max(m, r.day || 0); }, 0));
     return {
-      wins: wins, bonus: bonus, sansho: sansho, yusho: yusho,
+      wins: wins, bonus: bonus, sansho: sansho, yusho: yusho, scoring: scoring,
       lastDay: lastDay, basho: meta.basho || "Fantasy Sumo",
       started: results.length > 0
     };
   };
 
-  /* Score one team ({ band: name }) against a model. */
+  /* Score one team ({ band: name }) against a model. The model carries the
+     scoring weights (from scoreModel); win/sansho/yusho are applied here. */
   GG.teamScore = function (team, model) {
+    var sc = model.scoring || GG.DEFAULT_SCORING;
     var pts = 0, rows = [];
     Object.keys(team || {}).forEach(function (k) {
       var n = team[k]; if (!n) return;
-      var w = model.wins[n] || 0, bn = model.bonus[n] || 0;
-      var sa = model.sansho[n] ? 5 : 0, yu = (model.yusho && model.yusho === n) ? 5 : 0;
+      var wgames = model.wins[n] || 0, bn = model.bonus[n] || 0;
+      var w = wgames * sc.winPoint;
+      var sa = model.sansho[n] ? sc.sansho : 0, yu = (model.yusho && model.yusho === n) ? sc.yusho : 0;
       var p = w + bn + sa + yu; pts += p;
-      rows.push({ name: n, tier: tierOf(n), w: w, bonus: bn, sansho: !!sa, yusho: !!yu, pts: p });
+      rows.push({ name: n, tier: tierOf(n), w: w, wins: wgames, bonus: bn, sansho: !!sa, yusho: !!yu, pts: p });
     });
     rows.sort(function (a, b) { return b.pts - a.pts; });
     return { pts: pts, rows: rows };
@@ -175,7 +196,7 @@
   GG.leagues       = function (handle){ return GG.apiGetQ("leagues", { handle: handle || (GG.account.get()||{}).handle || "" }); };
   GG.leagueDetail  = function (id){ return GG.apiGetQ("league", { id: id, handle: (GG.account.get()||{}).handle || "" }); };
   GG.leagueByInvite= function (code){ return GG.apiGetQ("invite", { code: code }); };
-  GG.leagueCreate  = function (name, mode, rosterSize){ return GG.apiPost(authed({ action:"createLeague", name: name, mode: mode || "classic", rosterSize: rosterSize || 6 })); };
+  GG.leagueCreate  = function (name, mode, rosterSize, scoring){ return GG.apiPost(authed({ action:"createLeague", name: name, mode: mode || "classic", rosterSize: rosterSize || 6, scoring: scoring || null })); };
   GG.leagueJoin    = function (idOrCode){
     // a 7-char uppercase token is an invite code; anything else is a league id
     var isCode = /^[A-Z0-9]{5,10}$/.test(String(idOrCode||"")) && String(idOrCode).indexOf("lg_")!==0;
@@ -195,6 +216,9 @@
 
   /* ---- Keepers: mode, draft, trades, waivers ---- */
   GG.setLeagueMode = function (id, mode, rosterSize){ return GG.apiPost(authed({ action:"setLeagueMode", id:id, mode:mode, rosterSize:rosterSize })); };
+  GG.setLeagueScoring = function (id, scoring){ return GG.apiPost(authed({ action:"setLeagueScoring", id:id, scoring:scoring })); };
+  GG.setDraftDate  = function (id, draftDate){ return GG.apiPost(authed({ action:"setDraftDate", id:id, draftDate:draftDate })); };
+  GG.agreeDraftDate = function (id, agree){ return GG.apiPost(authed({ action:"agreeDraftDate", id:id, agree:agree !== false })); };
   GG.startDraft     = function (id){ return GG.apiPost(authed({ action:"startDraft", id:id })); };
   GG.draftState     = function (id){ return GG.apiGetQ("draftState", { id:id }); };
   GG.makePick       = function (id, rikishi){ return GG.apiPost(authed({ action:"makePick", id:id, rikishi:rikishi })); };
@@ -212,6 +236,7 @@
 
   /* ---- direct messages: user <-> user (and admin <-> user) ---- */
   GG.dmThreads   = function (){ return GG.apiGetQ("dmThreads", { handle: (GG.account.get()||{}).handle || "" }); };
+  GG.dmDirectory = function (){ return GG.apiGetQ("dmDirectory", { handle: (GG.account.get()||{}).handle || "" }); };
   GG.dmUnread    = function (){ return GG.apiGetQ("dmUnread",  { handle: (GG.account.get()||{}).handle || "" }); };
   GG.dmSend      = function (to, body){ return GG.apiPost(authed({ action:"dmSend", to: to, body: body })); };
   GG.dmMarkRead  = function (other){ return GG.apiPost(authed({ action:"dmMarkRead", other: other })); };
