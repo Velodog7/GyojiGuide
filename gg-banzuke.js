@@ -163,12 +163,12 @@
   +'.ggb-water{position:absolute;top:-30%;left:-30%;width:160%;height:160%;pointer-events:none;z-index:9;'
     +'background:url('+WATER+') center/cover no-repeat;transform:rotate(-8deg);'
     +'mix-blend-mode:color-burn;opacity:.34}'
-  +'.ggb-top{display:grid;grid-template-columns:auto 1fr auto;align-items:flex-end;gap:6px;padding:2px 12px 0;position:relative;z-index:6}'
+  +'.ggb-top{display:grid;grid-template-columns:auto 1fr auto;align-items:flex-end;gap:6px;padding:2px 12px 0;position:relative;z-index:6;max-width:100%}'
   +'.ggb-side-h{font-size:20px;font-weight:900;color:#2a2018;text-shadow:0 1px 0 rgba(255,255,255,.35);line-height:1;text-align:center}'
   +'.ggb-side-h em{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.16em;color:#7a6a4a;margin-top:2px}'
-  +'.ggb-sanyaku{display:flex;justify-content:center;gap:96px}'                 /* groups further apart */
-  +'.ggb-san{display:flex;align-items:flex-end}'
-  +'.ggb-san .ggb-fig{margin-left:-38px}.ggb-san .ggb-fig:first-child{margin-left:0}'  /* overlap within a group */
+  +'.ggb-sanyaku{display:flex;justify-content:center;gap:clamp(20px,9vw,96px);min-width:0;flex-wrap:nowrap}'  /* groups: gap scales with width so nobody is clipped */
+  +'.ggb-san{display:flex;align-items:flex-end;min-width:0}'
+  +'.ggb-san .ggb-fig{margin-left:clamp(-38px,-4vw,-14px)}.ggb-san .ggb-fig:first-child{margin-left:0}'  /* overlap within a group, scales too */
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{position:relative;overflow:visible}'
   +'.ggb-fig{position:relative;width:var(--fw,46px);text-align:center}'
@@ -181,14 +181,14 @@
     +'border-radius:2px;padding:2px 1px;white-space:nowrap;line-height:1;z-index:3;text-shadow:0 1px 0 rgba(255,255,255,.4)}'
   +'.ggb-cap-up figcaption{bottom:100%;margin-bottom:1px}'
   +'.ggb-cap-down figcaption{top:100%;margin-top:1px}'
-  +'.ggb-big{--fw:78px}.ggb-big figcaption{font-size:10px}'                     /* sanyaku a little smaller */
+  +'.ggb-big{--fw:clamp(46px,8vw,78px)}.ggb-big figcaption{font-size:10px}'    /* sanyaku scale down on narrow screens so none get cropped */
   +'.ggb-tY figcaption{background:#e7d38f}.ggb-tO figcaption{background:#e9c98c}'
   +'.ggb-tS figcaption{background:#e6b8a2}.ggb-tK figcaption{background:#e6c2b0}'
   +'.ggb-center{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;'
     +'width:clamp(200px,26vw,340px);padding:2px 4px 0;position:relative;z-index:6}'
   /* one big brush-stroke rule down the centre, dividing East from West and
      running beyond the top/bottom of the frame; integrated via multiply */
-  +'.ggb-sep{position:absolute;left:50%;top:-16%;height:132%;width:clamp(150px,18vw,300px);'
+  +'.ggb-sep{position:absolute;left:50%;top:-16%;height:132%;width:clamp(230px,26vw,440px);'
     +'transform:translateX(-50%);background:url('+BRUSH+') center/100% 100% no-repeat;'
     +'mix-blend-mode:multiply;opacity:.9;z-index:4;pointer-events:none}'
   +'.ggb-logo{width:100%;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45));position:relative;z-index:6}'
@@ -199,9 +199,10 @@
   +'.ggb-yobi{margin-top:2px}'
   +'.ggb-off img{width:100%;height:auto;display:block}'
   +'.ggb-off figcaption{font-size:9px;font-weight:800;color:#3a2c12;margin-top:1px}'
-  +'@media(max-width:760px){.ggb-fig{--fw:32px}.ggb-big{--fw:56px}.ggb-fig figcaption{font-size:7px}'
-    +'.ggb-sanyaku{gap:48px}.ggb-center{width:clamp(140px,30vw,220px)}}'
-  +'@media(max-width:520px){.ggb-fig figcaption{display:none}.ggb-off figcaption{display:none}}';
+  +'@media(max-width:760px){.ggb-fig{--fw:clamp(24px,4.4vw,32px)}.ggb-big{--fw:clamp(40px,7.5vw,56px)}.ggb-fig figcaption{font-size:7px}'
+    +'.ggb-sanyaku{gap:clamp(14px,7vw,48px)}.ggb-center{width:clamp(120px,28vw,220px)}}'
+  +'@media(max-width:520px){.ggb-fig figcaption{display:none}.ggb-off figcaption{display:none}'
+    +'.ggb-side-h{font-size:15px}.ggb-top{padding:2px 4px 0}}';
 
   function mount(){
     if (!document.getElementById("ggBanzuke")) return;
