@@ -27,27 +27,24 @@
   @media (max-width:640px){ .tab svg{ width:17px; height:17px } .tab-lab{ font-size:.62rem; font-weight:500; line-height:1.1 } }
 
   /* banzuke is always the backdrop, filling the space under the tab bar */
-  .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:440px; margin-top:6px }
-
-  /* Learn / Resources modals layered over the banzuke */
-  .bz-modal{ position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; padding:74px 16px 24px }
-  .bz-modal[hidden]{ display:none }
-  .bz-modal__backdrop{ position:absolute; inset:0; background:rgba(4,5,8,.72); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); animation:bzfade .2s ease }
-  @keyframes bzfade{ from{ opacity:0 } }
-  .bz-modal__card{ position:relative; z-index:1; width:min(1000px,100%); max-height:100%; overflow-y:auto;
-        background:#0f1116; border:1px solid var(--line); border-radius:16px; padding:30px 30px 40px;
-        box-shadow:0 24px 60px rgba(0,0,0,.5); animation:bzpop .22s cubic-bezier(.2,.8,.3,1) }
-  @keyframes bzpop{ from{ opacity:0; transform:translateY(10px) scale(.99) } }
-  @media (max-width:640px){ .bz-modal{ padding:64px 8px 12px } .bz-modal__card{ padding:22px 18px 30px; border-radius:14px } }
-  .bz-modal__x{ position:absolute; top:14px; right:14px; z-index:2; width:34px; height:34px; border-radius:9px; border:1px solid var(--line);
-        background:var(--surface); color:var(--muted); font-size:1rem; cursor:pointer; display:grid; place-items:center; transition:.12s }
-  .bz-modal__x:hover{ color:var(--ink); border-color:var(--sun) }
-  .bz-mv{ display:none }
-  .bz-mv.on{ display:block }
-  .view-h{ font-family:"Zen Kaku Gothic New","Space Grotesk",sans-serif; font-weight:900; font-size:1.7rem; margin:0 40px 6px 0 }
-  .view-sub{ color:var(--muted); font-size:.95rem; line-height:1.55; margin:0 0 26px; max-width:68ch }
-  /* full-page stage the header lives on */
+  /* banzuke is the backdrop; a single card sits integrated over it */
+  .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:520px; margin-top:6px }
   #ggBanzuke{ position:absolute; inset:0 }
+
+  /* the always-present card, centred over the brush stroke */
+  .bz-card{ position:absolute; z-index:5; left:50%; top:26px; transform:translateX(-50%);
+        width:min(680px,92%); max-height:calc(100% - 52px); overflow-y:auto;
+        background:rgba(15,17,22,.9); -webkit-backdrop-filter:blur(10px) saturate(1.1); backdrop-filter:blur(10px) saturate(1.1);
+        border:1px solid rgba(216,178,90,.35); border-radius:16px; padding:24px 26px 28px;
+        box-shadow:0 20px 50px rgba(0,0,0,.55) }
+  .bz-card.wide{ width:min(920px,94%) }              /* Learn needs more room for its two-column layout */
+  @media (max-width:640px){ .bz-card{ top:12px; padding:20px 16px 24px; width:94%; max-height:calc(100% - 24px) } }
+  .bz-mv{ display:none }
+  .bz-mv.on{ display:block; animation:bzswap .2s ease }
+  @keyframes bzswap{ from{ opacity:0; transform:translateY(4px) } }
+  .bz-welcome-cta{ display:flex; gap:10px; flex-wrap:wrap; margin-top:4px }
+  .view-h{ font-family:"Zen Kaku Gothic New","Space Grotesk",sans-serif; font-weight:900; font-size:1.5rem; margin:0 0 6px }
+  .view-sub{ color:var(--muted); font-size:.92rem; line-height:1.55; margin:0 0 20px; max-width:60ch }
   footer{ text-align:center; color:var(--muted); font-family:"IBM Plex Mono",monospace;
         font-size:.72rem; letter-spacing:.12em; padding:14px }
   footer a{ color:var(--gold); text-decoration:none }
@@ -139,17 +136,23 @@
 </nav>
 
 <!-- the banzuke crowd is always the backdrop -->
-<div class="bz-stage"><div id="ggBanzuke" aria-hidden="true"></div></div>
+<div class="bz-stage">
+  <div id="ggBanzuke" aria-hidden="true"></div>
 
-<!-- LEARN + RESOURCES open as modals layered over the banzuke -->
-<div class="bz-modal" id="bzModal" hidden>
-  <div class="bz-modal__backdrop" data-close></div>
-  <div class="bz-modal__card" role="dialog" aria-modal="true" aria-labelledby="bzModalTitle">
-    <button class="bz-modal__x" data-close aria-label="Close">✕</button>
+  <!-- a single card sits integrated over the banzuke; tabs swap its contents -->
+  <div class="bz-card" id="bzCard">
+    <div class="bz-mv on" id="mv-welcome">
+      <h2 class="view-h">Welcome to the dohyō</h2>
+      <p class="view-sub">This is the full Makuuchi banzuke — every top-division rikishi, ranked East and West around the gyōji at the centre. New to sumo? Hit <b>Learn</b> for a quick interactive guide. Want more? <b>Resources</b> has our favourite creators.</p>
+      <div class="bz-welcome-cta">
+        <button class="btn" onclick="setView('learn')">Learn the basics ›</button>
+        <button class="btn ghost" onclick="setView('resources')">Browse resources</button>
+      </div>
+    </div>
 
     <div class="bz-mv" id="mv-learn">
-      <h2 class="view-h" id="bzModalTitle">Learn sumo</h2>
-      <p class="view-sub">A quick, interactive tour of the sport — the ranks, how a bout is won, the winning moves, and a short quiz to test yourself. Pick a chapter, or just work through them in order.</p>
+      <h2 class="view-h">Learn sumo</h2>
+      <p class="view-sub">A quick, interactive tour of the sport — the ranks, how a bout is won, the winning moves, and a short quiz to test yourself.</p>
       <div class="learn-grid">
         <div class="learn-nav" id="learnNav"></div>
         <div class="learn-panel" id="learnPanel"></div>
@@ -178,38 +181,24 @@
   var esc = function(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); };
 
   window.setView = function(v){
+    if (["welcome","learn","resources"].indexOf(v) < 0) v = "welcome";
     // tab highlight
     ["welcome","learn","resources"].forEach(function(k){
       var tab = $("tab-"+k);
       if (tab) tab.setAttribute("aria-selected", k===v ? "true":"false");
     });
-    if (v==="welcome"){ closeModal(); return; }
-    // learn / resources open a modal over the banzuke
+    // lazily build the two rich cards the first time they're shown
     if (v==="learn" && !learnBuilt) buildLearn();
     if (v==="resources" && !resBuilt) buildResources();
-    $("mv-learn").classList.toggle("on", v==="learn");
-    $("mv-resources").classList.toggle("on", v==="resources");
-    var m = $("bzModal");
-    m.hidden = false;
-    m.querySelector(".bz-modal__card").scrollTop = 0;
-    document.body.style.overflow = "hidden";
+    // swap which card face is visible (the card itself is always present)
+    ["welcome","learn","resources"].forEach(function(k){
+      var mv = $("mv-"+k); if (mv) mv.classList.toggle("on", k===v);
+    });
+    var card = $("bzCard");
+    card.classList.toggle("wide", v==="learn");        // Learn's two-column layout needs more width
+    card.scrollTop = 0;
     try { history.replaceState(null,"","#"+v); } catch(e){}
   };
-  function closeModal(){
-    $("bzModal").hidden = true;
-    document.body.style.overflow = "";
-    // clicking Welcome or X returns focus to the Welcome tab
-    var wt = $("tab-welcome"); if (wt) wt.setAttribute("aria-selected","true");
-    ["tab-learn","tab-resources"].forEach(function(id){ var t=$(id); if(t) t.setAttribute("aria-selected","false"); });
-    try { history.replaceState(null,"","#welcome"); } catch(e){}
-  }
-  // close interactions: X button, backdrop click, Esc
-  document.addEventListener("click", function(e){
-    if (e.target.closest("[data-close]")) closeModal();
-  });
-  document.addEventListener("keydown", function(e){
-    if (e.key==="Escape" && !$("bzModal").hidden) closeModal();
-  });
 
   /* ---------------- LEARN ---------------- */
   var learnBuilt = false, curStep = 0;
@@ -297,7 +286,7 @@
     // wire the prev/next buttons of the now-visible step
     var step = $("learnPanel").querySelector(".learn-step[data-i='"+i+"'].on");
     if (step) Array.prototype.forEach.call(step.querySelectorAll("[data-goto]"), function(btn){
-      btn.onclick = function(){ showStep(+btn.dataset.goto); var c=document.querySelector(".bz-modal__card"); if(c) c.scrollTo({top:0,behavior:"smooth"}); };
+      btn.onclick = function(){ showStep(+btn.dataset.goto); var c=document.getElementById("bzCard"); if(c) c.scrollTo({top:0,behavior:"smooth"}); };
     });
   }
   function renderQuiz(){
@@ -371,9 +360,9 @@
     }).join("");
   }
 
-  /* honor a #hash on load (e.g. banzuke.html#learn) */
+  /* honor a #hash on load (banzuke.html#learn / #resources) */
   var h = (location.hash||"").replace("#","");
-  if (h==="learn"||h==="resources") setView(h);
+  setView(h==="learn"||h==="resources" ? h : "welcome");
 })();
 </script>
 </body>
