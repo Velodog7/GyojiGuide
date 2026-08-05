@@ -171,7 +171,7 @@
   +'.ggb-san .ggb-fig{margin-left:clamp(-38px,-4vw,-14px)}.ggb-san .ggb-fig:first-child{margin-left:0}'  /* overlap within a group, scales too */
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{position:relative;overflow:visible}'
-  +'.ggb-fig{position:relative;width:var(--fw,46px);text-align:center}'
+  +'.ggb-fig{position:relative;width:var(--fw,46px);flex:0 0 auto;text-align:center}'
   +'.ggb-col .ggb-fig{position:absolute}'
   +'.ggb-fig img{width:100%;height:auto;display:block}'
   +'.ggb-fig[data-n="Hoshoryu"] img{transform:scale(1.22);transform-origin:50% 100%}'  /* was rendering small */
@@ -199,10 +199,11 @@
   +'.ggb-yobi{margin-top:2px}'
   +'.ggb-off img{width:100%;height:auto;display:block}'
   +'.ggb-off figcaption{font-size:9px;font-weight:800;color:#3a2c12;margin-top:1px}'
-  +'@media(max-width:760px){.ggb-fig{--fw:clamp(30px,5.4vw,32px)}.ggb-big{--fw:clamp(54px,10.5vw,64px)}.ggb-fig figcaption{font-size:7px}'
-    +'.ggb-sanyaku{gap:clamp(8px,3.5vw,48px)}.ggb-center{width:clamp(120px,28vw,220px)}'
-    +'.ggb-san .ggb-fig{margin-left:clamp(-20px,-2.6vw,-8px)}}'                 /* less overlap so the bigger phone sanyaku spread out */
+  +'@media(max-width:760px){.ggb-fig{--fw:clamp(30px,5.4vw,32px)}.ggb-big{--fw:clamp(58px,15vw,64px)}.ggb-fig figcaption{font-size:7px}'
+    +'.ggb-sanyaku{gap:clamp(2px,1vw,20px)}.ggb-center{width:clamp(120px,28vw,220px)}'
+    +'.ggb-san .ggb-fig{margin-left:clamp(-40px,-9vw,-16px)}}'                   /* bigger sanyaku, packed tight so they stay large on thin screens */
   +'@media(max-width:520px){.ggb-fig figcaption{display:none}.ggb-off figcaption{display:none}'
+    +'.ggb-big{--fw:clamp(60px,17vw,72px)}.ggb-san .ggb-fig{margin-left:clamp(-46px,-11vw,-22px)}'  /* larger still + tighter on phones */
     +'.ggb-side-h{font-size:15px}.ggb-top{padding:2px 4px 0}}';
 
   function mount(){
