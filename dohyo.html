@@ -844,7 +844,7 @@
      control cluster wraps onto its own row when the single line runs out.
      JS mirrors the bar's real height into --menu-h so the ring still fits. */
   .menu{
-    position:sticky; top:0; z-index:5;
+    position:sticky; top:0; z-index:10;   /* above the stage title (z5) so "Enter the Dohyō" tucks under the bar; still below modals (z50/z90) */
     min-height:58px;
     display:flex; align-items:center;   /* centre the whole bar cluster within min-height */
     padding:9px 0;
