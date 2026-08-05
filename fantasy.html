@@ -236,6 +236,11 @@
         letter-spacing:.12em; text-transform:uppercase; color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--line) }
   table.lb td{ padding:11px 10px; border-bottom:1px solid var(--line) }
   table.lb tr:hover td{ background:rgba(255,255,255,.02) }
+  /* keep the leaderboard from widening the whole page on narrow screens:
+     contain each table so any overflow scrolls inside it, and let long
+     @handles break instead of forcing the Player column wide. */
+  #lbBody, #lbPinned{ max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch }
+  .lb-name{ min-width:0; overflow-wrap:anywhere }
   .lb-rank{ font-family:"Space Grotesk",sans-serif; font-weight:700; color:var(--sun); width:44px }
   .lb-rank.p1{ font-size:1.15rem } 
   .lb-avacol{ width:44px; padding-right:0 !important }
