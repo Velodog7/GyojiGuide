@@ -18,7 +18,7 @@
   var GG = (window.GyojiGuide = window.GyojiGuide || {});
 
   // The deployed Apps Script web app (Google Sheet backend).
-  GG.API_URL = "https://script.google.com/macros/s/AKfycbxY9s2600bfUvhT-2Qfp5N5Gnxb6IinI_I_lYLSt063MLOQrTnXo2gU_h5P2W9nyEeFQw/exec";
+  GG.API_URL = "https://script.google.com/macros/s/AKfycbxcc7UOaNjYl4IcGiUucV-X8GNI5M2pHwhfcfSD4W4DptJ7gC1A14S_VzAgZOvJO1aQIA/exec";
 
   GG.hasAPI = function () { return !!GG.API_URL; };
 

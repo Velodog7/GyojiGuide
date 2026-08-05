@@ -29,7 +29,7 @@ under "Not included" below.
 - `spinner.html` — the reusable loading-spinner reference
 
 **Current `/exec` URL** (already set in `gg-config.js` + `fantasy.html`):
-`.../AKfycbxY9s2600bfUvhT-2Qfp5N5Gnxb6IinI_I_lYLSt063MLOQrTnXo2gU_h5P2W9nyEeFQw/exec`
+`.../AKfycbxcc7UOaNjYl4IcGiUucV-X8GNI5M2pHwhfcfSD4W4DptJ7gC1A14S_VzAgZOvJO1aQIA/exec`
 
 ---
 
