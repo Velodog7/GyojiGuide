@@ -199,8 +199,9 @@
   +'.ggb-yobi{margin-top:2px}'
   +'.ggb-off img{width:100%;height:auto;display:block}'
   +'.ggb-off figcaption{font-size:9px;font-weight:800;color:#3a2c12;margin-top:1px}'
-  +'@media(max-width:760px){.ggb-fig{--fw:clamp(24px,4.4vw,32px)}.ggb-big{--fw:clamp(40px,7.5vw,56px)}.ggb-fig figcaption{font-size:7px}'
-    +'.ggb-sanyaku{gap:clamp(14px,7vw,48px)}.ggb-center{width:clamp(120px,28vw,220px)}}'
+  +'@media(max-width:760px){.ggb-fig{--fw:clamp(30px,5.4vw,32px)}.ggb-big{--fw:clamp(54px,10.5vw,64px)}.ggb-fig figcaption{font-size:7px}'
+    +'.ggb-sanyaku{gap:clamp(8px,3.5vw,48px)}.ggb-center{width:clamp(120px,28vw,220px)}'
+    +'.ggb-san .ggb-fig{margin-left:clamp(-20px,-2.6vw,-8px)}}'                 /* less overlap so the bigger phone sanyaku spread out */
   +'@media(max-width:520px){.ggb-fig figcaption{display:none}.ggb-off figcaption{display:none}'
     +'.ggb-side-h{font-size:15px}.ggb-top{padding:2px 4px 0}}';
 
