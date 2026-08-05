@@ -167,6 +167,12 @@
   .cdc b{ font-family:"IBM Plex Mono",monospace; font-size:1.5rem; color:var(--ink); font-weight:700; line-height:1 }
   .cdc span{ font-size:.66rem; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-top:4px }
   .countdown__sub{ margin-top:12px; font-size:.8rem; color:var(--dim) }
+  .countdown__bz{ margin-top:14px; padding-top:14px; border-top:1px dashed rgba(var(--sun-rgb),.28) }
+  .countdown__label--bz{ color:var(--dim) }
+  .cdc--bz{ min-width:48px; padding:6px 4px }
+  .cdc--bz b{ font-size:1.15rem }
+  .pcard.locked{ opacity:.55; cursor:default; filter:grayscale(.35); pointer-events:none }
+  .pcard.locked .cta{ color:var(--faint) }
 
   /* ── past teams (one snapshot per finished basho) ────── */
   .history{ margin:22px 0 0; border:1px solid var(--line); border-radius:var(--radius-sm);
@@ -528,7 +534,6 @@
         <button class="authbtn acctchip" id="openAccount" hidden><span class="acctchip__ava" id="acctAva">力</span><span id="acctChipName">Account</span></button>
       </div>
     </div>
-    <h1 class="title">Fantasy <span>Sumo</span></h1>
   </header>
 
   <!-- MY TEAM -->
@@ -546,6 +551,15 @@
         <div class="cdc"><b id="cdMins">0</b><span>min</span></div>
         <div class="cdc"><b id="cdSecs">0</b><span>sec</span></div>
       </div>
+      <div class="countdown__bz" id="cdBzRow" hidden>
+        <div class="countdown__label countdown__label--bz">Banzuke drops in</div>
+        <div class="countdown__clock" id="cdBzClock">
+          <div class="cdc cdc--bz"><b id="cdBzDays">0</b><span>days</span></div>
+          <div class="cdc cdc--bz"><b id="cdBzHours">0</b><span>hrs</span></div>
+          <div class="cdc cdc--bz"><b id="cdBzMins">0</b><span>min</span></div>
+          <div class="cdc cdc--bz"><b id="cdBzSecs">0</b><span>sec</span></div>
+        </div>
+      </div>
       <div class="countdown__sub" id="cdSub"></div>
     </div>
 
@@ -555,14 +569,6 @@
         <button class="btn" id="ctaSignup">Sign up</button>
         <button class="btn ghost" id="ctaLogin">Log in</button>
       </div>
-    </div>
-
-    <div class="slots" id="slots"></div>
-
-    <div class="saverow">
-      <button class="btn" id="saveBtn">Save my team</button>
-      <button class="btn ghost" id="clearBtn">Clear picks</button>
-      <span class="status" id="saveStatus"></span>
     </div>
 
     <div class="scorebox">
@@ -575,6 +581,14 @@
         <li><b>+5</b> for each <i>Sanshō</i> (special prize) a wrestler earns</li>
         <li><b>+5</b> for the <i>Makuuchi Yūshō</i></li>
       </ul>
+    </div>
+
+    <div class="slots" id="slots"></div>
+
+    <div class="saverow">
+      <button class="btn" id="saveBtn">Save my team</button>
+      <button class="btn ghost" id="clearBtn">Clear picks</button>
+      <span class="status" id="saveStatus"></span>
     </div>
 
     <div class="history" id="historyBox" hidden>
@@ -899,6 +913,16 @@ function pcardInner(name, bandLabel, withX = true){
 }
 
 function paintSlots(){
+  if (draftLocked){
+    $("slots").innerHTML = BANDS.map(band=>{
+      const cur = team[band.id] || "";
+      return cur
+        ? `<div class="pcard filled locked r-${RK[cur].code[0]}" data-band="${band.id}">${pcardInner(cur,band.label)}</div>`
+        : `<div class="pcard empty locked" data-band="${band.id}"><div class="pc-empty"><b>${band.label}</b><span class="cta">\uD83D\uDD12 Opens when the banzuke drops</span></div></div>`;
+    }).join("");
+    syncTeam();
+    return;
+  }
   $("slots").innerHTML = BANDS.map(band=>{
     const cur = team[band.id] || "";
     if (!cur) return `<div class="pcard empty" data-band="${band.id}" role="button" tabindex="0">
@@ -917,14 +941,16 @@ function paintSlots(){
 }
 function syncTeam(){
   $("pickN").textContent = teamCount() + "/7";
-  $("saveBtn").disabled = teamCount() !== 7 || !acct;
-  $("saveBtn").title = acct ? "" : "Create an account or sign in first";
+  $("saveBtn").disabled = draftLocked || teamCount() !== 7 || !acct;
+  $("saveBtn").title = draftLocked ? "Drafting opens when the banzuke drops"
+                     : (acct ? "" : "Create an account or sign in first");
 }
 
 /* ---------- picker modal ---------- */
 const pickModal = $("pickModal"), pickGrid = $("pickGrid");
 let flipT = [];
 function openPicker(bandId, ctx){
+  if (draftLocked && (!ctx || !ctx.team)) return;   // main draft locked until banzuke drops
   ctx = ctx || {};
   const targetTeam = ctx.team || team;
   const onPick = ctx.onPick || function(){ saveLocal(); closePicker(); paintSlots(); };
@@ -1204,31 +1230,57 @@ async function loadBoard(){
 // tournament-by-tournament — so this is a short, manually-updated table rather than
 // a "+6 weeks" guess. Add the next confirmed date here once the JSA announces it.
 const UPCOMING_BASHO = [
-  { name: "Aki 2026",    venue: "Tokyo",   start: "2026-09-13T00:00:00+09:00", end: "2026-09-27T23:59:59+09:00" },
-  { name: "Kyushu 2026", venue: "Fukuoka", start: "2026-11-08T00:00:00+09:00", end: "2026-11-22T23:59:59+09:00" }
+  // banzuke: JSA publishes the ranking the Monday 13 days before Day 1 (~6am JST).
+  // These are that standard timing; adjust if the JSA confirms a different day.
+  // The draft stays LOCKED until this moment, since ranks aren't known before it.
+  { name: "Aki 2026",    venue: "Tokyo",   banzuke: "2026-08-31T06:00:00+09:00", start: "2026-09-13T00:00:00+09:00", end: "2026-09-27T23:59:59+09:00" },
+  { name: "Kyushu 2026", venue: "Fukuoka", banzuke: "2026-10-26T06:00:00+09:00", start: "2026-11-08T00:00:00+09:00", end: "2026-11-22T23:59:59+09:00" }
 ];
 let cdTimer = null;
 function nextBasho(){
   const now = Date.now();
   return UPCOMING_BASHO.find(b => new Date(b.start).getTime() > now) || null;
 }
+// Draft is locked until the banzuke drops (ranks unknown before then).
+let draftLocked = false;
+function setDraftLocked(v){
+  if (draftLocked === v) return;
+  draftLocked = v;
+  try { paintSlots(); } catch (e) {}   // re-render slots into/out of the locked state
+}
+function banzukeDropped(b){ return !b || !b.banzuke || new Date(b.banzuke).getTime() <= Date.now(); }
+function setClock(ids, ms){
+  const s = Math.max(0, Math.floor(ms/1000));
+  $(ids[0]).textContent = Math.floor(s/86400);
+  $(ids[1]).textContent = String(Math.floor((s%86400)/3600)).padStart(2,"0");
+  $(ids[2]).textContent = String(Math.floor((s%3600)/60)).padStart(2,"0");
+  $(ids[3]).textContent = String(s%60).padStart(2,"0");
+}
 function renderCountdown(model){
   const active = model.started && model.lastDay < 15;
   if (cdTimer) { clearInterval(cdTimer); cdTimer = null; }
-  if (active) { $("countdown").hidden = true; return; }
+  if (active) { $("countdown").hidden = true; setDraftLocked(false); return; }
   const next = nextBasho();
-  if (!next) { $("countdown").hidden = true; return; }
+  if (!next) { $("countdown").hidden = true; setDraftLocked(false); return; }
   $("countdown").hidden = false;
   $("cdBasho").textContent = `${next.name} · ${next.venue}`;
-  $("cdSub").textContent = model.started ? "This basho has finished — draft again once the next one opens." : "Draft opens once the banzuke drops.";
   const tick = () => {
-    const ms = new Date(next.start).getTime() - Date.now();
-    if (ms <= 0) { clearInterval(cdTimer); cdTimer = null; renderCountdown(model); return; }
-    const s = Math.floor(ms/1000);
-    $("cdDays").textContent = Math.floor(s/86400);
-    $("cdHours").textContent = String(Math.floor((s%86400)/3600)).padStart(2,"0");
-    $("cdMins").textContent = String(Math.floor((s%3600)/60)).padStart(2,"0");
-    $("cdSecs").textContent = String(s%60).padStart(2,"0");
+    const now = Date.now();
+    const startMs = new Date(next.start).getTime() - now;
+    if (startMs <= 0) { clearInterval(cdTimer); cdTimer = null; renderCountdown(model); return; }
+    setClock(["cdDays","cdHours","cdMins","cdSecs"], startMs);
+    const dropped = banzukeDropped(next);
+    if (!dropped) {
+      $("cdBzRow").hidden = false;
+      setClock(["cdBzDays","cdBzHours","cdBzMins","cdBzSecs"], new Date(next.banzuke).getTime() - now);
+      $("cdSub").textContent = "The draft is locked until the banzuke is released — ranks aren't set yet.";
+    } else {
+      $("cdBzRow").hidden = true;
+      $("cdSub").textContent = model.started
+        ? "This basho has finished — draft again once the next one opens."
+        : "The banzuke is out — draft your team before the basho starts.";
+    }
+    setDraftLocked(!dropped);
   };
   tick();
   cdTimer = setInterval(tick, 1000);
