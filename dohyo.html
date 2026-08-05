@@ -64,6 +64,12 @@
     aspect-ratio:1851.27 / 1520;
     container-type:size;
     container-name:stage;
+    /* the figures sit on the clay line (a cqw offset) plus a small lift. That
+       lift used to be a flat 30px, which stays put while the cqw offset shrinks
+       with the stage — so on phone-width stages it became a huge proportional
+       nudge and the wrestlers/gyoji/yobidashi floated up off the clay. Cap it
+       at 30px on desktop but let it scale down with width on narrow screens. */
+    --lift: min(30px, 3.75cqw);
   }
   /* pause freezes every running keyframe animation on the clay in place */
   .stage.is-paused, .stage.is-paused *{ animation-play-state:paused !important }
@@ -181,21 +187,21 @@
   }
   .shadow.on{ opacity:1 }
   #gyojiShadow{
-    left:50.8%; bottom:calc(17.4cqw + 30px - .8cqw);
+    left:50.8%; bottom:calc(17.4cqw + var(--lift) - .8cqw);
     width:9cqw; height:2.2cqw;
     transform:translateX(-50%);
   }
   .stage.call-e #gyojiShadow{ transform:translateX(-50%) translateX(-2.2cqw) }
   .stage.call-w #gyojiShadow{ transform:translateX(-50%) translateX(2.2cqw) }
   #yobiShadow{
-    left:50%; bottom:calc(14.8cqw + 30px - .7cqw);
+    left:50%; bottom:calc(14.8cqw + var(--lift) - .7cqw);
     width:8cqw; height:2cqw;
     transform:translateX(-50%);
   }
 
   .yobidashi{                       /* he has the ring alone, before the bout */
     position:absolute;
-    bottom:calc(14.8cqw + 30px);
+    bottom:calc(14.8cqw + var(--lift));
     left:50%;
     height:20cqw; width:auto;
     transform:translateX(-26.2%);   /* centre him on his feet, not on the frame */
@@ -317,7 +323,7 @@
 
   .gyoji{                           /* stands a step back from the shikiri-sen */
     position:absolute;
-    bottom:calc(17.4cqw + 30px);
+    bottom:calc(17.4cqw + var(--lift));
     left:50.8%;
     height:19.2cqw; width:auto;
     transform:translateX(-50%);
@@ -337,7 +343,7 @@
   /* the gyōji's call — nothing moves on the clay until this lands */
   .shout{
     position:absolute; z-index:4;
-    bottom:calc(38.5cqw + 30px); left:50.8%;
+    bottom:calc(38.5cqw + var(--lift)); left:50.8%;
     transform:translateX(-50%);
     display:flex; flex-direction:column; align-items:center; gap:.25cqw;
     color:var(--sun); text-align:center; pointer-events:none;
@@ -360,7 +366,7 @@
   /* よいしょ — called out on each of the yokozuna's shiko stomps. Sits just
      above his head mid-squat, low enough to stay clear of the ceremony
      caption above. */
-  .shout--yoisho{ bottom:calc(35cqw + 30px) }
+  .shout--yoisho{ bottom:calc(35cqw + var(--lift)) }
   .shout--yoisho b{ color:var(--sun) }
   .shout--yoisho.on{ animation:yoisho .85s cubic-bezier(.2,.9,.3,1) both }
   @keyframes yoisho{
@@ -391,7 +397,7 @@
   /* kachi-koshi — the 8th win. A gold banner sweeps up over the ring, the way
      the gyōji's call does, but larger and held longer for the moment. */
   .kk{
-    position:absolute; z-index:6; left:50%; bottom:calc(30cqw + 30px);
+    position:absolute; z-index:6; left:50%; bottom:calc(30cqw + var(--lift));
     transform:translateX(-50%);
     display:flex; flex-direction:column; align-items:center; gap:.5cqw;
     text-align:center; pointer-events:none; opacity:0;
@@ -435,7 +441,7 @@
 
   .slot{
     position:absolute;
-    bottom:calc(13.69cqw + 30px);   /* clay line, lifted 30px */
+    bottom:calc(13.69cqw + var(--lift));   /* clay line, lifted (see --lift) */
     display:flex; justify-content:center; align-items:flex-end;
     background:none; border:0; padding:0;
     cursor:pointer;
@@ -947,6 +953,18 @@
   .wrap{ max-width:1440px; margin:0 auto; padding:22px 24px 80px }
   .tabs{ display:flex; gap:2px; align-items:center }
   .tabs[hidden]{ display:none }
+  /* division switch, relocated above the matchup list — styled to match the
+     site-wide tab bar on the Analysis/Fantasy pages (mixed-case labels,
+     muted→gold with a red underline) rather than the menu's uppercase tabs.
+     Higher specificity (.tabs.tabs--wrap) overrides the base .tabs button. */
+  .tabs--wrap{ display:flex; margin:0 0 16px; border-bottom:1px solid var(--line) }
+  .tabs.tabs--wrap button{
+    border-bottom:2px solid transparent; margin-bottom:-1px;
+    color:var(--faint); font-size:.85rem; font-weight:600; letter-spacing:.01em;
+    text-transform:none; padding:10px 18px; transition:color .12s;
+  }
+  .tabs.tabs--wrap button:hover{ color:var(--dim) }
+  .tabs.tabs--wrap button[aria-selected="true"]{ color:var(--sun); border-bottom-color:var(--red) }
   .tabs button{
     background:none; border:0; border-bottom:2px solid transparent;
     color:var(--dim); font-size:12px; letter-spacing:.22em; text-transform:uppercase;
@@ -1032,9 +1050,45 @@
   /* ── the opening flow ──────────────────────────────────────── */
   /* the dohyō stays on stage the whole time — the setup sits beneath it,
      while the ring-entering ceremony plays above. */
-  body.setup .menu,
   body.setup .wrap,
   body.setup .credit{ display:none }
+  /* during setup the subnav stays, but swaps its live controls for a
+     compact Steps 1–4 progress strip */
+  body.setup .menu__view,
+  body.setup .menu__actions{ display:none }
+  body:not(.setup) .menu__steps{ display:none }
+  .menu__steps{
+    display:flex; align-items:center; gap:5px 10px; flex-wrap:wrap;
+    list-style:none; margin:0 auto 0 0; padding:0;
+  }
+  .menu__steps li{
+    display:flex; align-items:center; gap:7px;
+    font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--faint); white-space:nowrap;
+  }
+  .menu__steps li .num{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:18px; height:18px; border-radius:50%;
+    border:1px solid var(--line2); color:var(--dim); font-size:10px; font-style:normal;
+  }
+  .menu__steps li.done{ color:var(--ink) }
+  .menu__steps li.done .num{ background:var(--sun); border-color:var(--sun); color:#14151b }
+  .menu__steps li.active{ color:var(--sun) }
+  .menu__steps li.active .num{ border-color:var(--sun); color:var(--sun) }
+  .menu__steps li.skip{ opacity:.38 }
+  .menu.is-nano .menu__steps li{ font-size:0; gap:0 }
+  .menu.is-nano .menu__steps li .num{ font-size:10px }
+  /* the Enter button, mirrored into the setup subnav — a compact take on the
+     intro's gold CTA, shown only during setup and disabled until ready */
+  body:not(.setup) .menu__go{ display:none }
+  .menu__go{
+    background:var(--sun); color:#14151b; border:1px solid var(--sun); border-radius:var(--radius-sm);
+    font:inherit; font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+    padding:8px 16px; cursor:pointer; white-space:nowrap;
+  }
+  .menu__go:hover:not(:disabled){ filter:brightness(1.1) }
+  .menu__go:disabled{ background:none; color:var(--dim); border-color:var(--line); cursor:not-allowed; font-weight:400 }
+  .menu.is-nano .menu__go{ padding:7px 11px; letter-spacing:.08em }
   /* the ring stays full size during setup — same as the simulation */
   body:not(.setup) #intro{ display:none }
 
@@ -1087,7 +1141,7 @@
   .ceremony{ position:absolute; inset:0; z-index:2; pointer-events:none }
   body:not(.setup) .ceremony{ display:none }
   .csprite{
-    position:absolute; bottom:calc(13.69cqw + 30px); left:var(--x,50%);
+    position:absolute; bottom:calc(13.69cqw + var(--lift)); left:var(--x,50%);
     height:calc(var(--h,1) * 26.88cqw);
     transform-origin:bottom center;
     transform:translateX(-50%) translateY(calc(var(--ly,0cqw) + var(--bob,0cqw)))
@@ -1457,10 +1511,6 @@
     <nav class="menu__nav">
       <div class="menu__view">
         <select id="daySel" aria-label="Day"></select>
-        <div class="tabs" role="tablist" id="divTabs">
-          <button role="tab" data-tab="makuuchi" data-short="Maku" aria-selected="true">Makuuchi</button>
-          <button role="tab" data-tab="juryo" data-short="Jūryō" aria-selected="false">Jūryō</button>
-        </div>
       </div>
       <div class="menu__actions">
         <button class="ghost" id="reroll" title="Re-roll the tournament"><i class="ico">↻</i><span class="lbl">Re-roll</span></button>
@@ -1469,6 +1519,8 @@
         <button class="ghost" id="nextBout" title="Next bout"><i class="ico">⏭</i></button>
         <button class="ghost" id="replayBout" title="Replay this bout"><i class="ico">↺</i></button>
       </div>
+      <ol class="menu__steps" id="setupSteps" aria-label="Setup progress"></ol>
+      <button class="menu__go" id="setupGo" disabled>Enter the dohyō</button>
     </nav>
   </div>
 </header>
@@ -1540,6 +1592,10 @@
 
   <div class="intro__step" id="introDivStep">Step 4 <b>— which division to watch</b></div>
   <div class="intro__opts" id="introDiv">
+    <button class="optcard" data-div="both">
+      <b>Both</b>
+      <span>Makuuchi and Jūryō, with a quick switch between them.</span>
+    </button>
     <button class="optcard" data-div="makuuchi">
       <b>Makuuchi</b>
       <span>Just the top division.</span>
@@ -1547,10 +1603,6 @@
     <button class="optcard" data-div="juryo">
       <b>Jūryō</b>
       <span>Just the second division.</span>
-    </button>
-    <button class="optcard" data-div="both">
-      <b>Both</b>
-      <span>Makuuchi and Jūryō, with a quick switch between them.</span>
     </button>
   </div>
 
@@ -1574,6 +1626,10 @@
 
 
 <div class="wrap">
+  <div class="tabs tabs--wrap" role="tablist" id="divTabs">
+    <button role="tab" data-tab="makuuchi" data-short="Maku" aria-selected="true">Makuuchi</button>
+    <button role="tab" data-tab="juryo" data-short="Jūryō" aria-selected="false">Jūryō</button>
+  </div>
   <div class="panel" id="p-makuuchi"><div class="bouts" id="l-makuuchi"></div></div>
   <div class="panel" id="p-juryo" hidden><div class="bouts" id="l-juryo"></div></div>
   <div class="panel" id="p-roster" hidden><div class="grid" id="grid"></div></div>
@@ -1767,7 +1823,7 @@ function throwSalt(div){
       const d = rand(0, 0.4).toFixed(2) + "s";
       g.className = "salt";
       g.style.left   = x.toFixed(2) + "%";
-      g.style.bottom = `calc(13.69cqw + 30px + ${(y + rand(-0.8, 1.4)).toFixed(2)}cqw)`;
+      g.style.bottom = `calc(13.69cqw + var(--lift) + ${(y + rand(-0.8, 1.4)).toFixed(2)}cqw)`;
       g.style.setProperty("--dx", (dir * rand(4, 36)).toFixed(2) + "cqw");   // a wide cast
       g.style.setProperty("--up", (-rand(9, 20)).toFixed(2) + "cqw");        // flung high
       g.style.setProperty("--dy", rand(10, 17).toFixed(2) + "cqw");
@@ -3311,6 +3367,7 @@ paintHeya();
 const intro       = document.getElementById("intro");
 const introSlots  = document.getElementById("introSlots");
 const introGo     = document.getElementById("introGo");
+const setupGo     = document.getElementById("setupGo");   // the same CTA, mirrored into the subnav
 const introNote   = document.getElementById("introNote");
 let runChoice = null;                          // "watch" | "sim"
 let watchDiv = null;                           // "makuuchi" | "juryo" | "both"
@@ -3450,6 +3507,7 @@ function syncIntro(){
   const needDiv = runChoice === "watch";         // sim-to-end skips straight to final scores
   const ready = n === BANDS.length && runChoice && (!needDiv || watchDiv);
   introGo.disabled = !ready;
+  setupGo.disabled = !ready;
   introNote.textContent = n < BANDS.length
     ? `${n} of ${BANDS.length} picked`
     : !runChoice ? ""
@@ -3457,11 +3515,37 @@ function syncIntro(){
     : runChoice === "sim" ? "Ready — jump to the final scores"
     : `Ready — watch ${watchScope === "mine" ? "your team's bouts" : "every bout"} in ${
         watchDiv === "both" ? "Makuuchi and Jūryō" : watchDiv === "juryo" ? "Jūryō" : "Makuuchi"}`;
+  paintSteps();
+}
+
+/* Compact Steps 1–4 for the setup subnav — mirrors the four intro sections,
+   marking each done / active / skipped as the person fills them in. Steps 3
+   and 4 don't apply when simulating to the end, so they read as skipped. */
+function paintSteps(){
+  const el = document.getElementById("setupSteps");
+  if (!el) return;
+  const nPick = myPicks().size, need = BANDS.length;
+  const sim = runChoice === "sim";
+  const scopeOn = !!document.querySelector('#introScope .optcard.on');
+  const steps = [
+    { label: "Team",     done: nPick === need,                 active: nPick < need },
+    { label: "Run",      done: !!runChoice,                     active: nPick === need && !runChoice },
+    { label: "Bouts",    skip: sim, done: !sim && scopeOn,      active: !sim && !!runChoice && !scopeOn },
+    { label: "Division", skip: sim, done: !sim && !!watchDiv,   active: !sim && !!runChoice && scopeOn && !watchDiv },
+  ];
+  el.innerHTML = steps.map((s, i) => {
+    const cls = s.skip ? "skip" : s.done ? "done" : s.active ? "active" : "";
+    return `<li class="${cls}"><i class="num">${s.done ? "\u2713" : (i + 1)}</i>${s.label}</li>`;
+  }).join("");
 }
 
 function enter(){
   stopCeremony();
   document.body.classList.remove("setup");
+  // they may have scrolled down the Steps 1–4 list to reach the button —
+  // bring the ring back into view as the tournament opens
+  const stillE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  window.scrollTo({ top: 0, behavior: stillE ? "auto" : "smooth" });
   applyFit();                                    // menu is back — resize the ring to full
   mountDay(daySel.value);                        // rebuild the matchups now the team is set
   document.getElementById("divTabs").hidden = watchDiv !== "both";  // only "both" needs a switch
@@ -3478,6 +3562,7 @@ function enter(){
   }
 }
 introGo.onclick = () => enter();
+setupGo.onclick = () => enter();
 
 /* ══ dohyō-iri — the ring-entering ceremony ══════════════════
    While the person builds their team the ring is never empty: each side
