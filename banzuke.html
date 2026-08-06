@@ -28,16 +28,16 @@
 
   /* banzuke is always the backdrop, filling the space under the tab bar */
   /* banzuke is the backdrop; a single card sits integrated over it */
-  .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:520px; margin-top:6px }
+  .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:860px; margin-top:6px }
   #ggBanzuke{ position:absolute; inset:0 }
 
   /* the always-present card, centred over the brush stroke */
-  .bz-card{ position:absolute; z-index:5; left:50%; top:26px; transform:translateX(-50%);
-        width:min(880px,94%); height:min(560px,calc(100% - 52px)); overflow-y:auto;
+  .bz-card{ position:absolute; z-index:5; left:50%; top:110px; transform:translateX(-50%);
+        width:min(560px,90%); height:722px; overflow:hidden;
         background:rgba(15,17,22,.9); -webkit-backdrop-filter:blur(10px) saturate(1.1); backdrop-filter:blur(10px) saturate(1.1);
-        border:1px solid rgba(216,178,90,.35); border-radius:16px; padding:24px 26px 28px;
+        border:1px solid rgba(216,178,90,.35); border-radius:16px; padding:22px 24px 26px;
         box-shadow:0 20px 50px rgba(0,0,0,.55) }
-  @media (max-width:640px){ .bz-card{ top:12px; padding:20px 16px 24px; width:94%; height:calc(100% - 24px) } }
+  @media (max-width:640px){ .bz-card{ top:10px; padding:20px 16px 24px; width:94%; height:auto; max-height:calc(100% - 20px); overflow-y:auto } }
   .bz-mv{ display:none }
   .bz-mv.on{ display:block; animation:bzswap .2s ease }
   @keyframes bzswap{ from{ opacity:0; transform:translateY(4px) } }
@@ -52,32 +52,33 @@
   footer a{ color:var(--gold); text-decoration:none }
 
   /* ── Learn: interactive guide ─────────────────────────── */
-  .learn-grid{ display:grid; grid-template-columns:220px 1fr; gap:24px; align-items:start }
+  .learn-grid{ display:grid; grid-template-columns:150px 1fr; gap:16px; align-items:start }
   @media (max-width:720px){ .learn-grid{ grid-template-columns:1fr } }
   .learn-nav{ display:flex; flex-direction:column; gap:4px; position:sticky; top:0 }
   @media (max-width:720px){ .learn-nav{ position:static; flex-direction:row; flex-wrap:wrap; gap:6px } }
   .learn-navb{ text-align:left; background:var(--surface); border:1px solid var(--line); color:var(--dim); font:inherit;
-        font-size:.86rem; font-weight:600; padding:11px 13px; border-radius:10px; cursor:pointer; transition:.12s; display:flex; align-items:center; gap:9px }
+        font-size:.78rem; font-weight:600; padding:8px 10px; border-radius:9px; cursor:pointer; transition:.12s; display:flex; align-items:center; gap:7px; line-height:1.15 }
   .learn-navb:hover{ border-color:var(--sun); color:var(--ink) }
   .learn-navb[aria-current="true"]{ border-color:var(--sun); background:var(--surface2); color:var(--sun) }
   .learn-navb .lb-i{ font-size:1.05rem; flex:none }
-  .learn-panel{ min-height:340px }
+  .learn-panel{ min-height:0 }
   .learn-step{ display:none; animation:fadein .25s ease }
   .learn-step.on{ display:block }
   @keyframes fadein{ from{ opacity:0; transform:translateY(4px) } }
   .learn-step h3{ font-family:"Zen Kaku Gothic New",sans-serif; font-weight:900; font-size:1.3rem; margin:0 0 4px }
   .learn-step .jp{ color:var(--sun); font-size:.85rem; letter-spacing:.06em; margin:0 0 14px }
-  .learn-step p{ color:var(--dim); line-height:1.65; margin:0 0 14px }
+  .learn-step p{ color:var(--dim); line-height:1.55; margin:0 0 11px }
   .learn-step b{ color:var(--ink) }
-  .rank-ladder{ display:flex; flex-direction:column; gap:6px; margin:16px 0 20px }
-  .rank-row{ display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:11px 14px; transition:.12s }
+  .rank-ladder{ display:flex; flex-direction:column; gap:3px; margin:10px 0 12px }
+  .rank-row{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:5px 11px; transition:.12s; font-size:.9rem }
   .rank-row:hover{ border-color:var(--sun); transform:translateX(3px) }
   .rank-row .rk{ font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--sun); width:34px; flex:none; text-align:center }
   .rank-row .rn{ font-weight:700 }
-  .rank-row .rd{ color:var(--muted); font-size:.85rem; margin-left:auto; text-align:right }
+  .rank-row .rd{ color:var(--muted); font-size:.78rem; margin-left:auto; text-align:right }
   .rank-row.sanyaku{ border-left:3px solid var(--sun) }
-  .kimarite-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin:14px 0 20px }
-  .kimarite{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:12px 14px }
+  .kimarite-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:12px 0 14px }
+  .kimarite{ background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:9px 11px }
+  @media (max-width:560px){ .kimarite-grid{ grid-template-columns:repeat(2,1fr) } }
   .kimarite h4{ margin:0 0 3px; font-size:.92rem }
   .kimarite .jp{ color:var(--sun); font-size:.76rem; margin:0 0 5px }
   .kimarite p{ font-size:.8rem; margin:0; color:var(--muted); line-height:1.5 }
@@ -209,37 +210,36 @@
   var CHAPTERS = [
     { id:"basics", icon:"\u76ee", title:"What is sumo?", jp:"\u76f8\u64b2 \u30fb s\u016dm\u014d",
       html:
-        "<p>Sumo is Japan\u2019s national sport, with roots going back over 1,500 years to Shinto ritual. Two <b>rikishi</b> (wrestlers) face off in a round clay ring called the <b>dohy\u014d</b>.</p>"+
+        "<p>Sumo is Japan\u2019s national sport, rooted in 1,500 years of Shinto ritual. Two <b>rikishi</b> face off in a round clay ring, the <b>dohy\u014d</b>.</p>"+
         "<p>The rules are beautifully simple. You lose if <b>any part of your body other than the soles of your feet touches the ground</b>, or if you\u2019re forced <b>out of the ring</b>. Most bouts are over in seconds \u2014 but those seconds are pure explosive power and technique.</p>"+
-        "<p>Six <b>honbasho</b> (grand tournaments) are held each year, each lasting <b>15 days</b>. A wrestler fights once per day; the one with the best win\u2013loss record takes the <b>y\u016bsh\u014d</b> (championship).</p>" },
+        "<p>Six <b>honbasho</b> (tournaments) run each year, <b>15 days</b> each \u2014 one bout a day, best record takes the <b>y\u016bsh\u014d</b> (title).</p>" },
     { id:"ranks", icon:"\u4f4d", title:"The ranks (banzuke)", jp:"\u756a\u4ed8 \u30fb banzuke",
       html:
-        "<p>Wrestlers are ranked on the <b>banzuke</b>, a hierarchy they climb (or slide down) based on results. The top division is <b>Makuuchi</b>. Its five highest ranks are collectively the <b>sanyaku</b> \u2014 the elite.</p>"+
+        "<p>Wrestlers are ranked on the <b>banzuke</b>, climbing or sliding by results. The top division is <b>Makuuchi</b>; its highest ranks are the <b>sanyaku</b> elite.</p>"+
         "<div class='rank-ladder'>"+
-          "<div class='rank-row sanyaku'><span class='rk'>Y</span><span class='rn'>Yokozuna</span><span class='rd'>Grand champion \u2014 the pinnacle, held for life</span></div>"+
-          "<div class='rank-row sanyaku'><span class='rk'>O</span><span class='rn'>\u014czeki</span><span class='rd'>Champion \u2014 one step below yokozuna</span></div>"+
+          "<div class='rank-row sanyaku'><span class='rk'>Y</span><span class='rn'>Yokozuna</span><span class='rd'>Grand champion, held for life</span></div>"+
+          "<div class='rank-row sanyaku'><span class='rk'>O</span><span class='rn'>\u014czeki</span><span class='rd'>Champion</span></div>"+
           "<div class='rank-row sanyaku'><span class='rk'>S</span><span class='rn'>Sekiwake</span><span class='rd'>Junior champion</span></div>"+
-          "<div class='rank-row sanyaku'><span class='rk'>K</span><span class='rn'>Komusubi</span><span class='rd'>The entry to the sanyaku elite</span></div>"+
-          "<div class='rank-row'><span class='rk'>M</span><span class='rn'>Maegashira</span><span class='rd'>The rank-and-file of the top division</span></div>"+
-          "<div class='rank-row'><span class='rk'>J</span><span class='rn'>J\u016bry\u014d</span><span class='rd'>Second division \u2014 also salaried (\u201csekitori\u201d)</span></div>"+
+          "<div class='rank-row sanyaku'><span class='rk'>K</span><span class='rn'>Komusubi</span><span class='rd'>Entry to the elite</span></div>"+
+          "<div class='rank-row'><span class='rk'>M</span><span class='rn'>Maegashira</span><span class='rd'>Top-division rank-and-file</span></div>"+
+          "<div class='rank-row'><span class='rk'>J</span><span class='rn'>J\u016bry\u014d</span><span class='rd'>Second division (salaried)</span></div>"+
         "</div>"+
-        "<p>Beating a higher-ranked wrestler when you\u2019re a <b>maegashira</b> earns a <b>kinboshi</b> (gold star) \u2014 a giant-killing upset that follows you for the rest of your career.</p>" },
+        "<p>A <b>maegashira</b> beating a yokozuna earns a <b>kinboshi</b> (gold star) \u2014 a prized upset.</p>" },
     { id:"winning", icon:"\u5df4", title:"Winning a bout", jp:"\u53d6\u7d44 \u30fb torikumi",
       html:
-        "<p>A bout begins with the <b>tachiai</b> \u2014 the explosive initial charge from a crouch. Everything can be decided in that first collision, or it can settle into a grip battle at the <b>mawashi</b> (belt).</p>"+
-        "<p>The technique that ends the bout is called the <b>kimarite</b> \u2014 there are <b>82 official ones</b>. Here are a few you\u2019ll see constantly:</p>"+
+        "<p>A bout starts with the <b>tachiai</b> (initial charge) and may settle into a grip battle at the <b>mawashi</b> (belt). The finishing move is the <b>kimarite</b> \u2014 82 exist; here are the staples:</p>"+
         "<div class='kimarite-grid'>"+
-          "<div class='kimarite'><h4>Oshidashi</h4><div class='jp'>\u62bc\u3057\u51fa\u3057</div><p>Push out \u2014 shoving the opponent out without gripping the belt.</p></div>"+
-          "<div class='kimarite'><h4>Yorikiri</h4><div class='jp'>\u5bc4\u308a\u5207\u308a</div><p>Force out \u2014 gripping the belt and marching them over the edge.</p></div>"+
-          "<div class='kimarite'><h4>Hatakikomi</h4><div class='jp'>\u306f\u305f\u304d\u8fbc\u307f</div><p>Slap down \u2014 pulling/slapping a charging opponent to the clay. (Our namesake!)</p></div>"+
-          "<div class='kimarite'><h4>Uwatenage</h4><div class='jp'>\u4e0a\u624b\u6295\u3052</div><p>Overarm throw \u2014 a throw using an outside grip on the belt.</p></div>"+
-          "<div class='kimarite'><h4>Tsukidashi</h4><div class='jp'>\u7a81\u304d\u51fa\u3057</div><p>Thrust out \u2014 rapid palm thrusts driving them out.</p></div>"+
-          "<div class='kimarite'><h4>Okuridashi</h4><div class='jp'>\u9001\u308a\u51fa\u3057</div><p>Rear push out \u2014 shoving them out from behind.</p></div>"+
+          "<div class='kimarite'><h4>Oshidashi</h4><div class='jp'>\u62bc\u3057\u51fa\u3057</div><p>Push out, no belt grip.</p></div>"+
+          "<div class='kimarite'><h4>Yorikiri</h4><div class='jp'>\u5bc4\u308a\u5207\u308a</div><p>Belt grip, march them out.</p></div>"+
+          "<div class='kimarite'><h4>Hatakikomi</h4><div class='jp'>\u306f\u305f\u304d\u8fbc\u307f</div><p>Slap a charger down. (Our namesake!)</p></div>"+
+          "<div class='kimarite'><h4>Uwatenage</h4><div class='jp'>\u4e0a\u624b\u6295\u3052</div><p>Throw with an outside belt grip.</p></div>"+
+          "<div class='kimarite'><h4>Tsukidashi</h4><div class='jp'>\u7a81\u304d\u51fa\u3057</div><p>Rapid palm thrusts out.</p></div>"+
+          "<div class='kimarite'><h4>Okuridashi</h4><div class='jp'>\u9001\u308a\u51fa\u3057</div><p>Shove them out from behind.</p></div>"+
         "</div>" },
     { id:"ritual", icon:"\u5869", title:"Ritual & ceremony", jp:"\u5100\u5f0f \u30fb gishiki",
       html:
-        "<p>Sumo is steeped in Shinto ritual. Before a bout, wrestlers throw <b>salt</b> (shio) into the ring to purify it, and perform <b>shiko</b> \u2014 the iconic high leg stomps that drive away evil spirits.</p>"+
-        "<p>The <b>gy\u014dji</b> (referee) in ornate robes directs the bout, while a <b>yobidashi</b> announces the wrestlers with a fan. A <b>yokozuna</b> gets his own grand <b>dohy\u014d-iri</b> (ring-entering ceremony), wearing the sacred white rope.</p>"+
+        "<p>Before a bout, wrestlers throw <b>salt</b> to purify the ring and perform <b>shiko</b> \u2014 the high leg stomps that drive off evil spirits.</p>"+
+        "<p>The <b>gy\u014dji</b> (referee) directs the bout; a <b>yobidashi</b> announces the wrestlers. A <b>yokozuna</b> gets his own <b>dohy\u014d-iri</b> ring-entering ceremony in the sacred white rope.</p>"+
         "<p>These aren\u2019t just for show \u2014 they connect a modern sport to centuries of tradition, and they\u2019re a huge part of what makes watching sumo special.</p>" },
     { id:"quiz", icon:"\u554f", title:"Test yourself", jp:"\u30af\u30a4\u30ba \u30fb quiz", quiz:true }
   ];
