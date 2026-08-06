@@ -68,21 +68,15 @@
   // the two apexes sit — smaller = closer together, while the bases (top, middle,
   // bottom, at the outer edge) stay put.
   function xfrac(p, k){
-    // control points (p, xFraction): bases at 0/0.5/1 → 0 (outer); apexes at 0.5±k → 1 (centre)
-    var pts = [[0,0],[0.5-k,1],[0.5,0],[0.5+k,1],[1,0]];
-    for (var j=0;j<pts.length-1;j++){
-      var a=pts[j], b=pts[j+1];
-      if (p>=a[0] && p<=b[0]){
-        var t = (b[0]===a[0]) ? 0 : (p-a[0])/(b[0]-a[0]);
-        return a[1] + t*(b[1]-a[1]);
-      }
-    }
-    return 0;
+    // gentle S-wave kept in the outer flank so no rikishi is covered by the
+    // centre card: two soft bows down each side, never reaching the middle.
+    // 0 = outer edge, 1 = toward centre. (k unused)
+    return 0.30 + 0.34 * Math.sin(p * Math.PI * 2 - Math.PI/2);
   }
   function zigzag(list, isEast){
     var n = list.length; if (!n) return "";
-    var APEX = 0.26, OUT = 6, SPAN = 76;    // apexes further apart (APEX) and reaching toward centre (SPAN)
-    var TOP = 5, BOT = 95;                  // fill the (now shorter) header vertically
+    var APEX = 0.26, OUT = 3, SPAN = 34;    // wave kept to the OUTER flank so nobody hides behind the centre card
+    var TOP = 5, BOT = 96;                  // fill the (now shorter) header vertically
     var W = 540, H = 300;                   // approx px, only to weight arc-length evenly
     // dense samples of the path, with cumulative arc length
     var S = 400, xs = [], ys = [], cl = [0];

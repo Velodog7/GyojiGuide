@@ -28,7 +28,7 @@
 
   /* banzuke is always the backdrop, filling the space under the tab bar */
   /* banzuke is the backdrop; a single card sits integrated over it */
-  .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:860px; margin-top:6px }
+  .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:860px; margin-top:0 }
   #ggBanzuke{ position:absolute; inset:0 }
 
   /* the always-present card, centred over the brush stroke */
@@ -43,7 +43,7 @@
   @keyframes bzswap{ from{ opacity:0; transform:translateY(4px) } }
   .bz-welcome{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; height:100%; gap:2px }
   .bz-welcome .view-sub{ margin-bottom:18px }
-  .bz-logo{ width:min(300px,72%); height:auto; margin-bottom:16px; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)) }
+  .bz-logo{ width:min(230px,58%); height:auto; margin-bottom:14px; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)) }
   .bz-intro{ max-width:52ch; color:var(--dim); font-size:.94rem; line-height:1.6 }
   .bz-intro b{ color:var(--ink) }
   .bz-features{ list-style:none; margin:0; padding:0; text-align:left; max-width:52ch; display:flex; flex-direction:column; gap:11px }
