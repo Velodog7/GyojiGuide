@@ -123,7 +123,6 @@
     host.innerHTML =
       '<div class="ggb">'
       + '<div class="ggb-water" aria-hidden="true"></div>'
-      + '<div class="ggb-sep" aria-hidden="true"></div>'
       + '<div class="ggb-top">'
       +   '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
       +   '<div class="ggb-sanyaku">'
@@ -135,7 +134,6 @@
       + '<div class="ggb-body">'
       +   '<div class="ggb-col ggb-colW">'+zigzag(westFile, false)+'</div>'
       +   '<div class="ggb-center">'
-      +     '<div class="ggb-logo" role="img" aria-label="Sumo Slapdown">'+LOGO_SVG+'</div>'
       +     officials()
       +   '</div>'
       +   '<div class="ggb-col ggb-colE">'+zigzag(eastFile, true)+'</div>'
@@ -188,9 +186,6 @@
     +'width:clamp(200px,26vw,340px);padding:2px 4px 0;position:relative;z-index:6}'
   /* one big brush-stroke rule down the centre, dividing East from West and
      running beyond the top/bottom of the frame; integrated via multiply */
-  +'.ggb-sep{position:absolute;left:50%;top:-16%;height:132%;width:clamp(460px,52vw,880px);'
-    +'transform:translateX(-50%);background:url('+BRUSH+') center/100% 100% no-repeat;'
-    +'mix-blend-mode:multiply;opacity:.5;z-index:4;pointer-events:none}'
   +'.ggb-logo{width:100%;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45));position:relative;z-index:6}'
   +'.ggb-logo svg,.ggb-logo img{width:100%;height:auto;display:block}'
   +'.ggb-officials{display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:6px;position:relative;z-index:6}'

@@ -33,16 +33,18 @@
 
   /* the always-present card, centred over the brush stroke */
   .bz-card{ position:absolute; z-index:5; left:50%; top:26px; transform:translateX(-50%);
-        width:min(680px,92%); max-height:calc(100% - 52px); overflow-y:auto;
+        width:min(880px,94%); height:min(560px,calc(100% - 52px)); overflow-y:auto;
         background:rgba(15,17,22,.9); -webkit-backdrop-filter:blur(10px) saturate(1.1); backdrop-filter:blur(10px) saturate(1.1);
         border:1px solid rgba(216,178,90,.35); border-radius:16px; padding:24px 26px 28px;
         box-shadow:0 20px 50px rgba(0,0,0,.55) }
-  .bz-card.wide{ width:min(920px,94%) }              /* Learn needs more room for its two-column layout */
-  @media (max-width:640px){ .bz-card{ top:12px; padding:20px 16px 24px; width:94%; max-height:calc(100% - 24px) } }
+  @media (max-width:640px){ .bz-card{ top:12px; padding:20px 16px 24px; width:94%; height:calc(100% - 24px) } }
   .bz-mv{ display:none }
   .bz-mv.on{ display:block; animation:bzswap .2s ease }
   @keyframes bzswap{ from{ opacity:0; transform:translateY(4px) } }
-  .bz-welcome-cta{ display:flex; gap:10px; flex-wrap:wrap; margin-top:4px }
+  .bz-welcome{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; height:100%; gap:2px }
+  .bz-welcome .view-sub{ margin-bottom:22px }
+  .bz-logo{ width:min(360px,80%); height:auto; margin-bottom:20px; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)) }
+  .bz-welcome-cta{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:4px }
   .view-h{ font-family:"Zen Kaku Gothic New","Space Grotesk",sans-serif; font-weight:900; font-size:1.5rem; margin:0 0 6px }
   .view-sub{ color:var(--muted); font-size:.92rem; line-height:1.55; margin:0 0 20px; max-width:60ch }
   footer{ text-align:center; color:var(--muted); font-family:"IBM Plex Mono",monospace;
@@ -142,11 +144,14 @@
   <!-- a single card sits integrated over the banzuke; tabs swap its contents -->
   <div class="bz-card" id="bzCard">
     <div class="bz-mv on" id="mv-welcome">
-      <h2 class="view-h">Welcome to the dohyō</h2>
-      <p class="view-sub">This is the full Makuuchi banzuke — every top-division rikishi, ranked East and West around the gyōji at the centre. New to sumo? Hit <b>Learn</b> for a quick interactive guide. Want more? <b>Resources</b> has our favourite creators.</p>
-      <div class="bz-welcome-cta">
-        <button class="btn" onclick="setView('learn')">Learn the basics ›</button>
-        <button class="btn ghost" onclick="setView('resources')">Browse resources</button>
+      <div class="bz-welcome">
+        <img class="bz-logo" src="SumoSlapdown-logoTall.svg" alt="Sumo Slapdown">
+        <h2 class="view-h">Welcome to the dohyō</h2>
+        <p class="view-sub">This is the full Makuuchi banzuke — every top-division rikishi, ranked East and West around the gyōji at the centre. New to sumo? Hit <b>Learn</b> for a quick interactive guide. Want more? <b>Resources</b> has our favourite creators.</p>
+        <div class="bz-welcome-cta">
+          <button class="btn" onclick="setView('learn')">Learn the basics ›</button>
+          <button class="btn ghost" onclick="setView('resources')">Browse resources</button>
+        </div>
       </div>
     </div>
 
@@ -195,7 +200,6 @@
       var mv = $("mv-"+k); if (mv) mv.classList.toggle("on", k===v);
     });
     var card = $("bzCard");
-    card.classList.toggle("wide", v==="learn");        // Learn's two-column layout needs more width
     card.scrollTop = 0;
     try { history.replaceState(null,"","#"+v); } catch(e){}
   };
