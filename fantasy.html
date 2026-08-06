@@ -2031,8 +2031,10 @@ function renderMessages(msgs){
 /* ---------- leaderboard board (site-wide, shown on the Leaderboard tab) ---------- */
 let boardMsgs = [];
 async function loadLbBoard(){
-  const r = await GyojiGuide.board();
-  boardMsgs = (r && r.ok) ? (r.messages||[]) : [];
+  try {
+    const r = await GyojiGuide.board();
+    boardMsgs = (r && r.ok) ? (r.messages||[]) : [];
+  } catch (e) { boardMsgs = []; }   // fetch failed — still render the shell so the chat never vanishes
   renderLbBoard();
 }
 function boardThreadHTML(msgs, parentId){
