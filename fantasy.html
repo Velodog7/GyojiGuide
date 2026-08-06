@@ -151,6 +151,11 @@
         padding:14px 16px; background:var(--surface) }
   .scorebox h3{ margin:0 0 8px; font-family:"Space Grotesk",sans-serif; font-size:1rem }
   .scorebox h3:not(:first-child){ margin-top:16px }
+  .rulebox > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:1rem; color:var(--ink) }
+  .rulebox > summary::-webkit-details-marker{ display:none }
+  .rulebox > summary::after{ content:"\25BE"; color:var(--faint); font-size:.9em; transition:transform .2s ease }
+  .rulebox[open] > summary::after{ transform:rotate(180deg) }
+  .rulebox__body{ margin-top:14px }
   .scorebox .sb-lead{ margin:0 0 10px; color:var(--dim); font-size:.86rem; line-height:1.5 }
   .scorebox ul{ margin:0; padding-left:18px; color:var(--dim); font-size:.88rem; line-height:1.6 }
   .scorebox b{ color:var(--ink) }
@@ -577,7 +582,9 @@
       </div>
     </div>
 
-    <div class="scorebox">
+    <details class="scorebox rulebox">
+      <summary>The Rules</summary>
+      <div class="rulebox__body">
       <h3>How drafting works</h3>
       <p class="sb-lead">A prediction game for the upcoming basho: draft a seven-wrestler team, one pick per rank band, so your roster spans the whole banzuke instead of stacking the top.</p>
       <ul>
@@ -596,7 +603,8 @@
         <li><b>+5</b> for each <i>Sanshō</i> (special prize) a wrestler earns</li>
         <li><b>+5</b> for the <i>Makuuchi Yūshō</i></li>
       </ul>
-    </div>
+      </div>
+    </details>
 
     <div class="slots" id="slots"></div>
 
@@ -2260,8 +2268,7 @@ if (acct) loadHistory();
     syncRanksFromRK();
     try { paintSlots(); } catch(e){}
     if (typeof renderLeague === "function" && typeof curLeagueId !== "undefined" && curLeagueId) { try { renderLeague(); } catch(e){} }
-    var extra = sum.newcomers.length ? " \u00b7 " + sum.newcomers.length + " new sekitori (no photo yet)" : "";
-    show("Live banzuke \u2014 <b>" + res.label + "</b> \u00b7 " + res.count.makuuchi + " Makuuchi + " + res.count.juryo + " J\u016bry\u014d" + extra, "#c3c8d4");
+    if (note) note.hidden = true;   // roster loaded fine — hide the status note (no banner)
   });
 })();
 </script>
