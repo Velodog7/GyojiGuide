@@ -42,9 +42,14 @@
   .bz-mv.on{ display:block; animation:bzswap .2s ease }
   @keyframes bzswap{ from{ opacity:0; transform:translateY(4px) } }
   .bz-welcome{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; height:100%; gap:2px }
-  .bz-welcome .view-sub{ margin-bottom:22px }
-  .bz-logo{ width:min(360px,80%); height:auto; margin-bottom:20px; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)) }
-  .bz-welcome-cta{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:4px }
+  .bz-welcome .view-sub{ margin-bottom:18px }
+  .bz-logo{ width:min(300px,72%); height:auto; margin-bottom:16px; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)) }
+  .bz-intro{ max-width:52ch; color:var(--dim); font-size:.94rem; line-height:1.6 }
+  .bz-intro b{ color:var(--ink) }
+  .bz-features{ list-style:none; margin:0; padding:0; text-align:left; max-width:52ch; display:flex; flex-direction:column; gap:11px }
+  .bz-features li{ position:relative; padding-left:20px; color:var(--dim); font-size:.9rem; line-height:1.5 }
+  .bz-features li::before{ content:"\25B8"; position:absolute; left:0; top:0; color:var(--sun) }
+  .bz-feat-h{ color:var(--sun); font-weight:700 }
   .view-h{ font-family:"Zen Kaku Gothic New","Space Grotesk",sans-serif; font-weight:900; font-size:1.5rem; margin:0 0 6px }
   .view-sub{ color:var(--muted); font-size:.92rem; line-height:1.55; margin:0 0 20px; max-width:60ch }
   footer{ text-align:center; color:var(--muted); font-family:"IBM Plex Mono",monospace;
@@ -123,9 +128,9 @@
 
 <nav class="tabs" role="tablist">
   <div class="tabs-inner">
-    <button class="tab" id="tab-welcome" role="tab" aria-selected="true" onclick="setView('welcome')" aria-label="Welcome" title="Welcome">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5"/><path d="M5 8.5V21h14V8.5"/><path d="M9 21v-6h6v6"/></svg>
-      <span class="tab-lab">Welcome</span>
+    <button class="tab" id="tab-welcome" role="tab" aria-selected="true" onclick="setView('welcome')" aria-label="About" title="About">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r="1.1" fill="currentColor" stroke="none"/></svg>
+      <span class="tab-lab">About</span>
     </button>
     <button class="tab" id="tab-learn" role="tab" aria-selected="false" onclick="setView('learn')" aria-label="Learn" title="Learn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="M6 10.5V16c0 1.4 2.7 3 6 3s6-1.6 6-3v-5.5"/></svg>
@@ -147,12 +152,14 @@
     <div class="bz-mv on" id="mv-welcome">
       <div class="bz-welcome">
         <img class="bz-logo" src="SumoSlapdown-logoTall.svg" alt="Sumo Slapdown">
-        <h2 class="view-h">Welcome to the dohyō</h2>
-        <p class="view-sub">This is the full Makuuchi banzuke — every top-division rikishi, ranked East and West around the gyōji at the centre. New to sumo? Hit <b>Learn</b> for a quick interactive guide. Want more? <b>Resources</b> has our favourite creators.</p>
-        <div class="bz-welcome-cta">
-          <button class="btn" onclick="setView('learn')">Learn the basics ›</button>
-          <button class="btn ghost" onclick="setView('resources')">Browse resources</button>
-        </div>
+        <p class="view-sub bz-intro">Welcome to <b>Sumo Slap Down</b>, the ultimate hub for fantasy sumo! I built this site because my sumo-addicted family and friends wanted a single, one-stop shop to analyze rikishi, simulate upcoming basho, and customize private fantasy leagues.</p>
+        <ul class="bz-features">
+          <li><span class="bz-feat-h">Analyze Wrestlers</span> — Dig into historical stats, monitor health updates, and track performance to scout your perfect lineup.</li>
+          <li><span class="bz-feat-h">Create Mock Drafts</span> — Practice your picks and have your draft instantly graded against our predictions.</li>
+          <li><span class="bz-feat-h">Run Simulations</span> — Watch a day-to-day simulation of the entire tournament using hypothetical matchups.</li>
+          <li><span class="bz-feat-h">Compete in Leagues</span> — Join public games or create private custom fantasy leagues—including dedicated Keeper Leagues that let you build a stable and carry your top wrestlers from one basho to the next.</li>
+          <li><span class="bz-feat-h">Stay Connected</span> — All of our rikishi data and tournament results are powered by the sumo-api, ensuring your stats, rankings, and match history are always accurate and up to date.</li>
+        </ul>
       </div>
     </div>
 
@@ -341,12 +348,12 @@
   var RESOURCES = [
     { section:"YouTube channels", jp:"\u52d5\u753b \u30fb creators to watch", icon:YT(),
       items:[
-        { name:"Chris Sumo", desc:"Rewriting the YouTube sumo book", url:"https://www.youtube.com/@chrissumo69" },
-        { name:"Sumo Spiffy\u2019s Bar & Grill", desc:"Hot sumo yeets & fantasy sumo", url:"https://www.youtube.com/@sumospiffysbarandgrill" },
-        { name:"Sumo Files", desc:"Deep dives into the sport", url:"https://www.youtube.com/@SumoFiles" },
-        { name:"Grand Sumo Breakdown", desc:"Sports-radio style tournament breakdowns", url:"https://www.youtube.com/channel/UCwCKsyGA7lzbcdJ8Jlhqhdw" },
-        { name:"Sumo Kaboom Podcast", desc:"Weekly sumo podcast & BINGO", url:"https://www.youtube.com/@sumokaboom" },
-        { name:"LeoDickinsonSumo", desc:"Live tournament English commentary", url:"https://www.youtube.com/@LeoDickinsonSumo" }
+        { name:"Chris Sumo", desc:"In-depth analysis and commentary on the sport", url:"https://www.youtube.com/@chrissumo69" },
+        { name:"Sumo Spiffy\u2019s Bar & Grill", desc:"Match highlights and fantasy sumo coverage", url:"https://www.youtube.com/@sumospiffysbarandgrill" },
+        { name:"Sumo Files", desc:"In-depth features and profiles of the sport", url:"https://www.youtube.com/@SumoFiles" },
+        { name:"Grand Sumo Breakdown", desc:"Comprehensive tournament analysis and discussion", url:"https://www.youtube.com/channel/UCwCKsyGA7lzbcdJ8Jlhqhdw" },
+        { name:"Sumo Kaboom Podcast", desc:"A weekly podcast covering the sport", url:"https://www.youtube.com/@sumokaboom" },
+        { name:"LeoDickinsonSumo", desc:"Live English-language tournament commentary", url:"https://www.youtube.com/@LeoDickinsonSumo" }
       ] }
   ];
   function buildResources(){
