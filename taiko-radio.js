@@ -399,6 +399,10 @@
       ".tkr-vol::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:#e6b453;cursor:pointer}" +
       ".tkr-make{flex:none;width:30px;height:30px;border-radius:50%;font-size:16px;color:#e6b453;text-decoration:none}" +
       ".tkr-make:hover{background:rgba(230,180,83,.16)}" +
+      ".tkr-toggle{flex:none;width:30px;height:30px;border-radius:50%;font-size:16px;color:#a8998c}" +
+      ".tkr-toggle:hover{background:rgba(255,255,255,.08);color:#fff}" +
+      ".tkr.collapsed{padding:8px}" +
+      ".tkr.collapsed .tkr-eq,.tkr.collapsed .tkr-meta,.tkr.collapsed .tkr-next,.tkr.collapsed .tkr-mute,.tkr.collapsed .tkr-vol,.tkr.collapsed .tkr-make{display:none}" +
       "@media (max-width:640px){.tkr-vol{display:none}.tkr-name{max-width:130px}.tkr-sub{max-width:100px}}";
     document.head.appendChild(css);
 
@@ -411,7 +415,8 @@
       '<button class="tkr-ico tkr-next" title="Next song" aria-label="Next song">⏭</button>' +
       '<button class="tkr-ico tkr-mute" title="Mute" aria-label="Mute">🔊</button>' +
       '<input class="tkr-vol" type="range" min="0" max="100" title="Volume" aria-label="Volume">' +
-      '<a class="tkr-make" href="taiko.html" title="Create a loop in the constructor" aria-label="Create a loop">＋</a>';
+      '<a class="tkr-make" href="taiko.html" title="Create a loop in the constructor" aria-label="Create a loop">＋</a>' +
+      '<button class="tkr-toggle" title="Collapse player" aria-label="Collapse player" aria-expanded="true">‹</button>';
     document.body.appendChild(bar);
 
     nameEl = bar.querySelector(".tkr-name"); subEl = bar.querySelector(".tkr-sub");
@@ -423,6 +428,24 @@
     bar.querySelector(".tkr-next").addEventListener("click", next);
     muteBtn.addEventListener("click", function () { prefs.muted=!prefs.muted; savePrefs(); applyGain(); reflectMute(); });
     volInput.addEventListener("input", function () { prefs.vol=(+volInput.value)/100; if (prefs.vol>0 && prefs.muted){ prefs.muted=false; reflectMute(); } savePrefs(); applyGain(); });
+
+    // Collapse control: on thin/mobile widths the full bar covers page content,
+    // so it auto-collapses to a compact play + chevron puck. The chevron toggles
+    // it manually; once the user taps it, we stop auto-managing on resize.
+    var toggleBtn = bar.querySelector(".tkr-toggle");
+    var userToggledTkr = false;
+    function setTkrCollapsed(v){
+      bar.classList.toggle("collapsed", v);
+      toggleBtn.textContent = v ? "\u203a" : "\u2039";   // › expand  /  ‹ collapse
+      toggleBtn.title = v ? "Expand player" : "Collapse player";
+      toggleBtn.setAttribute("aria-label", v ? "Expand player" : "Collapse player");
+      toggleBtn.setAttribute("aria-expanded", v ? "false" : "true");
+    }
+    function autoTkrCollapse(){ if (!userToggledTkr) setTkrCollapsed(window.innerWidth <= 560); }
+    toggleBtn.addEventListener("click", function () { userToggledTkr = true; setTkrCollapsed(!bar.classList.contains("collapsed")); });
+    window.addEventListener("resize", autoTkrCollapse);
+    autoTkrCollapse();
+
     tickInt = setInterval(tickNow, 400);
   }
   function reflectMute() { if (!muteBtn) return; muteBtn.textContent = prefs.muted?"🔇":"🔊"; muteBtn.title = prefs.muted?"Unmute":"Mute"; }

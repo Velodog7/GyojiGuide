@@ -61,7 +61,7 @@
     "@media(max-width:430px){"+
       ".ggn-acct{gap:6px}"+
       ".gga-btn{height:34px;padding:0 10px;font-size:.76rem}"+
-      ".gga-chip{height:34px;padding:0 8px 0 4px;gap:0}"+
+      ".gga-chip{height:34px;width:34px;padding:0;gap:0;justify-content:center}"+
       ".gga-chip__ava{width:24px;height:24px}"+
       ".gga-chip__nm{display:none}"+
     "}"+
