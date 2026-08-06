@@ -161,6 +161,7 @@
   .scorebox b{ color:var(--ink) }
 
   /* ── countdown to the next basho ─────────────────────── */
+  .lb-logo{ display:block; margin:4px auto 20px; width:auto; max-width:min(320px,72%); height:auto }
   .countdown{ margin:0 0 22px; border:1px solid rgba(var(--sun-rgb),.35); border-radius:var(--radius-sm);
         padding:18px 20px; background:linear-gradient(160deg, rgba(var(--sun-rgb),.09), rgba(var(--sun-rgb),.02));
         text-align:center }
@@ -553,6 +554,7 @@
     <div id="rosterNote" hidden style="max-width:1080px;margin:0 auto 4px;padding:2px 20px;font-size:.8rem;color:#9aa0b0;"></div>
     <script src="gg-roster.js"></script>
 
+    <img class="lb-logo" src="SumoSlapdown-logoMedium.svg" alt="Sumo Slapdown" />
     <div class="countdown" id="countdown" hidden>
       <div class="countdown__label">Next up</div>
       <div class="countdown__basho" id="cdBasho">—</div>
