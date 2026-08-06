@@ -147,9 +147,10 @@
   .status{ font-size:.88rem; color:var(--muted) }
   .status.ok{ color:var(--win) } .status.err{ color:var(--tangerine) }
 
-  .scorebox{ margin:26px 0 0; border:1px solid var(--line); border-radius:var(--radius-sm);
+  .scorebox{ margin:26px 0; border:1px solid var(--line); border-radius:var(--radius-sm);
         padding:14px 16px; background:var(--surface) }
   .scorebox h3{ margin:0 0 8px; font-family:"Space Grotesk",sans-serif; font-size:1rem }
+  .scorebox h3:not(:first-child){ margin-top:16px }
   .scorebox .sb-lead{ margin:0 0 10px; color:var(--dim); font-size:.86rem; line-height:1.5 }
   .scorebox ul{ margin:0; padding-left:18px; color:var(--dim); font-size:.88rem; line-height:1.6 }
   .scorebox b{ color:var(--ink) }
@@ -167,7 +168,7 @@
   .cdc b{ font-family:"IBM Plex Mono",monospace; font-size:1.5rem; color:var(--ink); font-weight:700; line-height:1 }
   .cdc span{ font-size:.66rem; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-top:4px }
   .countdown__sub{ margin-top:12px; font-size:.8rem; color:var(--dim) }
-  .countdown__bz{ margin-top:14px; padding-top:14px; border-top:1px dashed rgba(var(--sun-rgb),.28) }
+  .countdown__bz{ margin-top:16px }
   .countdown__label--bz{ color:var(--dim) }
   .cdc--bz{ min-width:48px; padding:6px 4px }
   .cdc--bz b{ font-size:1.15rem }
@@ -577,8 +578,17 @@
     </div>
 
     <div class="scorebox">
+      <h3>How drafting works</h3>
+      <p class="sb-lead">A prediction game for the upcoming basho: draft a seven-wrestler team, one pick per rank band, so your roster spans the whole banzuke instead of stacking the top.</p>
+      <ul>
+        <li><b>Sanyaku</b> — a Yokozuna, Ōzeki, Sekiwake or Komusubi</li>
+        <li><b>M1–M4 · M5–M8 · M9–M12 · M13–M16+</b> — one Maegashira from each block</li>
+        <li><b>Any Makuuchi</b> — a free pick from the top division</li>
+        <li><b>Jūryō</b> — one wrestler from the second division</li>
+      </ul>
+      <p class="sb-lead">The draft opens when the banzuke is released and locks once the basho begins — no swaps after that, even for injury or absence.</p>
+
       <h3>How scoring works</h3>
-      <p class="sb-lead">A prediction game for the upcoming basho — draft before it starts; no swaps for injury or absence.</p>
       <ul>
         <li><b>+1</b> for every match a wrestler wins across the 15 days</li>
         <li><b>Upset bonus</b> for beating a <i>sanyaku</i> opponent — one point per rank gap:
