@@ -331,6 +331,15 @@ function submitFeedback(body) {
 
 /* create an account: fails if the handle is taken (unless it's an
    unclaimed v1 row with no PIN, which the first register claims) */
+/* Welcome DM dropped into a new player's inbox on sign-up, sent from the
+   ADMIN_HANDLE account so it displays as being from "Sumo Slapdown". */
+var WELCOME_MSG = "Welcome to Sumo Slap Down! The site is currently in beta and being updated regularly, so please bear with any temporary glitches. The suggestion box and bug reporting tools are wide open\u2014if you want to be one of our very first official beta testers, I'd love your help. Thank you for joining the league!";
+function sendWelcomeDm(toHandle){
+  try {
+    sh_(SHEET_DMS).appendRow([ newId('dm_'), ADMIN_HANDLE, ADMIN_NAME, toHandle, WELCOME_MSG, new Date().toISOString(), '' ]);
+  } catch (e) {}   // never let a welcome-note hiccup block account creation
+}
+
 function register(body) {
   var handle = cleanHandle(body.handle);
   if (!handle) return { ok: false, error: 'Handle: 2\u201340 letters, digits, _ . -' };
@@ -351,12 +360,14 @@ function register(body) {
       if (String(v[r][0]).trim().toLowerCase() === key) {
         if (String(v[r][2] || '') === '') {          // unclaimed v1 account — claim it
           sh.getRange(r + 1, 1, 1, 6).setValues([[handle, name, auth, v[r][3] || '{}', when, avatar || v[r][5] || '']]);
+          sendWelcomeDm(handle);
           return { ok: true, claimed: true, handle: handle };
         }
         return { ok: false, error: 'That handle is taken \u2014 sign in instead.' };
       }
     }
     sh.appendRow([handle, name, auth, '{}', when, avatar]);
+    sendWelcomeDm(handle);
     return { ok: true, created: true, handle: handle };
   } finally {
     lock.releaseLock();

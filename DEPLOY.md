@@ -113,7 +113,7 @@ here as backup/reference. To update the live backend:
 The site currently points at:
 
 ```
-https://script.google.com/macros/s/AKfycbxcc7UOaNjYl4IcGiUucV-X8GNI5M2pHwhfcfSD4W4DptJ7gC1A14S_VzAgZOvJO1aQIA/exec
+https://script.google.com/macros/s/AKfycbzf6elYznU-a0uAF_AjseWOi6Me1UnL_cCCbaeFzfLVOjumqw65w_NFQk2IhvQHfTGMPw/exec
 ```
 
 This lives in **`gg-config.js`** (`GyojiGuide.API_URL`) — the single source of
