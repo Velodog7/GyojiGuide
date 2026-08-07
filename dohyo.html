@@ -1429,9 +1429,16 @@
   .bz__head span:nth-child(2){ text-align:center }
   .bz__rank{ text-align:center; font-family:ui-monospace,Menlo,monospace; font-size:10px; color:var(--dim);
           background:rgba(68,52,79,.55); border:1px solid var(--line); border-radius:2px; padding:3px 0 }
-  .bz__side{ display:flex; align-items:baseline; gap:9px; padding:7px 6px; min-width:0; border-radius:3px }
+  .bz__side{ display:flex; align-items:center; gap:9px; padding:7px 6px; min-width:0; border-radius:3px }
   .bz__e{ justify-content:flex-end }            /* names hug the rank in the middle */
   .bz__w{ justify-content:flex-start }
+  .bz__who{ display:flex; flex-direction:column; min-width:0; gap:1px }
+  .bz__e .bz__who{ align-items:flex-end }
+  .bz__w .bz__who{ align-items:flex-start }
+  .bz__vs{ font-family:ui-monospace,Menlo,monospace; font-size:9.5px; letter-spacing:.02em;
+           color:var(--faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100% }
+  .bz__side.won .bz__vs{ color:var(--win) }
+  .bz__side.lost .bz__vs{ color:var(--loss) }
   .bz__side .nm{ font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
   .bz__side .rec{ font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--dim); min-width:44px }
   .bz__e .rec{ text-align:left } .bz__w .rec{ text-align:right }
@@ -2761,6 +2768,37 @@ function winProbE(eE, eW, fE, fW){
   return 1 / (1 + Math.pow(10, (dW - dE) / ELO_SCALE));
 }
 
+const H2H_PTS = 14;   // Elo-equivalent tilt per net all-time head-to-head win (capped)
+function clampN(v, lo, hi){ return v < lo ? lo : v > hi ? hi : v; }
+
+/* Health/condition — drawn fresh at the start of each simulated basho, so it
+   shifts run to run. Most men arrive around normal; a minority carry a knock
+   (negative) or come in peak shape (positive). It's an Elo-equivalent modifier
+   applied for the whole tournament. */
+function drawConditions(rng){
+  const c = {};
+  for (const n of Object.keys(ROSTER)){
+    const r = rng();
+    c[n] = r < 0.15 ? -(18 + Math.floor(rng() * 62))   // ~15% nicked up:  -18…-80
+         : r < 0.27 ?  (10 + Math.floor(rng() * 28))   // ~12% peak form:  +10…+38
+         : 0;
+  }
+  return c;
+}
+
+/* P(east wins), from Elo + current form + all-time head-to-head + condition.
+   The random roll against this in matchDay/realDay is what keeps outcomes
+   uncertain — a favourite is likely, never guaranteed. */
+function boutProb(e, w, st, h2h, cond){
+  let hE = 0, hW = 0;
+  const m = /^(\d+)-(\d+)$/.exec(String(h2h || ""));
+  if (m) { hE = +m[1]; hW = +m[2]; }
+  const tilt = H2H_PTS * clampN(hE - hW, -6, 6);          // cap so old rivalries don't dominate
+  const eE = elo(e) + (cond ? cond[e] || 0 : 0) + tilt;
+  const eW = elo(w) + (cond ? cond[w] || 0 : 0);
+  return winProbE(eE, eW, st[e].w - st[e].l, st[w].w - st[w].l);
+}
+
 /* kimarite: each man wins with his OWN technique. His signature style tags
    (sig, from Sumo Slapdown) map to the finishing moves they imply; the primary
    style dominates, so his most-common kimarite is the modal outcome, with a
@@ -2808,7 +2846,7 @@ function seedMet(){
   return met;
 }
 
-function matchDay(divName, st, met, rng){
+function matchDay(divName, st, met, rng, cond){
   const pool = ROSTER_BY_DIV[divName].slice()
     .sort((a,b) => (st[b].w - st[a].w) || (elo(b) - elo(a)));   // by record, then rank
   const legal = (x,y) => x !== y && !met.has(pairKey(x,y)) && ROSTER[x].stable !== ROSTER[y].stable;
@@ -2850,7 +2888,7 @@ function matchDay(divName, st, met, rng){
     const sx = ROSTER[x].code.slice(-1), sy = ROSTER[y].code.slice(-1);
     if (sx === sy) { if (elo(y) > elo(x)) { e = y; w = x; } }
     else if (sx === "w") { e = y; w = x; }
-    const pe = winProbE(elo(e), elo(w), st[e].w - st[e].l, st[w].w - st[w].l);
+    const pe = boutProb(e, w, st, "0-0", cond);
     const eastWins = rng() < pe;
     if (eastWins) { st[e].w++; st[w].l++; } else { st[w].w++; st[e].l++; }
     const sig = ROSTER[eastWins ? e : w].sig;
@@ -2858,13 +2896,13 @@ function matchDay(divName, st, met, rng){
   });
 }
 
-function realDay(D, st, rng){                                  // real announced card → project every bout
+function realDay(D, st, rng, cond){                                  // real announced card → project every bout
   const src = REAL_SNAP[String(D)], out = {};
   for (const div of ["makuuchi","juryo"]) {
     out[div] = src[div].map(b => {
       const t = b.slice();
       const e = t[1], w = t[5];                                // keep matchup + all-time h2h (t[6])
-      const pe = winProbE(elo(e), elo(w), st[e].w - st[e].l, st[w].w - st[w].l);
+      const pe = boutProb(e, w, st, t[6], cond);
       const eastWins = rng() < pe;
       t[2] = eastWins ? "e" : "w";
       t[3] = pickKimarite(rng, ROSTER[eastWins ? e : w].sig);
@@ -2888,10 +2926,11 @@ function championOf(st, rng){                                  // Makuuchi yūsh
 }
 function runSeason(rng, fill){
   const st = freshStandings(), met = seedMet(), days = {};
+  const cond = drawConditions(rng);                            // this run's health/condition draw
   for (let D = 1; D <= BASHO_DAYS; D++){                        // the whole tournament, Day 1 → 15
     const day = REAL_SNAP[String(D)]                            // real announced opening cards where known
-      ? realDay(D, st, rng)
-      : { makuuchi: matchDay("makuuchi", st, met, rng), juryo: matchDay("juryo", st, met, rng) };
+      ? realDay(D, st, rng, cond)
+      : { makuuchi: matchDay("makuuchi", st, met, rng, cond), juryo: matchDay("juryo", st, met, rng, cond) };
     if (fill) days[String(D)] = { label:`Day ${D}`, sub:`Day ${D} · Simulation`,
                                   makuuchi:day.makuuchi, juryo:day.juryo };
   }
@@ -2972,9 +3011,13 @@ function bzCell(name, side, upto){
   if (!name) return `<div class="bz__side bz__${side}"></div>`;
   const res = RESULTS[name]?.[String(upto)];               // this day's result
   const cls = res === "w" ? "won" : res === "l" ? "lost" : "";
-  const nm  = `<span class="nm">${name}</span>`;
+  const bt  = boutFor(name, upto);                          // who he actually fought this day
+  const vs  = bt && bt.opp
+    ? `<span class="bz__vs">${bt.decided ? (bt.won ? "def. " : "lost to ") : "vs "}${bt.opp}</span>`
+    : `<span class="bz__vs"></span>`;
+  const who = `<span class="bz__who"><span class="nm">${name}</span>${vs}</span>`;
   const rec = `<span class="rec">${recordStr(name, upto)}</span>`;
-  return `<div class="bz__side bz__${side} ${cls}">${side === "e" ? rec + nm : nm + rec}</div>`;
+  return `<div class="bz__side bz__${side} ${cls}">${side === "e" ? rec + who : who + rec}</div>`;
 }
 function buildDayModal(){
   const upto = Number(day);

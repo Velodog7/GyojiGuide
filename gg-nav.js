@@ -12,7 +12,7 @@
   "use strict";
   var GGN_LOGO="<img src=\"SumoSlapdown-logowide.svg\" alt=\"Sumo Slapdown\" class=\"ggn-logo-img\">";
   var LINKS = [
-    { href: "banzuke.html", label: "Welcome",      match: ["banzuke.html", "banzuke"] },
+    { href: "banzuke.html", label: "About",      match: ["banzuke.html", "banzuke"] },
     { href: "index.html",   label: "Analysis",     match: ["", "index.html", "index"] },
     { href: "dohyo.html",   label: "Simulation",   match: ["dohyo.html", "dohyo"] },
     { href: "fantasy.html", label: "Fantasy",      match: ["fantasy.html", "fantasy"] }
