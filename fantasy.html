@@ -161,7 +161,7 @@
   .scorebox b{ color:var(--ink) }
 
   /* ── countdown to the next basho ─────────────────────── */
-  .lb-logo{ display:block; margin:4px auto 20px; width:auto; max-width:min(320px,72%); height:auto }
+  .lb-logo{ display:block; margin:2px auto 14px; width:min(320px,72%); aspect-ratio:2/1; object-fit:cover; object-position:center }
   .countdown{ margin:0 0 22px; border:1px solid rgba(var(--sun-rgb),.35); border-radius:var(--radius-sm);
         padding:18px 20px; background:linear-gradient(160deg, rgba(var(--sun-rgb),.09), rgba(var(--sun-rgb),.02));
         text-align:center }
@@ -2199,8 +2199,9 @@ function setView(v){
   document.querySelectorAll(".tab").forEach(t=>t.setAttribute("aria-selected","false"));
   $("v-"+v).classList.add("on");
   $("tab-"+v).setAttribute("aria-selected","true");
-  if (v==="team") { loadBoard(); loadLbBoard(); }
+  if (v==="team") loadBoard();
   if (v==="leagues") loadLeagues();
+  if (typeof loadLbBoard === "function") loadLbBoard();   // load the chat wherever its tab now lives
 }
 $("refreshBtn").onclick = loadBoard;
 
