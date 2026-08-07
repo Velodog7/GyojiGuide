@@ -158,9 +158,9 @@
   +'.ggb-top{display:grid;grid-template-columns:auto 1fr auto;align-items:flex-end;gap:6px;padding:2px 12px 0;position:relative;z-index:6;max-width:100%}'
   +'.ggb-side-h{font-size:20px;font-weight:900;color:#2a2018;text-shadow:0 1px 0 rgba(255,255,255,.35);line-height:1;text-align:center}'
   +'.ggb-side-h em{display:block;font-style:normal;font-family:"IBM Plex Mono",monospace;font-size:8px;letter-spacing:.16em;color:#7a6a4a;margin-top:2px}'
-  +'.ggb-sanyaku{display:flex;justify-content:center;gap:clamp(20px,9vw,96px);min-width:0;flex-wrap:nowrap}'  /* groups: gap scales with width so nobody is clipped */
-  +'.ggb-san{display:flex;align-items:flex-end;min-width:0}'
-  +'.ggb-san .ggb-fig{margin-left:clamp(-38px,-4vw,-14px)}.ggb-san .ggb-fig:first-child{margin-left:0}'  /* overlap within a group, scales too */
+  +'.ggb-sanyaku{display:flex;justify-content:center;gap:clamp(200px,26vw,340px);min-width:0;flex-wrap:nowrap}'  /* centre gap = cartouche width, so each group spans its flank */
+  +'.ggb-san{display:flex;align-items:flex-end;justify-content:space-evenly;flex:1 1 0;min-width:0}'  /* spread evenly across the flank, like the grid below */
+  +'.ggb-san .ggb-fig{margin-left:0}'
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));'
     +'gap:2px 1px;align-content:start;justify-items:stretch;padding:4px 4px 0}'
@@ -192,6 +192,7 @@
   +'.ggb-off figcaption{font-size:9px;font-weight:800;color:#3a2c12;margin-top:1px}'
   +'@media(max-width:760px){.ggb-fig{--fw:clamp(30px,5.4vw,32px)}.ggb-big{--fw:clamp(58px,15vw,64px)}.ggb-fig figcaption{font-size:7px}'
     +'.ggb-sanyaku{gap:clamp(2px,1vw,20px)}.ggb-center{width:clamp(120px,28vw,220px)}'
+    +'.ggb-san{flex:0 1 auto;justify-content:center}'                            /* compact cluster on small screens */
     +'.ggb-san .ggb-fig{margin-left:clamp(-40px,-9vw,-16px)}}'                   /* bigger sanyaku, packed tight so they stay large on thin screens */
   +'@media(max-width:520px){.ggb-fig figcaption{display:none}.ggb-off figcaption{display:none}'
     +'.ggb-big{--fw:clamp(60px,17vw,72px)}.ggb-san .ggb-fig{margin-left:clamp(-46px,-11vw,-22px)}'  /* larger still + tighter on phones */
