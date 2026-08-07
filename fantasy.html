@@ -2033,11 +2033,12 @@ function renderMessages(msgs){
 /* ---------- leaderboard board (site-wide, shown on the Leaderboard tab) ---------- */
 let boardMsgs = [];
 async function loadLbBoard(){
+  renderLbBoard();                          // show the chat shell right away — never wait on the network
   try {
     const r = await GyojiGuide.board();
     boardMsgs = (r && r.ok) ? (r.messages||[]) : [];
-  } catch (e) { boardMsgs = []; }   // fetch failed — still render the shell so the chat never vanishes
-  renderLbBoard();
+    renderLbBoard();                        // fill in posts once (if) they arrive
+  } catch (e) { /* fetch failed or hung — the shell is already on screen */ }
 }
 function boardThreadHTML(msgs, parentId){
   return msgs.filter(m=>(m.parentId||"")===parentId).map(m=>{
