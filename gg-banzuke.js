@@ -126,11 +126,11 @@
       +   '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
       + '</div>'
       + '<div class="ggb-body">'
-      +   '<div class="ggb-col ggb-colW">'+zigzag(westFile, false)+'</div>'
+      +   '<div class="ggb-col ggb-colW">'+westFile.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
       +   '<div class="ggb-center">'
       +     officials()
       +   '</div>'
-      +   '<div class="ggb-col ggb-colE">'+zigzag(eastFile, true)+'</div>'
+      +   '<div class="ggb-col ggb-colE">'+eastFile.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
       + '</div>'
       + '</div>';
   }
@@ -162,9 +162,11 @@
   +'.ggb-san{display:flex;align-items:flex-end;min-width:0}'
   +'.ggb-san .ggb-fig{margin-left:clamp(-38px,-4vw,-14px)}.ggb-san .ggb-fig:first-child{margin-left:0}'  /* overlap within a group, scales too */
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
-  +'.ggb-col{position:relative;overflow:visible}'
+  +'.ggb-col{position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(3,1fr);'
+    +'gap:2px 0;align-content:start;justify-items:center;padding:6px 6px 0}'
   +'.ggb-fig{position:relative;width:var(--fw,46px);flex:0 0 auto;text-align:center}'
-  +'.ggb-col .ggb-fig{position:absolute}'
+  +'.ggb-col .ggb-fig{position:relative;--fw:clamp(44px,6.6vw,82px)}'      /* neat rows, larger figures that fill the flank */
+  +'.ggb-col .ggb-fig figcaption{display:none}'                            /* names off in the crowd — like a printed banzuke sheet */
   +'.ggb-fig img{width:100%;height:auto;display:block}'
   +'.ggb-fig[data-n="Hoshoryu"] img{transform:scale(1.22);transform-origin:50% 100%}'  /* was rendering small */
   /* names: vertical, alternating above / below the figure so neighbours never collide */
