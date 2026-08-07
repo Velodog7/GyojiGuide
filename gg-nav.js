@@ -39,8 +39,8 @@
       }).join("") +
       '</div>' +
       '<div class="ggn-right">' +
-        '<button type="button" class="ggn-help" id="ggnHelp" aria-label="Help & feedback" title="Help & feedback">?</button>' +
         '<div class="ggn-acct"></div>' +
+        '<button type="button" class="ggn-help" id="ggnHelp" aria-label="Help & feedback" title="Help & feedback">?</button>' +
       '</div>' +
       '</div>';
     document.body.insertBefore(nav, document.body.firstChild);
@@ -75,17 +75,20 @@
   }
 
   var CSS =
+    /* smooth cross-fade between page loads where the browser supports it
+       (same-origin MPA navigations; ignored gracefully elsewhere) */
+    '@view-transition{navigation:auto}' +
     '#gg-nav{position:relative;width:100%;z-index:900;' +
       'background:rgba(20,22,30,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);' +
       'border-bottom:1px solid rgba(216,178,90,.25);font-family:"Space Grotesk","Zen Kaku Gothic New",system-ui,sans-serif}' +
     '.ggn-inner{max-width:1180px;margin:0 auto;min-height:68px;padding:0 20px;' +
-      'display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}' +
+      'display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px}' +
     '.ggn-brand{grid-column:1;justify-self:start;display:inline-flex;align-items:center;gap:8px;' +
       'text-decoration:none;color:#f4ecd8;font-weight:700;font-size:.98rem;letter-spacing:.01em;white-space:nowrap}' +
     '.ggn-brand svg,.ggn-brand img{height:68px;width:auto;display:block}' +
     '.ggn-beta{align-self:flex-start;margin-top:14px;margin-left:-2px;font-family:"Space Grotesk",system-ui,sans-serif;' +
       'font-weight:600;font-size:.62rem;letter-spacing:.14em;text-transform:lowercase;color:#d8b25a;opacity:.85}' +
-    '.ggn-links{grid-column:2;justify-self:center;display:flex;gap:6px;align-items:stretch}' +
+    '.ggn-links{grid-column:2;justify-self:end;display:flex;gap:6px;align-items:stretch}' +
     '.ggn-link{display:flex;align-items:center;justify-content:center;box-sizing:border-box;height:40px;' +
       'font-family:"Potta One","Space Grotesk",system-ui,sans-serif;font-weight:400;font-size:.9rem;letter-spacing:.05em;text-transform:uppercase;' +
       'text-decoration:none;color:#c7cbd9;padding:0 18px;border-radius:10px;transition:color .15s,background .15s}' +
@@ -111,7 +114,7 @@
       '.ggn-brand{grid-column:1}' +
       '.ggn-brand svg,.ggn-brand img{height:52px}' +
       '.ggn-beta{margin-top:10px;font-size:.56rem}' +
-      '.ggn-burger{display:flex;justify-self:start}' +
+      '.ggn-burger{display:flex;justify-self:end}' +
       '.ggn-right{grid-column:3}' +
       '.ggn-links{grid-column:1 / -1;flex-direction:column;align-items:stretch;gap:4px;' +
         'position:absolute;left:0;right:0;top:100%;padding:8px 14px 14px;' +
@@ -344,6 +347,10 @@
     build();
     trackPageview();
   }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount);
-  else mount();
+  // Mount as soon as <body> exists rather than waiting for DOMContentLoaded.
+  // The gg-nav script sits at the top of <body>, so building now inserts the
+  // bar before the rest of the page renders — no downward content shift (jump)
+  // on each page load.
+  if (document.body) mount();
+  else document.addEventListener("DOMContentLoaded", mount);
 })();

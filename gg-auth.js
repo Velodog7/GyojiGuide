@@ -577,6 +577,9 @@
 
   /* ---------------- boot ---------------- */
   function boot(){ ensureCSS(); mountNav(0); }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
-  else boot();
+  // Mount as soon as <body> exists (gg-nav has already built the .ggn-acct slot
+  // synchronously by this point), so the account control appears with the bar
+  // instead of popping in on DOMContentLoaded and shoving the links sideways.
+  if (document.body) boot();
+  else document.addEventListener("DOMContentLoaded", boot);
 })();
