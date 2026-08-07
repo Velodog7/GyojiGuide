@@ -10,7 +10,8 @@ under "Not included" below.
 ## What's in this zip
 
 **Pages**
-- `index.html` — Analysis
+- `index.html` — About (home; the former Welcome/banzuke page)
+- `analysis.html` — Analysis
 - `dohyo.html` — Simulation
 - `fantasy.html` — Fantasy
 - `admin.html` — private admin dashboard (not linked in nav)
@@ -38,8 +39,7 @@ under "Not included" below.
 These are unchanged and were never uploaded to this chat, so grab them from
 your existing deployment / repo:
 
-- `banzuke.html` — the Welcome page
-- `gg-banzuke.js` — the Welcome page's crowd illustration
+- `gg-banzuke.js` — the About (home) page's banzuke crowd illustration
 - `taiko-radio.js` — background taiko radio player
 - `SumoSlapdown-logowide.svg` — nav logo (every page)
 - `SumoSlapdown-logoTall.svg` — Welcome-page centerpiece

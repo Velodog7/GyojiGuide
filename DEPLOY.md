@@ -12,8 +12,8 @@ Netlify Drop, etc.). No bundler, no npm.
 **Pages**
 | File | Nav label |
 |---|---|
-| `banzuke.html` | Welcome |
-| `index.html` | Analysis |
+| `index.html` | About (home) |
+| `analysis.html` | Analysis |
 | `dohyo.html` | Simulation |
 | `fantasy.html` | Fantasy |
 
