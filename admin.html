@@ -63,7 +63,7 @@ nav.tabs{ position:sticky; top:0; z-index:30; background:rgba(14,15,20,.92); bac
 @media(max-width:640px){ .tab svg{ width:17px; height:17px } .tab-lab{ font-size:.62rem; font-weight:500; line-height:1.1 } }
 .tab:hover{ color:var(--dim) }
 .tab[aria-selected="true"]{ color:var(--sun); border-bottom-color:var(--red) }
-.tab .n{ position:absolute; top:6px; left:50%; transform:translateX(4px); font-family:"WDXL Lubrifont TC",monospace; font-size:.58rem;
+.tab .n{ position:absolute; top:6px; left:50%; transform:translateX(4px); font-family:"WDXL Lubrifont TC",monospace; font-size:0.684rem;
       font-weight:600; color:#fff; background:var(--red); border-radius:999px; min-width:15px; height:15px;
       display:flex; align-items:center; justify-content:center; padding:0 4px; line-height:1 }
 
@@ -76,11 +76,11 @@ main{ max-width:var(--maxw); margin:0 auto; padding:24px 20px 80px }
 /* ---------- generic bits ---------- */
 .grid-cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:22px }
 .stat-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:15px 17px }
-.stat-card .k{ font-family:"WDXL Lubrifont TC",monospace; font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted) }
+.stat-card .k{ font-family:"WDXL Lubrifont TC",monospace; font-size:0.732rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted) }
 .stat-card .v{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.7rem; margin-top:4px }
 .stat-card .v.small{ font-size:1.1rem }
 
-.badge{ display:inline-flex; align-items:center; gap:6px; font-family:"WDXL Lubrifont TC",monospace; font-size:.72rem; font-weight:600; padding:4px 10px; border-radius:999px }
+.badge{ display:inline-flex; align-items:center; gap:6px; font-family:"WDXL Lubrifont TC",monospace; font-size:0.85rem; font-weight:600; padding:4px 10px; border-radius:999px }
 .badge .dot{ width:7px; height:7px; border-radius:50% }
 .badge.up{ color:var(--up); background:rgba(67,192,138,.14) }
 .badge.up .dot{ background:var(--up) }
@@ -121,14 +121,14 @@ td{ padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top }
 tbody tr:hover{ background:rgba(255,255,255,.025) }
 tbody tr:last-child td{ border-bottom:0 }
 td.handle{ font-weight:600; white-space:nowrap }
-td.handle small{ display:block; color:var(--muted); font-weight:400; font-family:"WDXL Lubrifont TC",monospace; font-size:.72rem }
+td.handle small{ display:block; color:var(--muted); font-weight:400; font-family:"WDXL Lubrifont TC",monospace; font-size:0.85rem }
 td.actions{ white-space:nowrap }
 td.actions .btn{ margin-right:6px }
 td.msg-body{ max-width:420px; white-space:pre-wrap; word-break:break-word; color:var(--dim); line-height:1.45 }
 td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space:nowrap }
 .warn-msg{ display:block; margin-top:3px; font-size:.74rem; color:#e0a23a }
 .empty-row td{ text-align:center; color:var(--muted); padding:24px }
-.load-row td{ text-align:center; color:var(--muted); padding:24px; font-family:"WDXL Lubrifont TC",monospace; font-size:.8rem }
+.load-row td{ text-align:center; color:var(--muted); padding:24px; font-family:"WDXL Lubrifont TC",monospace; font-size:0.944rem }
 .ld-row{ display:inline-flex; align-items:center; justify-content:center; gap:10px }
 .ld-ring{ width:16px; height:16px; border-radius:50%; flex:none; border:2px solid rgba(216,178,90,.18); border-top-color:var(--sun); animation:ld-spin .8s linear infinite }
 @keyframes ld-spin{ to{ transform:rotate(360deg) } }

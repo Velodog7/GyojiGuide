@@ -175,7 +175,7 @@
       'align-items:center;justify-content:center;gap:14px;pointer-events:none;z-index:5}' +
     '.gg-spinner__ring{width:44px;height:44px;border-radius:50%;border:3px solid rgba(216,178,90,.16);' +
       'border-top-color:#d8b25a;animation:gg-spin .85s linear infinite}' +
-    '.gg-spinner__label{font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace;font-size:.62rem;' +
+    '.gg-spinner__label{font-family:"WDXL Lubrifont TC",ui-monospace,monospace;font-size:0.732rem;' +
       'letter-spacing:.22em;text-transform:uppercase;color:#878da0;animation:gg-pulse 1.4s ease-in-out infinite}' +
     '.gg-spin{display:inline-block;width:14px;height:14px;border-radius:50%;flex:none;' +
       'border:2px solid rgba(216,178,90,.18);border-top-color:#d8b25a;animation:gg-spin .8s linear infinite;' +

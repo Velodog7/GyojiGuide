@@ -93,7 +93,7 @@
     ".gga-acctrow__initials{color:#e0a23a;font-weight:700;font-size:1.1rem}"+
     ".gga-acctrow__id{flex:1;min-width:0}"+
     ".gga-acctrow b{display:block;color:#f1f2f6;font-size:1rem}"+
-    ".gga-acctrow small{color:#878da0;font-family:'WDXL Lubrifont TC',monospace;font-size:.75rem}"+
+    ".gga-acctrow small{color:#878da0;font-family:'WDXL Lubrifont TC',monospace;font-size:0.885rem}"+
     ".gga-editbtn{flex:none;width:30px;height:30px;border-radius:8px;border:1px solid #2a2d38;background:#1b1e27;"+
       "color:#878da0;font-size:.85rem;cursor:pointer;display:grid;place-items:center}"+
     ".gga-editbtn:hover{color:#e0a23a;border-color:#e0a23a}"+
