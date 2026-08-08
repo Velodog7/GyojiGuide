@@ -6,7 +6,7 @@
 <title>Dohyō — Nagoya 2026, Day 1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Potta+One&family=WDXL+Lubrifont+TC&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
     /* palette */
@@ -114,7 +114,7 @@
   }
   .hud__record{
     display:flex; align-items:baseline; gap:.55cqw;
-    font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
+    font-family:"Potta One","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
     font-weight:900; font-size:2.4cqw; line-height:1; color:#fff;
   }
   .hud__record b{ color:#fff }
@@ -144,7 +144,7 @@
     position:absolute; top:23%;
     transform:translateY(-50%);
     display:flex; flex-direction:column; align-items:center; gap:.25cqw;
-    font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",
+    font-family:"Potta One","Hiragino Kaku Gothic ProN","Yu Gothic",
                 "Noto Sans JP",system-ui,sans-serif;
     text-shadow:0 .2cqw 1.4cqw #000;
     pointer-events:none;
@@ -216,7 +216,7 @@
     position:absolute; top:45%; left:50%;
     transform:translateX(-50%) translateY(6px);
     display:flex; align-items:flex-start; justify-content:center;
-    font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",
+    font-family:"Potta One","Hiragino Kaku Gothic ProN","Yu Gothic",
                 "Noto Sans JP",system-ui,sans-serif;
     white-space:nowrap; color:var(--ink);
     text-shadow:0 .15cqw 1cqw #000, 0 0 1.6cqw #000, 0 0 3cqw rgba(0,0,0,.9);
@@ -238,7 +238,7 @@
   }
   .call__stack{ display:flex; flex-direction:column; align-items:center; gap:.35cqw }
   /* a wrestler from your team, called out on the dohyō */
-  .call__mine{ font-style:normal; font-family:"IBM Plex Mono",ui-monospace,monospace;
+  .call__mine{ font-style:normal; font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace;
         font-size:1cqw; font-weight:700; letter-spacing:.18em; text-transform:uppercase;
         color:#0d0f15; background:var(--sun); padding:.2cqw .8cqw; border-radius:99px;
         box-shadow:0 0 0 1px rgba(var(--sun-rgb),.45); }
@@ -285,7 +285,7 @@
 
   .call__score{                     /* the record as a number, e.g. 7–8 */
     margin-top:.5cqw;
-    font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace;
   }
   .call__rec{
     font-weight:600; font-size:1.5cqw; letter-spacing:.06em; color:var(--ink);
@@ -305,7 +305,7 @@
   .call__bio i + i::before{ content:"·"; margin-right:.7cqw; color:rgba(231,222,208,.35) }
   .call__rank{
     display:flex; align-items:center; gap:.6cqw; margin-top:.5cqw;
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace;
     font-size:1.15cqw; letter-spacing:.04em;
   }
   .call__rank em{
@@ -350,7 +350,7 @@
     opacity:0;
   }
   .shout b{
-    font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
+    font-family:"Potta One","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
     font-weight:900; font-size:3.4cqw; line-height:1; letter-spacing:.08em;
     text-shadow:0 .25cqw .8cqw rgba(0,0,0,.75);
   }
@@ -403,13 +403,13 @@
     text-align:center; pointer-events:none; opacity:0;
   }
   .kk b{
-    font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
+    font-family:"Potta One","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
     font-weight:900; font-size:6cqw; line-height:1; letter-spacing:.1em;
     color:var(--sun);
     text-shadow:0 0 2cqw rgba(var(--sun-rgb),.6), 0 .3cqw 1.2cqw #000, 0 0 5cqw rgba(var(--sun-rgb),.35);
   }
   .kk span{
-    font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace;
     font-size:1.2cqw; font-weight:600; letter-spacing:.28em; text-transform:uppercase;
     color:var(--ink); text-shadow:0 .2cqw .6cqw #000;
   }
@@ -860,7 +860,7 @@
   }
   .menu__brand{
     display:flex; align-items:baseline; gap:10px; flex:0 0 auto;
-    font-family:"Space Grotesk",sans-serif;
+    font-family:"Zen Maru Gothic",sans-serif;
     font-size:15px; letter-spacing:.01em; color:var(--dim);
     white-space:nowrap;
   }
@@ -876,7 +876,7 @@
   .menu select{
     background:var(--surface); color:var(--ink);
     border:1px solid var(--line); border-radius:var(--radius-sm);
-    font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.08em;
+    font-family:"WDXL Lubrifont TC",monospace; font-size:11px; letter-spacing:.08em;
     padding:6px 8px; cursor:pointer; flex:0 0 auto;
   }
   .menu select:hover{ border-color:var(--line2) }
@@ -910,7 +910,7 @@
 
   /* ── bout bar ─────────────────────────────────────────────── */
   .bar__h2h{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace;
     font-size:11px; letter-spacing:.06em; color:var(--dim);
   }
   .bar__h2h b{ color:#fff; font-weight:600 }
@@ -927,7 +927,7 @@
   .split__w{ background:var(--west) }
   .split__pct{
     width:100%; display:flex; justify-content:space-between;
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10px;
+    font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; font-size:10px;
   }
   .split__pct b{ color:#fff; font-weight:600 }
   .split__pct i{ font-style:normal; color:#fff }
@@ -997,13 +997,13 @@
   .bout__e, .bout__w{ display:flex; align-items:baseline; gap:9px; min-width:0 }
   .bout__w{ justify-content:flex-end; text-align:right }
   .bout__rank{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace;
     font-size:9px; letter-spacing:.04em; color:var(--dim); white-space:nowrap;
     background:rgba(68,52,79,.55); border:1px solid var(--line);
     padding:2px 5px; border-radius:2px;
   }
   .bout__past{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace;
     font-size:11px; text-align:right; color:var(--faint);
   }
   .bout__mid.pending{ color:var(--faint); font-style:italic; letter-spacing:.04em }
@@ -1064,7 +1064,7 @@
   }
   .menu__steps li{
     display:flex; align-items:center; gap:7px;
-    font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.14em;
+    font-family:"WDXL Lubrifont TC",monospace; font-size:10px; letter-spacing:.14em;
     text-transform:uppercase; color:var(--faint); white-space:nowrap;
   }
   .menu__steps li .num{
@@ -1105,10 +1105,10 @@
 
   .intro{ width:min(1180px,100%); margin:0 auto; padding:8px 20px 44px }
   .intro__title{ text-align:center; margin-bottom:6px;
-        font-family:"Space Grotesk",sans-serif; font-weight:700;
+        font-family:"Zen Maru Gothic",sans-serif; font-weight:700;
         font-size:clamp(24px,4vw,38px); letter-spacing:-.01em; color:var(--ink) }
   .intro__title span{ color:var(--red) }
-  .intro__sub{ text-align:center; color:var(--faint); font-family:"IBM Plex Mono",monospace;
+  .intro__sub{ text-align:center; color:var(--faint); font-family:"WDXL Lubrifont TC",monospace;
         font-size:12px; letter-spacing:.16em; text-transform:uppercase; margin-bottom:22px }
   .intro__step{ font-size:10px; letter-spacing:.34em; text-transform:uppercase; color:var(--sun);
         margin:24px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--line) }
@@ -1165,7 +1165,7 @@
   }
   .ceremony__cap.on{ opacity:1 }
   .ceremony__cap b{ display:block;
-    font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
+    font-family:"Potta One","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
     font-weight:800; font-size:2.6cqw; letter-spacing:.06em;
     text-shadow:0 .2cqw .7cqw rgba(0,0,0,.7) }
   .ceremony__cap span{ font-size:1cqw; letter-spacing:.34em; text-transform:uppercase; color:var(--sun) }
@@ -1177,14 +1177,14 @@
   }
   body:not(.setup) .stage__title{ display:none }
   .stage__title b{
-    display:block; font-family:"Potta One","Space Grotesk",sans-serif; font-weight:400;
+    display:block; font-family:"Potta One","Zen Maru Gothic",sans-serif; font-weight:400;
     font-size:3.4cqw; line-height:1.05; letter-spacing:.02em; text-transform:uppercase; color:var(--ink);
     text-shadow:0 .3cqw 1cqw #000, 0 0 2cqw rgba(0,0,0,.9);
   }
   .stage__title b span{ color:var(--sun) }
   .stage__title-sub{
     display:block; margin-top:.7cqw;
-    font-family:"IBM Plex Mono",monospace; font-size:1.15cqw; font-weight:500;
+    font-family:"WDXL Lubrifont TC",monospace; font-size:1.15cqw; font-weight:500;
     letter-spacing:.18em; text-transform:uppercase; color:var(--sun);
     text-shadow:0 .2cqw .8cqw #000, 0 0 1.4cqw rgba(0,0,0,.95);
   }
@@ -1193,14 +1193,14 @@
   .team{ max-width:1100px; margin:0 auto; padding:22px 24px 40px }
   .team__head{ display:flex; align-items:flex-end; justify-content:space-between; gap:20px;
         padding-bottom:14px; border-bottom:1px solid var(--line); flex-wrap:wrap }
-  .team__head b{ display:block; font-family:"Space Grotesk",sans-serif; font-weight:700;
+  .team__head b{ display:block; font-family:"Zen Maru Gothic",sans-serif; font-weight:700;
         font-size:17px; letter-spacing:-.01em }
   .team__head span{ display:block; margin-top:4px; font-size:11px; letter-spacing:.16em;
         text-transform:uppercase; color:var(--faint) }
   .team__total{ text-align:right; line-height:1 }
   .team__total em{ display:block; font-style:normal; font-size:10px; letter-spacing:.32em;
         text-transform:uppercase; color:var(--faint); margin-bottom:6px }
-  .team__total b{ font-family:ui-monospace,Menlo,monospace; font-size:34px; color:var(--sun) }
+  .team__total b{ font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; font-size:34px; color:var(--sun) }
 
   .team__slots{ display:grid; gap:10px; margin:18px 0 24px;
         grid-template-columns:repeat(auto-fill,minmax(250px,1fr)) }
@@ -1213,7 +1213,7 @@
   .slotpick select:hover{ border-color:var(--line2) }
   .slotpick__line{ display:flex; align-items:baseline; justify-content:space-between; gap:10px;
         margin-top:8px; font-size:11px; color:var(--dim); min-height:15px }
-  .slotpick__line b{ font-family:ui-monospace,Menlo,monospace; color:var(--ink); font-weight:600 }
+  .slotpick__line b{ font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; color:var(--ink); font-weight:600 }
 
   /* ── team picker: full trading cards, à la Sumo Slapdown ─────── */
   .intro__slots{ grid-template-columns:repeat(7,minmax(0,1fr)) !important; gap:8px !important }
@@ -1239,7 +1239,7 @@
   .pcard.filled::after{ content:""; position:absolute; inset:0; z-index:2; pointer-events:none;
         background:radial-gradient(120% 80% at 50% 30%, transparent 45%, rgba(20,8,40,.55) 100%) }
   .pc-bg{ position:absolute; inset:0; display:grid; place-items:center;
-        font-family:"Space Grotesk",sans-serif; font-weight:700;
+        font-family:"Zen Maru Gothic",sans-serif; font-weight:700;
         font-size:clamp(40px,34cqw,86px); color:rgba(255,255,255,.13);
         line-height:.85; letter-spacing:-.03em; z-index:0; pointer-events:none; }
   .pc-photo{ position:absolute; left:50%; top:9%; transform:translateX(-50%);
@@ -1250,7 +1250,7 @@
   .pc-frame{ position:absolute; inset:5px; border:1px solid rgba(255,255,255,.2);
         border-radius:8px; z-index:4; pointer-events:none }
   .pc-brk{ position:absolute; top:9px; left:9px; z-index:5;
-        font-family:"IBM Plex Mono",monospace; font-size:.5rem; letter-spacing:.1em;
+        font-family:"WDXL Lubrifont TC",monospace; font-size:.5rem; letter-spacing:.1em;
         text-transform:uppercase; color:#fff; background:rgba(0,0,0,.45);
         border:1px solid rgba(255,255,255,.22); padding:3px 6px; border-radius:6px }
   .pc-x{ position:absolute; top:8px; right:8px; z-index:8; width:22px; height:22px;
@@ -1259,25 +1259,25 @@
   .pc-x:hover{ border-color:var(--tangerine); color:var(--tangerine) }
   .pc-idblock{ position:absolute; left:8px; right:8px; top:60%; bottom:38px; z-index:5;
         display:flex; flex-direction:column; justify-content:center; align-items:center; gap:2px }
-  .pc-kanji{ max-width:100%; text-align:center; font-family:"Zen Kaku Gothic New","Noto Serif JP",serif;
+  .pc-kanji{ max-width:100%; text-align:center; font-family:"Potta One","Noto Serif JP",serif;
         font-weight:700; font-size:clamp(12px,7cqw,17px); letter-spacing:.14em; color:#fff;
         text-shadow:0 2px 7px rgba(0,0,0,.95); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-  .pc-name{ max-width:100%; text-align:center; font-family:"Space Grotesk",sans-serif;
+  .pc-name{ max-width:100%; text-align:center; font-family:"Zen Maru Gothic",sans-serif;
         font-weight:700; font-size:clamp(11px,7.2cqw,15px); letter-spacing:.08em; text-transform:uppercase;
         color:#fff; text-shadow:0 2px 7px rgba(0,0,0,.95); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
   .pc-foot{ position:absolute; left:0; right:0; bottom:0; z-index:5; display:flex; align-items:center;
         gap:5px; padding:8px; background:rgba(8,6,14,.86); border-top:1px solid rgba(255,255,255,.14) }
-  .pc-rankline{ flex:1; min-width:0; font-family:"Space Grotesk",sans-serif; font-weight:700;
+  .pc-rankline{ flex:1; min-width:0; font-family:"Zen Maru Gothic",sans-serif; font-weight:700;
         font-size:clamp(.72rem,5.8cqw,.9rem); color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.85);
         overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left }
-  .pc-side{ flex:none; font-family:"IBM Plex Mono",monospace; font-weight:600;
+  .pc-side{ flex:none; font-family:"WDXL Lubrifont TC",monospace; font-weight:600;
         font-size:clamp(8px,4cqw,9.5px); letter-spacing:.1em; text-transform:uppercase;
         color:rgba(255,255,255,.62); white-space:nowrap }
   .pc-flag{ flex:none; font-size:clamp(11px,5.2cqw,14px); line-height:1 }
   .pc-empty{ color:var(--faint); font-size:.86rem; padding:14px; z-index:5 }
-  .pc-empty b{ display:block; font-family:"IBM Plex Mono",monospace; font-size:.55rem;
+  .pc-empty b{ display:block; font-family:"WDXL Lubrifont TC",monospace; font-size:.55rem;
         letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-bottom:8px }
-  .pc-empty .pc-cta{ display:block; margin-top:8px; font-family:"IBM Plex Mono",monospace;
+  .pc-empty .pc-cta{ display:block; margin-top:8px; font-family:"WDXL Lubrifont TC",monospace;
         font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; color:var(--sun) }
 
   /* ── the draft modal: available rikishi as cards that flip to reveal ── */
@@ -1288,9 +1288,9 @@
   .pickmodal__panel{ width:min(1040px,100%); margin:0 auto; }
   .pickmodal__head{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px;
         margin-bottom:18px; }
-  .pickmodal__title{ font-family:"Space Grotesk",sans-serif; font-weight:700; color:var(--ink);
+  .pickmodal__title{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; color:var(--ink);
         font-size:clamp(20px,3vw,28px); letter-spacing:-.01em; }
-  .pickmodal__title span{ display:block; margin-top:4px; font-family:"IBM Plex Mono",monospace;
+  .pickmodal__title span{ display:block; margin-top:4px; font-family:"WDXL Lubrifont TC",monospace;
         font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--sun); font-weight:500; }
   .pickmodal__close{ flex:none; width:38px; height:38px; border-radius:9px;
         border:1px solid var(--line2); background:var(--surface); color:var(--ink);
@@ -1315,7 +1315,7 @@
   .flip__back{ transform:rotateY(180deg);
         background:linear-gradient(158deg,#241a3f,#0f1c37);
         border:1px solid var(--line2); display:grid; place-items:center; }
-  .flip__back::before{ content:"力"; font-family:"Zen Kaku Gothic New","Noto Serif JP",serif;
+  .flip__back::before{ content:"力"; font-family:"Potta One","Noto Serif JP",serif;
         font-weight:900; font-size:52px; color:rgba(216,178,90,.5);
         text-shadow:0 2px 10px rgba(0,0,0,.6); }
   .flip__back::after{ content:""; position:absolute; inset:6px; border-radius:9px;
@@ -1354,7 +1354,7 @@
         padding:8px 14px; font-size:13px; border-bottom:1px solid rgba(68,52,79,.4) }
   .uprow:last-child{ border-bottom:0 }
   .uprow__opp{ color:var(--dim) }
-  .uprow__opp em{ font-style:normal; font-family:ui-monospace,Menlo,monospace;
+  .uprow__opp em{ font-style:normal; font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace;
         font-size:11px; color:var(--faint); margin-left:6px }
   .uprow__gap{ font-size:11px; color:var(--win); white-space:nowrap }
 
@@ -1371,7 +1371,7 @@
   .tsrow--head{ font-size:9px; letter-spacing:.2em; text-transform:uppercase; color:var(--faint);
         background:rgba(68,52,79,.28) }
   .tsrow--sum{ background:rgba(var(--sun-rgb),.07); font-weight:700 }
-  .tsrow span:nth-child(n+3){ text-align:right; font-family:ui-monospace,Menlo,monospace }
+  .tsrow span:nth-child(n+3){ text-align:right; font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace }
   .tsrow__band{ font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint) }
   .tsrow__name{ color:var(--ink) }
   .tsrow__name em{ font-style:normal; font-size:11px; color:var(--dim); margin-left:8px }
@@ -1400,7 +1400,7 @@
   @keyframes cardIn{ from{ transform:translateY(10px) scale(.98); opacity:0 } }
   .modal__head{ display:flex; align-items:center; justify-content:space-between; gap:16px;
           padding:16px 20px; border-bottom:1px solid var(--line); }
-  .modal__head b{ font-family:"Zen Kaku Gothic New",system-ui,sans-serif; font-size:16px; letter-spacing:.05em }
+  .modal__head b{ font-family:"Potta One",system-ui,sans-serif; font-size:16px; letter-spacing:.05em }
   .modal__head span{ font-size:11px; letter-spacing:.24em; text-transform:uppercase; color:var(--dim); margin-left:10px }
   .modal__x{ background:none; border:1px solid var(--line); color:var(--dim); border-radius:2px;
           font-size:12px; letter-spacing:.1em; padding:7px 11px; cursor:pointer }
@@ -1418,7 +1418,7 @@
 
   .bz{ margin-top:14px }
   .bz__div{ position:sticky; top:0; z-index:1; background:var(--surface);
-          font-family:"Zen Kaku Gothic New",system-ui,sans-serif; font-size:12px; font-weight:700;
+          font-family:"Potta One",system-ui,sans-serif; font-size:12px; font-weight:700;
           letter-spacing:.28em; text-transform:uppercase; color:var(--sun); padding:8px 0 6px; }
   .bz__row{ display:grid; grid-template-columns:1fr 56px 1fr; align-items:center; gap:10px;
           border-bottom:1px solid rgba(68,52,79,.5); }
@@ -1427,7 +1427,7 @@
   .bz__head span{ padding:6px 4px }
   .bz__head span:last-child{ text-align:right }
   .bz__head span:nth-child(2){ text-align:center }
-  .bz__rank{ text-align:center; font-family:ui-monospace,Menlo,monospace; font-size:10px; color:var(--dim);
+  .bz__rank{ text-align:center; font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; font-size:10px; color:var(--dim);
           background:rgba(68,52,79,.55); border:1px solid var(--line); border-radius:2px; padding:3px 0 }
   .bz__side{ display:flex; align-items:center; gap:9px; padding:7px 6px; min-width:0; border-radius:3px }
   .bz__e{ justify-content:flex-end }            /* names hug the rank in the middle */
@@ -1435,12 +1435,12 @@
   .bz__who{ display:flex; flex-direction:column; min-width:0; gap:1px }
   .bz__e .bz__who{ align-items:flex-end }
   .bz__w .bz__who{ align-items:flex-start }
-  .bz__vs{ font-family:ui-monospace,Menlo,monospace; font-size:9.5px; letter-spacing:.02em;
+  .bz__vs{ font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; font-size:9.5px; letter-spacing:.02em;
            color:var(--faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100% }
   .bz__side.won .bz__vs{ color:var(--win) }
   .bz__side.lost .bz__vs{ color:var(--loss) }
   .bz__side .nm{ font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-  .bz__side .rec{ font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--dim); min-width:44px }
+  .bz__side .rec{ font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; font-size:11px; color:var(--dim); min-width:44px }
   .bz__e .rec{ text-align:left } .bz__w .rec{ text-align:right }
   .bz__side.won .nm{ color:var(--win); font-weight:700 }
   .bz__side.won{ background:rgba(var(--win-rgb),.07) }
@@ -1460,10 +1460,10 @@
     color:var(--sun);
   }
   .modal__champ b{
-    font-family:"Zen Kaku Gothic New",system-ui,sans-serif;
+    font-family:"Potta One",system-ui,sans-serif;
     font-size:26px; font-weight:800; letter-spacing:.03em; color:var(--ink);
   }
-  .modal__champ span{ font-family:ui-monospace,Menlo,monospace; font-size:13px; color:var(--dim) }
+  .modal__champ span{ font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; font-size:13px; color:var(--dim) }
   @keyframes champIn{ from{ opacity:0; transform:translateY(8px) } }
 
   /* the person's team, tallied inside the between-days modal */
@@ -1472,8 +1472,8 @@
         border-top:2px solid rgba(var(--sun-rgb),.5) }
   .dmt__head{ display:flex; align-items:baseline; justify-content:space-between;
         font-size:11px; letter-spacing:.24em; text-transform:uppercase; color:var(--sun); margin-bottom:10px }
-  .dmt__head b{ font-family:ui-monospace,Menlo,monospace; font-size:18px; letter-spacing:0; color:var(--ink) }
-  .dmt__dayrec{ font-style:normal; font-family:ui-monospace,Menlo,monospace; font-size:12px; letter-spacing:.04em;
+  .dmt__head b{ font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; font-size:18px; letter-spacing:0; color:var(--ink) }
+  .dmt__dayrec{ font-style:normal; font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; font-size:12px; letter-spacing:.04em;
         color:var(--dim); margin-left:10px }
   .dmt__rows{ display:flex; flex-direction:column; gap:3px }
   .dmt__row{ display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:0 12px;
@@ -1482,14 +1482,14 @@
   .dmt__row.won{  background:rgba(67,192,138,.14);  border-color:rgba(67,192,138,.4) }
   .dmt__row.lost{ background:rgba(226,86,74,.13);   border-color:rgba(226,86,74,.38) }
   .dmt__today{ order:-1; width:18px; height:18px; border-radius:50%; font-size:10px; font-weight:700;
-        display:grid; place-items:center; font-family:ui-monospace,Menlo,monospace; color:transparent }
+        display:grid; place-items:center; font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; color:transparent }
   .dmt__row.won  .dmt__today{ background:var(--win,#43c08a); color:#08130d }
   .dmt__row.lost .dmt__today{ background:#e2564a; color:#1a0605 }
   .dmt__name{ color:var(--ink); font-weight:500 }
   .dmt__row.won  .dmt__name{ color:#7ee0b4 }
   .dmt__row.lost .dmt__name{ color:#f0a097 }
-  .dmt__rec{ font-family:ui-monospace,Menlo,monospace; color:var(--dim) }
-  .dmt__pts{ text-align:right; font-family:ui-monospace,Menlo,monospace; color:var(--sun); min-width:34px }
+  .dmt__rec{ font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; color:var(--dim) }
+  .dmt__pts{ text-align:right; font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace; color:var(--sun); min-width:34px }
 
   /* the footer carries the day on — one tap and the next day's card runs */  .modal__foot{ display:flex; align-items:center; justify-content:space-between; gap:16px;
           padding:14px 20px; border-top:1px solid var(--line); background:var(--surface); }

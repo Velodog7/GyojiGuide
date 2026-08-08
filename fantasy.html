@@ -6,7 +6,7 @@
 <title>Sumo Slapdown · Fantasy Sumo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Potta+One&family=WDXL+Lubrifont+TC&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   /* many elements below set their own `display` (flex/grid/etc.) with equal CSS
      specificity to the browser's built-in [hidden]{display:none} rule, which lets
@@ -32,7 +32,7 @@
   /* ── header ─────────────────────────────────────────── */
   header.top{ padding:34px 0 6px }
   .brandline{ display:flex; align-items:center; gap:12px; flex-wrap:wrap }
-  h1.title{ font-family:"Potta One","Space Grotesk",sans-serif; font-weight:400; letter-spacing:.02em; text-transform:uppercase;
+  h1.title{ font-family:"Potta One","Zen Maru Gothic",sans-serif; font-weight:400; letter-spacing:.02em; text-transform:uppercase;
         font-size:clamp(1.5rem,3.6vw,2.25rem); margin:14px 0 4px }
   h1.title span{ color:var(--sun) }
   .sub{ color:var(--muted); max-width:70ch; line-height:1.55; margin:0 0 4px; font-size:.95rem }
@@ -44,10 +44,10 @@
         background:none; border:0; border-bottom:2px solid transparent; color:var(--muted); padding:9px 0; cursor:pointer; transition:color .12s }
   .tab svg{ width:20px; height:20px; display:block }
   .tab-lab{ font-size:.85rem; font-weight:600; letter-spacing:.01em; line-height:1.15; text-align:center }
-  .tab-lab__sub{ font-family:"IBM Plex Mono",monospace; font-weight:400; font-style:italic; opacity:.6; font-size:.85em }
+  .tab-lab__sub{ font-family:"WDXL Lubrifont TC",monospace; font-weight:400; font-style:italic; opacity:.6; font-size:.85em }
   .tab:hover{ color:var(--dim) }
   .tab[aria-selected="true"]{ color:var(--sun); border-bottom-color:var(--red) }
-  .tab .n{ position:absolute; top:6px; left:50%; transform:translateX(4px); font-family:"IBM Plex Mono",monospace; font-size:.58rem;
+  .tab .n{ position:absolute; top:6px; left:50%; transform:translateX(4px); font-family:"WDXL Lubrifont TC",monospace; font-size:.58rem;
         font-weight:600; color:#fff; background:var(--red); border-radius:999px; min-width:15px; height:15px;
         display:flex; align-items:center; justify-content:center; padding:0 4px; line-height:1 }
   /* keep tab text readable on desktop; scale it back down on narrow screens */
@@ -63,14 +63,14 @@
   .banner{ border:1px solid var(--line2); border-radius:var(--radius-sm); padding:12px 14px;
         font-size:.86rem; color:var(--dim); margin:0 0 18px; line-height:1.5 }
   .banner.warn{ border-color:rgba(var(--sun-rgb),.5); background:rgba(var(--sun-rgb),.07); color:var(--ink) }
-  .banner code{ font-family:"IBM Plex Mono",monospace; color:var(--sun); font-size:.8rem }
+  .banner code{ font-family:"WDXL Lubrifont TC",monospace; color:var(--sun); font-size:.8rem }
 
   /* ── signup ─────────────────────────────────────────── */
   .signup{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px;
         align-items:end; margin:0 0 22px }
   .acct-badge{ flex:none; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
-        font-family:"Zen Kaku Gothic New",serif; font-weight:900; color:#0d0f15; background:var(--sun) }
-  .field label{ display:block; font-family:"IBM Plex Mono",monospace; font-size:.62rem;
+        font-family:"Potta One",serif; font-weight:900; color:#0d0f15; background:var(--sun) }
+  .field label{ display:block; font-family:"WDXL Lubrifont TC",monospace; font-size:.62rem;
         letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin:0 0 6px }
   .field input{ width:100%; background:var(--surface); border:1px solid var(--line);
         border-radius:var(--radius-sm); color:var(--ink); font:inherit; font-size:.95rem; padding:11px 12px }
@@ -97,7 +97,7 @@
   .pcard.filled::after{ content:""; position:absolute; inset:0; z-index:2; pointer-events:none;
         background:radial-gradient(120% 80% at 50% 30%, transparent 45%, rgba(20,8,40,.55) 100%) }
   .pc-bg{ position:absolute; inset:0; display:grid; place-items:center;
-        font-family:"Space Grotesk",sans-serif; font-weight:700;
+        font-family:"Zen Maru Gothic",sans-serif; font-weight:700;
         font-size:clamp(40px,34cqw,86px); color:rgba(255,255,255,.13);
         line-height:.85; letter-spacing:-.03em; z-index:0; pointer-events:none; }
   .pc-photo{ position:absolute; left:50%; top:9%; transform:translateX(-50%);
@@ -106,29 +106,29 @@
   .pc-photo img{ width:100%; height:100%; object-fit:cover; object-position:center top }
   .pc-frame{ position:absolute; inset:5px; border:1px solid rgba(255,255,255,.2); border-radius:8px; z-index:4; pointer-events:none }
   .pc-brk{ position:absolute; top:9px; left:9px; z-index:5;
-        font-family:"IBM Plex Mono",monospace; font-size:.5rem; letter-spacing:.1em;
+        font-family:"WDXL Lubrifont TC",monospace; font-size:.5rem; letter-spacing:.1em;
         text-transform:uppercase; color:#fff; background:rgba(0,0,0,.45);
         border:1px solid rgba(255,255,255,.22); padding:3px 6px; border-radius:6px }
   .pc-idblock{ position:absolute; left:8px; right:8px; top:60%; bottom:38px; z-index:5;
         display:flex; flex-direction:column; justify-content:center; align-items:center; gap:2px }
-  .pc-kanji{ max-width:100%; text-align:center; font-family:"Zen Kaku Gothic New",serif;
+  .pc-kanji{ max-width:100%; text-align:center; font-family:"Potta One",serif;
         font-weight:700; font-size:clamp(12px,7cqw,17px); letter-spacing:.14em; color:#fff;
         text-shadow:0 2px 7px rgba(0,0,0,.95); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-  .pc-name{ max-width:100%; text-align:center; font-family:"Space Grotesk",sans-serif;
+  .pc-name{ max-width:100%; text-align:center; font-family:"Zen Maru Gothic",sans-serif;
         font-weight:700; font-size:clamp(11px,7.2cqw,15px); letter-spacing:.08em; text-transform:uppercase;
         color:#fff; text-shadow:0 2px 7px rgba(0,0,0,.95); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
   .pc-foot{ position:absolute; left:0; right:0; bottom:0; z-index:5; display:flex; align-items:center;
         gap:5px; padding:8px; background:rgba(8,6,14,.86); border-top:1px solid rgba(255,255,255,.14) }
-  .pc-rankline{ flex:1; min-width:0; font-family:"Space Grotesk",sans-serif; font-weight:700;
+  .pc-rankline{ flex:1; min-width:0; font-family:"Zen Maru Gothic",sans-serif; font-weight:700;
         font-size:clamp(.72rem,5.8cqw,.9rem); color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.85);
         overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left }
-  .pc-side{ flex:none; font-family:"IBM Plex Mono",monospace; font-weight:600;
+  .pc-side{ flex:none; font-family:"WDXL Lubrifont TC",monospace; font-weight:600;
         font-size:clamp(8px,4cqw,9.5px); letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.62) }
   .pc-flag{ flex:none; font-size:clamp(11px,5.2cqw,14px); line-height:1 }
   .pc-empty{ color:var(--faint); font-size:.86rem; padding:12px; z-index:5 }
-  .pc-empty b{ display:block; font-family:"IBM Plex Mono",monospace; font-size:.55rem;
+  .pc-empty b{ display:block; font-family:"WDXL Lubrifont TC",monospace; font-size:.55rem;
         letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-bottom:8px }
-  .pc-empty .cta{ display:block; margin-top:8px; font-family:"IBM Plex Mono",monospace;
+  .pc-empty .cta{ display:block; margin-top:8px; font-family:"WDXL Lubrifont TC",monospace;
         font-size:.55rem; letter-spacing:.08em; text-transform:uppercase; color:var(--sun) }
   .pc-x{ position:absolute; top:8px; right:8px; z-index:8; width:22px; height:22px; border-radius:6px;
         border:1px solid rgba(255,255,255,.3); background:rgba(0,0,0,.55); color:#fff; font-size:11px;
@@ -137,7 +137,7 @@
 
   /* ── save row ───────────────────────────────────────── */
   .saverow{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:8px 0 0 }
-  .btn{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1rem; letter-spacing:.02em;
+  .btn{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1rem; letter-spacing:.02em;
         padding:13px 22px; border-radius:10px; border:0; cursor:pointer; color:#0d0f15;
         background:linear-gradient(180deg,#f0d590,var(--sun)); box-shadow:0 8px 22px rgba(216,178,90,.3) }
   .btn:hover{ filter:brightness(1.06) }
@@ -149,9 +149,9 @@
 
   .scorebox{ margin:26px 0; border:1px solid var(--line); border-radius:var(--radius-sm);
         padding:14px 16px; background:var(--surface) }
-  .scorebox h3{ margin:0 0 8px; font-family:"Space Grotesk",sans-serif; font-size:1rem }
+  .scorebox h3{ margin:0 0 8px; font-family:"Zen Maru Gothic",sans-serif; font-size:1rem }
   .scorebox h3:not(:first-child){ margin-top:16px }
-  .rulebox > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:1rem; color:var(--ink) }
+  .rulebox > summary{ list-style:none; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; font-family:"Zen Maru Gothic",sans-serif; font-weight:600; font-size:1rem; color:var(--ink) }
   .rulebox > summary::-webkit-details-marker{ display:none }
   .rulebox > summary::after{ content:"\25BE"; color:var(--faint); font-size:.9em; transition:transform .2s ease }
   .rulebox[open] > summary::after{ transform:rotate(180deg) }
@@ -165,13 +165,13 @@
   .countdown{ margin:0 0 22px; border:1px solid rgba(var(--sun-rgb),.35); border-radius:var(--radius-sm);
         padding:18px 20px; background:linear-gradient(160deg, rgba(var(--sun-rgb),.09), rgba(var(--sun-rgb),.02));
         text-align:center }
-  .countdown__label{ font-family:"IBM Plex Mono",monospace; font-size:.68rem; letter-spacing:.16em;
+  .countdown__label{ font-family:"WDXL Lubrifont TC",monospace; font-size:.68rem; letter-spacing:.16em;
         text-transform:uppercase; color:var(--sun) }
-  .countdown__basho{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1.15rem; margin:4px 0 14px }
+  .countdown__basho{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.15rem; margin:4px 0 14px }
   .countdown__clock{ display:flex; justify-content:center; gap:10px; flex-wrap:wrap }
   .cdc{ display:flex; flex-direction:column; align-items:center; min-width:58px; padding:8px 4px;
         border-radius:10px; background:var(--surface-2); border:1px solid var(--line) }
-  .cdc b{ font-family:"IBM Plex Mono",monospace; font-size:1.5rem; color:var(--ink); font-weight:700; line-height:1 }
+  .cdc b{ font-family:"WDXL Lubrifont TC",monospace; font-size:1.5rem; color:var(--ink); font-weight:700; line-height:1 }
   .cdc span{ font-size:.66rem; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); margin-top:4px }
   .countdown__sub{ margin-top:12px; font-size:.8rem; color:var(--dim) }
   .countdown__bz{ margin-top:16px }
@@ -184,16 +184,16 @@
   /* ── past teams (one snapshot per finished basho) ────── */
   .history{ margin:22px 0 0; border:1px solid var(--line); border-radius:var(--radius-sm);
         padding:14px 16px; background:var(--surface) }
-  .history h3{ margin:0; font-family:"Space Grotesk",sans-serif; font-size:1rem; display:flex; align-items:center; gap:8px }
+  .history h3{ margin:0; font-family:"Zen Maru Gothic",sans-serif; font-size:1rem; display:flex; align-items:center; gap:8px }
   .history h3 .n{ background:var(--surface-2); color:var(--dim); border-radius:999px; padding:1px 8px;
-        font-size:.7rem; font-family:"IBM Plex Mono",monospace; font-weight:600 }
+        font-size:.7rem; font-family:"WDXL Lubrifont TC",monospace; font-weight:600 }
   .history__hint{ margin:4px 0 12px; color:var(--dim); font-size:.86rem }
   .hist-row{ border:1px solid var(--line); border-radius:12px; padding:11px 14px; margin-bottom:8px; cursor:pointer }
   .hist-row:hover{ border-color:var(--sun) }
   .hist-row__top{ display:flex; align-items:center; gap:10px }
   .hist-row__basho{ font-weight:700; font-size:.92rem }
-  .hist-row__wins{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.76rem }
-  .hist-row__score{ margin-left:auto; font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--sun) }
+  .hist-row__wins{ color:var(--faint); font-family:"WDXL Lubrifont TC",monospace; font-size:.76rem }
+  .hist-row__score{ margin-left:auto; font-family:"WDXL Lubrifont TC",monospace; font-weight:700; color:var(--sun) }
   .hist-expand{ margin-top:10px }
 
   /* ── picker modal (3D flip) ─────────────────────────── */
@@ -202,9 +202,9 @@
   .pickmodal.open{ display:block }
   .pickmodal__panel{ width:min(1040px,100%); margin:0 auto }
   .pickmodal__head{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px }
-  .pickmodal__title{ font-family:"Space Grotesk",sans-serif; font-weight:700; color:var(--ink);
+  .pickmodal__title{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; color:var(--ink);
         font-size:clamp(20px,3vw,28px) }
-  .pickmodal__title span{ display:block; margin-top:4px; font-family:"IBM Plex Mono",monospace;
+  .pickmodal__title span{ display:block; margin-top:4px; font-family:"WDXL Lubrifont TC",monospace;
         font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--sun); font-weight:500 }
   .pickmodal__close{ flex:none; width:38px; height:38px; border-radius:9px; border:1px solid var(--line2);
         background:var(--surface); color:var(--ink); font-size:16px; cursor:pointer }
@@ -220,7 +220,7 @@
   .flip__front{ transform:rotateY(0deg) }
   .flip__back{ transform:rotateY(180deg); background:linear-gradient(158deg,#241a3f,#0f1c37);
         border:1px solid var(--line2); display:grid; place-items:center }
-  .flip__back::before{ content:"力"; font-family:"Zen Kaku Gothic New",serif; font-weight:900;
+  .flip__back::before{ content:"力"; font-family:"Potta One",serif; font-weight:900;
         font-size:52px; color:rgba(216,178,90,.5); text-shadow:0 2px 10px rgba(0,0,0,.6) }
   .flip__back::after{ content:""; position:absolute; inset:6px; border-radius:9px; border:1px solid rgba(216,178,90,.28) }
   .flip .pcard{ position:relative; width:100%; height:100%; aspect-ratio:auto; container-type:normal }
@@ -232,14 +232,14 @@
 
   /* ── leaderboard ────────────────────────────────────── */
   .lb-head{ display:flex; align-items:baseline; justify-content:space-between; gap:14px; flex-wrap:wrap; margin:0 0 6px }
-  .lb-meta{ font-family:"IBM Plex Mono",monospace; font-size:.8rem; color:var(--sun); letter-spacing:.08em }
+  .lb-meta{ font-family:"WDXL Lubrifont TC",monospace; font-size:.8rem; color:var(--sun); letter-spacing:.08em }
   .lb-day{ display:flex; gap:4px; margin:12px 0 18px; flex-wrap:wrap }
   .lb-day i{ width:22px; height:22px; border-radius:5px; display:grid; place-items:center;
-        font-family:"IBM Plex Mono",monospace; font-size:.66rem; font-style:normal;
+        font-family:"WDXL Lubrifont TC",monospace; font-size:.66rem; font-style:normal;
         border:1px solid var(--line); color:var(--faint) }
   .lb-day i.done{ background:rgba(var(--sun-rgb),.16); border-color:rgba(var(--sun-rgb),.5); color:var(--sun) }
   table.lb{ width:100%; border-collapse:collapse; font-size:.92rem }
-  table.lb th{ text-align:left; font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:.66rem;
+  table.lb th{ text-align:left; font-family:"WDXL Lubrifont TC",monospace; font-weight:600; font-size:.66rem;
         letter-spacing:.12em; text-transform:uppercase; color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--line) }
   table.lb td{ padding:11px 10px; border-bottom:1px solid var(--line) }
   table.lb tr:hover td{ background:rgba(255,255,255,.02) }
@@ -248,7 +248,7 @@
      @handles break instead of forcing the Player column wide. */
   #lbBody, #lbPinned{ max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch }
   .lb-name{ min-width:0; overflow-wrap:anywhere }
-  .lb-rank{ font-family:"Space Grotesk",sans-serif; font-weight:700; color:var(--sun); width:44px }
+  .lb-rank{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; color:var(--sun); width:44px }
   .lb-rank.p1{ font-size:1.15rem } 
   .lb-avacol{ width:44px; padding-right:0 !important }
   .lb-section{ margin-top:40px; padding-top:28px; border-top:1px solid var(--line) }
@@ -257,24 +257,24 @@
     align-items:center; justify-content:center; font-family:"Noto Serif JP",serif; font-size:.9rem; color:var(--sun); flex:none }
   .lb-ava svg{ width:100%; height:100%; display:block }
   .lb-name b{ font-weight:600 } .lb-name span{ color:var(--faint); font-size:.8rem; margin-left:6px }
-  .lb-you{ color:var(--sun); font-family:"IBM Plex Mono",monospace; font-size:.6rem; letter-spacing:.1em;
+  .lb-you{ color:var(--sun); font-family:"WDXL Lubrifont TC",monospace; font-size:.6rem; letter-spacing:.1em;
         border:1px solid rgba(var(--sun-rgb),.5); border-radius:99px; padding:1px 7px; margin-left:8px }
-  .lb-house{ color:var(--muted); font-family:"IBM Plex Mono",monospace; font-size:.58rem; letter-spacing:.1em;
+  .lb-house{ color:var(--muted); font-family:"WDXL Lubrifont TC",monospace; font-size:.58rem; letter-spacing:.1em;
         text-transform:uppercase; border:1px solid var(--line2); border-radius:99px; padding:1px 7px; margin-left:8px }
-  .lb-score{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1.05rem; text-align:right }
-  .lb-w{ color:var(--dim); text-align:right; font-family:"IBM Plex Mono",monospace; font-size:.85rem }
+  .lb-score{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.05rem; text-align:right }
+  .lb-w{ color:var(--dim); text-align:right; font-family:"WDXL Lubrifont TC",monospace; font-size:.85rem }
   .lb-team{ color:var(--faint); font-size:.78rem; max-width:0 }
   .expand td{ background:rgba(0,0,0,.25) !important; padding:0 }
   .expand-in{ padding:10px 14px 14px; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:6px }
   .exline{ display:flex; justify-content:space-between; gap:8px; font-size:.82rem;
         padding:6px 9px; background:var(--surface); border:1px solid var(--line); border-radius:7px }
-  .exline .w{ font-family:"IBM Plex Mono",monospace; color:var(--sun) }
+  .exline .w{ font-family:"WDXL Lubrifont TC",monospace; color:var(--sun) }
   .empty-lb{ color:var(--muted); padding:30px 0; text-align:center }
 
   .foot{ color:var(--faint); font-size:.78rem; line-height:1.6; margin:34px 0 0; padding-top:18px; border-top:1px solid var(--line) }
   /* ---- top-right auth actions ---- */
   .auth-actions{ margin-left:auto; display:flex; gap:8px; align-items:center }
-  .authbtn{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:.86rem; cursor:pointer;
+  .authbtn{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:.86rem; cursor:pointer;
         padding:8px 15px; border-radius:9px; border:0; color:#0d0f15;
         background:linear-gradient(180deg,#f0d590,var(--sun)) }
   .authbtn.ghost{ background:none; color:var(--dim); border:1px solid var(--line2) }
@@ -283,7 +283,7 @@
   .acctchip{ display:inline-flex; align-items:center; gap:8px; background:var(--surface-2); color:var(--ink); border:1px solid var(--line2) }
   .acctchip:hover{ border-color:var(--sun) }
   .acctchip__ava{ width:22px; height:22px; border-radius:50%; display:grid; place-items:center;
-        font-family:"Zen Kaku Gothic New",serif; font-weight:900; font-size:12px; color:#0d0f15; background:var(--sun); overflow:hidden }
+        font-family:"Potta One",serif; font-weight:900; font-size:12px; color:#0d0f15; background:var(--sun); overflow:hidden }
   .acctchip__ava svg,.acctchip__ava img{ width:100%; height:100%; object-fit:cover }
   .acct-badge svg,.acct-badge img{ width:100%; height:100%; object-fit:cover; border-radius:50% }
 
@@ -309,7 +309,7 @@
   .authmodal__close{ position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:8px;
         border:1px solid var(--line2); background:none; color:var(--dim); cursor:pointer; font-size:15px }
   .authmodal__close:hover{ border-color:var(--sun); color:var(--ink) }
-  .authmodal__title{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1.3rem; margin:0 0 16px }
+  .authmodal__title{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.3rem; margin:0 0 16px }
   .authform,.acctview{ display:flex; flex-direction:column; gap:12px }
   .afl{ display:flex; flex-direction:column; gap:5px; font-size:.8rem; color:var(--dim); font-weight:600 }
   .afl input{ background:var(--surface-2); border:1px solid var(--line); border-radius:9px;
@@ -323,7 +323,7 @@
   .status.ok{ color:#43c08a } .status.err{ color:var(--tangerine) }
   .acctview__head{ display:flex; align-items:center; gap:12px; margin-bottom:4px }
   .acct-badge.lg{ width:46px; height:46px; font-size:20px }
-  .acctview__name{ font-weight:700; font-size:1.05rem } .acctview__handle{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.8rem }
+  .acctview__name{ font-weight:700; font-size:1.05rem } .acctview__handle{ color:var(--faint); font-family:"WDXL Lubrifont TC",monospace; font-size:.8rem }
   .acctview__row{ display:flex; gap:8px } .acctview__row .btn{ margin-top:0 }
 
   /* ---- leaderboard search + pins ---- */
@@ -338,7 +338,7 @@
   .lb-star{ background:none; border:0; cursor:pointer; color:var(--faint); font-size:15px; line-height:1; padding:2px 4px }
   .lb-star.on{ color:var(--sun) }
   .lb-star:hover{ color:var(--sun) }
-  .lb-diff{ font-family:"IBM Plex Mono",monospace; font-size:.78rem; color:var(--muted) }
+  .lb-diff{ font-family:"WDXL Lubrifont TC",monospace; font-size:.78rem; color:var(--muted) }
   .lb-diff.lead{ color:var(--sun) }
   td.lb-pincol{ width:26px; text-align:center }
 
@@ -347,14 +347,14 @@
         grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px }
   .expand-cards .ecard{ display:flex; flex-direction:column; gap:6px }
   .expand-cards .pcard{ aspect-ratio:5/7 }
-  .expand-cards .ec-pts{ font-family:"IBM Plex Mono",monospace; font-size:.76rem; color:var(--dim); text-align:center }
+  .expand-cards .ec-pts{ font-family:"WDXL Lubrifont TC",monospace; font-size:.76rem; color:var(--dim); text-align:center }
   .expand-cards .ec-pts b{ color:var(--sun) }
 
   /* ---- My Leagues ---- */
   .btn.sm{ font-size:.85rem; padding:8px 14px }
   .lg-bar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:4px 0 16px }
   .lg-switch{ display:flex; gap:6px; flex-wrap:wrap; flex:1 }
-  .lg-pill{ font-family:"Space Grotesk",sans-serif; font-weight:600; font-size:.86rem; cursor:pointer;
+  .lg-pill{ font-family:"Zen Maru Gothic",sans-serif; font-weight:600; font-size:.86rem; cursor:pointer;
         padding:7px 14px; border-radius:99px; border:1px solid var(--line2); background:var(--surface); color:var(--dim) }
   .lg-pill.on{ background:rgba(var(--sun-rgb),.14); border-color:var(--sun); color:var(--ink) }
   .lg-pill:hover{ border-color:var(--sun) }
@@ -379,7 +379,7 @@
   .lg-score-fld input:focus{ outline:none; border-color:var(--sun) }
   .lg-score-fld__hint{ color:var(--faint); font-size:.76rem; line-height:1.45 }
   .lg-score-actions{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:2px }
-  .lg-agree-count{ font-family:"IBM Plex Mono",monospace; font-size:.74rem; color:var(--faint) }
+  .lg-agree-count{ font-family:"WDXL Lubrifont TC",monospace; font-size:.74rem; color:var(--faint) }
   .lg-agree-count.all{ color:#43c08a }
   .lg-sched-date{ margin-bottom:8px }
   .lg-sched-when{ font-size:.95rem; font-weight:600; color:var(--ink) }
@@ -420,7 +420,7 @@
   .lg-draftroom{ border:1px solid rgba(var(--sun-rgb),.35); border-radius:var(--radius-sm); padding:16px;
         margin:0 0 22px; background:linear-gradient(160deg, rgba(var(--sun-rgb),.08), rgba(var(--sun-rgb),.02)) }
   .lg-draftroom h4{ margin:0 0 4px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun) }
-  .lg-draft-turn{ font-family:"Space Grotesk",sans-serif; font-weight:700; font-size:1.05rem; margin:4px 0 12px }
+  .lg-draft-turn{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.05rem; margin:4px 0 12px }
   .lg-draft-turn b{ color:var(--sun) }
   .lg-draft-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; margin-bottom:14px;
         max-height:360px; overflow-y:auto; padding-right:2px }
@@ -431,7 +431,7 @@
   .lg-draft-board{ display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto; font-size:.8rem }
   .lg-draft-board div{ display:flex; justify-content:space-between; gap:8px; padding:4px 8px; border-radius:6px }
   .lg-draft-board div.me{ background:rgba(var(--sun-rgb),.1) }
-  .lg-draft-board .h{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.72rem }
+  .lg-draft-board .h{ color:var(--faint); font-family:"WDXL Lubrifont TC",monospace; font-size:.72rem }
   .lg-waiting{ text-align:center; padding:30px 10px; color:var(--dim) }
   .lg-roster-block{ margin-bottom:10px }
   .lg-roster-block h5{ margin:0 0 6px; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--faint) }
@@ -450,7 +450,7 @@
   .lg-teams{ margin:0 0 22px }
   .lg-teams h4{ margin:0 0 10px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun);
         display:flex; align-items:center; gap:8px }
-  .lg-teams h4 .n{ background:var(--surface-2); color:var(--dim); border-radius:999px; padding:1px 8px; font-size:.7rem; font-family:"IBM Plex Mono",monospace }
+  .lg-teams h4 .n{ background:var(--surface-2); color:var(--dim); border-radius:999px; padding:1px 8px; font-size:.7rem; font-family:"WDXL Lubrifont TC",monospace }
   .lg-team-row{ border:1px solid var(--line); border-radius:12px; padding:11px 14px; margin-bottom:8px; background:var(--surface); cursor:pointer }
   .lg-team-row:hover{ border-color:var(--sun) }
   .lg-team-row__top{ display:flex; align-items:center; gap:10px }
@@ -459,8 +459,8 @@
   .lg-team-row__ava svg,.lg-team-row__ava img{ width:100%; height:100%; object-fit:cover }
   .lg-team-row__name{ font-weight:700; font-size:.9rem }
   .lg-team-row__you{ font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; color:var(--sun); margin-left:6px }
-  .lg-team-row__h{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.72rem; margin-left:6px }
-  .lg-team-row__score{ margin-left:auto; font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--ink) }
+  .lg-team-row__h{ color:var(--faint); font-family:"WDXL Lubrifont TC",monospace; font-size:.72rem; margin-left:6px }
+  .lg-team-row__score{ margin-left:auto; font-family:"WDXL Lubrifont TC",monospace; font-weight:700; color:var(--ink) }
   .lg-team-row__empty{ color:var(--faint); font-size:.82rem; font-style:italic }
   .lg-team-expand{ margin-top:10px }
 
@@ -471,7 +471,7 @@
   .lg-mem .mem-ava{ width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-weight:800;
         font-size:12px; color:#0d0f15; background:var(--sun); flex:none }
   .lg-mem .mem-name{ font-weight:600; font-size:.9rem } .lg-mem .mem-name b{ color:var(--ink) }
-  .lg-mem .mem-h{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.72rem }
+  .lg-mem .mem-h{ color:var(--faint); font-family:"WDXL Lubrifont TC",monospace; font-size:.72rem }
   .lg-mem .mem-tag{ font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--sun); margin-left:4px }
   .lg-mem .mem-kick{ margin-left:auto; background:none; border:0; color:var(--faint); cursor:pointer; font-size:14px }
   .lg-mem .mem-kick:hover{ color:var(--tangerine) }
@@ -489,7 +489,7 @@
   .lg-msgs{ display:flex; flex-direction:column; gap:12px }
   .lg-msg{ border:1px solid var(--line); border-radius:12px; padding:11px 13px; background:var(--surface) }
   .lg-msg__head{ display:flex; align-items:baseline; gap:8px; margin-bottom:4px }
-  .lg-msg__who{ font-weight:700; font-size:.9rem } .lg-msg__h{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.7rem }
+  .lg-msg__who{ font-weight:700; font-size:.9rem } .lg-msg__h{ color:var(--faint); font-family:"WDXL Lubrifont TC",monospace; font-size:.7rem }
   .lg-msg__when{ margin-left:auto; color:var(--faint); font-size:.7rem }
   .lg-msg__body{ font-size:.92rem; color:var(--dim); white-space:pre-wrap; word-break:break-word }
   .lg-msg__reply{ background:none; border:0; color:var(--sun); cursor:pointer; font-size:.78rem; margin-top:6px; padding:0 }
@@ -500,7 +500,7 @@
 
   /* ── leaderboard board (vote buttons, edit mode) ───────── */
   .lb-board{ margin-top:26px }
-  .lb-board__title{ font-family:"Space Grotesk","Zen Kaku Gothic New",sans-serif; font-size:1.1rem; margin:0 0 12px }
+  .lb-board__title{ font-family:"Zen Maru Gothic","Potta One",sans-serif; font-size:1.1rem; margin:0 0 12px }
   .lg-msg__row{ display:flex; gap:12px }
   .lg-vote{ flex:none; display:flex; flex-direction:column; align-items:center; gap:2px; padding-top:1px }
   .lg-vote__btn{ background:none; border:1px solid var(--line); color:var(--faint); width:24px; height:22px;
@@ -509,7 +509,7 @@
   .lg-vote__btn:disabled{ cursor:default; opacity:.5 }
   .lg-vote__btn.on.up{ background:rgba(var(--sun-rgb),.16); border-color:var(--sun); color:var(--sun) }
   .lg-vote__btn.on.down{ background:rgba(226,59,46,.16); border-color:var(--red); color:var(--red) }
-  .lg-vote__score{ font-family:"IBM Plex Mono",monospace; font-size:.76rem; font-weight:600; color:var(--dim) }
+  .lg-vote__score{ font-family:"WDXL Lubrifont TC",monospace; font-size:.76rem; font-weight:600; color:var(--dim) }
   .lg-msg__main{ flex:1; min-width:0 }
   .lg-msg__edited{ color:var(--faint); font-size:.68rem; font-style:italic }
   .lg-msg__del{ color:var(--faint) }

@@ -70,7 +70,7 @@
       "background:rgba(6,7,11,.72);backdrop-filter:blur(3px);padding:18px}"+
     ".gga-ov.open{display:flex}"+
     ".gga-modal{width:min(420px,100%);max-height:90vh;overflow:auto;background:#14161d;border:1px solid #2a2d38;"+
-      "border-radius:16px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.6);font-family:'Space Grotesk','Zen Kaku Gothic New',system-ui,sans-serif}"+
+      "border-radius:16px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.6);font-family:'Zen Maru Gothic','Potta One',system-ui,sans-serif}"+
     ".gga-modal.wide{width:min(560px,100%)}"+
     ".gga-x{float:right;background:none;border:0;color:#878da0;font-size:1.2rem;cursor:pointer;line-height:1;padding:2px 6px}"+
     ".gga-x:hover{color:#e9eaf0}"+
@@ -93,7 +93,7 @@
     ".gga-acctrow__initials{color:#e0a23a;font-weight:700;font-size:1.1rem}"+
     ".gga-acctrow__id{flex:1;min-width:0}"+
     ".gga-acctrow b{display:block;color:#f1f2f6;font-size:1rem}"+
-    ".gga-acctrow small{color:#878da0;font-family:'IBM Plex Mono',monospace;font-size:.75rem}"+
+    ".gga-acctrow small{color:#878da0;font-family:'WDXL Lubrifont TC',monospace;font-size:.75rem}"+
     ".gga-editbtn{flex:none;width:30px;height:30px;border-radius:8px;border:1px solid #2a2d38;background:#1b1e27;"+
       "color:#878da0;font-size:.85rem;cursor:pointer;display:grid;place-items:center}"+
     ".gga-editbtn:hover{color:#e0a23a;border-color:#e0a23a}"+

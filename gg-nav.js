@@ -80,17 +80,17 @@
     '@view-transition{navigation:auto}' +
     '#gg-nav{position:relative;width:100%;z-index:900;' +
       'background:rgba(20,22,30,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);' +
-      'border-bottom:1px solid rgba(216,178,90,.25);font-family:"Space Grotesk","Zen Kaku Gothic New",system-ui,sans-serif}' +
+      'border-bottom:1px solid rgba(216,178,90,.25);font-family:"Zen Maru Gothic","Potta One",system-ui,sans-serif}' +
     '.ggn-inner{max-width:1180px;margin:0 auto;min-height:68px;padding:0 20px;' +
       'display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px}' +
     '.ggn-brand{grid-column:1;justify-self:start;display:inline-flex;align-items:center;gap:8px;' +
       'text-decoration:none;color:#f4ecd8;font-weight:700;font-size:.98rem;letter-spacing:.01em;white-space:nowrap}' +
     '.ggn-brand svg,.ggn-brand img{height:68px;width:auto;display:block}' +
-    '.ggn-beta{align-self:flex-start;margin-top:14px;margin-left:-2px;font-family:"Space Grotesk",system-ui,sans-serif;' +
+    '.ggn-beta{align-self:flex-start;margin-top:14px;margin-left:-2px;font-family:"Zen Maru Gothic",system-ui,sans-serif;' +
       'font-weight:600;font-size:.62rem;letter-spacing:.14em;text-transform:lowercase;color:#d8b25a;opacity:.85}' +
     '.ggn-links{grid-column:2;justify-self:end;display:flex;gap:6px;align-items:stretch}' +
     '.ggn-link{display:flex;align-items:center;justify-content:center;box-sizing:border-box;height:40px;' +
-      'font-family:"Potta One","Space Grotesk",system-ui,sans-serif;font-weight:400;font-size:.9rem;letter-spacing:.05em;text-transform:uppercase;' +
+      'font-family:"Potta One","Zen Maru Gothic",system-ui,sans-serif;font-weight:400;font-size:.9rem;letter-spacing:.05em;text-transform:uppercase;' +
       'text-decoration:none;color:#c7cbd9;padding:0 18px;border-radius:10px;transition:color .15s,background .15s}' +
     '.ggn-link:hover{color:#f4ecd8;background:rgba(255,255,255,.07)}' +
     '.ggn-link.active{color:#0f1118;background:linear-gradient(180deg,#f0d590,#d8b25a);font-weight:400}' +
@@ -105,7 +105,7 @@
     /* right wrapper + help button */
     '.ggn-right{grid-column:3;justify-self:end;display:flex;align-items:center;gap:10px}' +
     '.ggn-help{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid #39404f;background:rgba(255,255,255,.03);' +
-      'color:#c7cbd9;font-family:"Space Grotesk",system-ui,sans-serif;font-weight:700;font-size:.95rem;line-height:1;cursor:pointer;' +
+      'color:#c7cbd9;font-family:"Zen Maru Gothic",system-ui,sans-serif;font-weight:700;font-size:.95rem;line-height:1;cursor:pointer;' +
       'display:grid;place-items:center;transition:color .15s,border-color .15s,background .15s}' +
     '.ggn-help:hover{color:#e0a23a;border-color:#e0a23a}' +
     /* ── narrow layout: collapse links into a hamburger dropdown ── */
@@ -136,7 +136,7 @@
     '}' +
     /* help modal */
     '.ggh-ov{position:fixed;inset:0;z-index:1100;display:none;align-items:center;justify-content:center;background:rgba(6,7,11,.72);' +
-      'backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);padding:18px;font-family:"Space Grotesk","Zen Kaku Gothic New",system-ui,sans-serif}' +
+      'backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);padding:18px;font-family:"Zen Maru Gothic","Potta One",system-ui,sans-serif}' +
     '.ggh-ov.open{display:flex}' +
     '.ggh-modal{width:min(560px,100%);max-height:88vh;overflow:auto;background:#14161d;border:1px solid #2a2d38;border-radius:16px;' +
       'padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.6);color:#e9eaf0}' +
@@ -175,7 +175,7 @@
       'align-items:center;justify-content:center;gap:14px;pointer-events:none;z-index:5}' +
     '.gg-spinner__ring{width:44px;height:44px;border-radius:50%;border:3px solid rgba(216,178,90,.16);' +
       'border-top-color:#d8b25a;animation:gg-spin .85s linear infinite}' +
-    '.gg-spinner__label{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.62rem;' +
+    '.gg-spinner__label{font-family:"WDXL Lubrifont TC","WDXL Lubrifont TC",ui-monospace,monospace;font-size:.62rem;' +
       'letter-spacing:.22em;text-transform:uppercase;color:#878da0;animation:gg-pulse 1.4s ease-in-out infinite}' +
     '.gg-spin{display:inline-block;width:14px;height:14px;border-radius:50%;flex:none;' +
       'border:2px solid rgba(216,178,90,.18);border-top-color:#d8b25a;animation:gg-spin .8s linear infinite;' +
@@ -189,7 +189,7 @@
     var pc1 = document.createElement("link"); pc1.rel = "preconnect"; pc1.href = "https://fonts.googleapis.com";
     var pc2 = document.createElement("link"); pc2.rel = "preconnect"; pc2.href = "https://fonts.gstatic.com"; pc2.crossOrigin = "anonymous";
     var css = document.createElement("link"); css.id = "gg-nav-font"; css.rel = "stylesheet";
-    css.href = "https://fonts.googleapis.com/css2?family=Potta+One&display=swap";
+    css.href = "https://fonts.googleapis.com/css2?family=Potta+One&family=WDXL+Lubrifont+TC&family=Zen+Maru+Gothic:wght@400;500;700&display=swap";
     document.head.appendChild(pc1); document.head.appendChild(pc2); document.head.appendChild(css);
   }
 

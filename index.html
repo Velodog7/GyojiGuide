@@ -6,13 +6,13 @@
 <title>The Banzuke · Sumo Slapdown</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700;900&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Potta+One&family=WDXL+Lubrifont+TC&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{ --bg:#000; --ink:#f1f2f6; --muted:#878da0; --gold:#d8b25a;
          --sun:#d8b25a; --red:#e23b2e; --line:#2a2e3a; --dim:#a7adbe; --faint:#6b7180; --surface:#181a22; --surface2:#20232d; }
   *{ box-sizing:border-box }
   html,body{ margin:0 }
-  body{ background:var(--bg); color:var(--ink); font-family:"Space Grotesk",system-ui,sans-serif;
+  body{ background:var(--bg); color:var(--ink); font-family:"Zen Maru Gothic",system-ui,sans-serif;
         -webkit-font-smoothing:antialiased; min-height:100vh; display:flex; flex-direction:column }
 
   /* ── subnav / tab bar (matches the other pages) ───────── */
@@ -50,9 +50,9 @@
   .bz-features li{ position:relative; padding-left:20px; color:var(--dim); font-size:.9rem; line-height:1.5 }
   .bz-features li::before{ content:"\25B8"; position:absolute; left:0; top:0; color:var(--sun) }
   .bz-feat-h{ color:var(--sun); font-weight:700 }
-  .view-h{ font-family:"Zen Kaku Gothic New","Space Grotesk",sans-serif; font-weight:900; font-size:1.5rem; margin:0 0 6px }
+  .view-h{ font-family:"Potta One","Zen Maru Gothic",sans-serif; font-weight:900; font-size:1.5rem; margin:0 0 6px }
   .view-sub{ color:var(--muted); font-size:.92rem; line-height:1.55; margin:0 0 20px; max-width:60ch }
-  footer{ text-align:center; color:var(--muted); font-family:"IBM Plex Mono",monospace;
+  footer{ text-align:center; color:var(--muted); font-family:"WDXL Lubrifont TC",monospace;
         font-size:.72rem; letter-spacing:.12em; padding:14px }
   footer a{ color:var(--gold); text-decoration:none }
 
@@ -70,14 +70,14 @@
   .learn-step{ display:none; animation:fadein .25s ease }
   .learn-step.on{ display:block }
   @keyframes fadein{ from{ opacity:0; transform:translateY(4px) } }
-  .learn-step h3{ font-family:"Zen Kaku Gothic New",sans-serif; font-weight:900; font-size:1.3rem; margin:0 0 4px }
+  .learn-step h3{ font-family:"Potta One",sans-serif; font-weight:900; font-size:1.3rem; margin:0 0 4px }
   .learn-step .jp{ color:var(--sun); font-size:.85rem; letter-spacing:.06em; margin:0 0 14px }
   .learn-step p{ color:var(--dim); line-height:1.55; margin:0 0 11px }
   .learn-step b{ color:var(--ink) }
   .rank-ladder{ display:flex; flex-direction:column; gap:3px; margin:10px 0 12px }
   .rank-row{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:5px 11px; transition:.12s; font-size:.9rem }
   .rank-row:hover{ border-color:var(--sun); transform:translateX(3px) }
-  .rank-row .rk{ font-family:"IBM Plex Mono",monospace; font-weight:700; color:var(--sun); width:34px; flex:none; text-align:center }
+  .rank-row .rk{ font-family:"WDXL Lubrifont TC",monospace; font-weight:700; color:var(--sun); width:34px; flex:none; text-align:center }
   .rank-row .rn{ font-weight:700 }
   .rank-row .rd{ color:var(--muted); font-size:.78rem; margin-left:auto; text-align:right }
   .rank-row.sanyaku{ border-left:3px solid var(--sun) }
@@ -108,7 +108,7 @@
 
   /* ── Resources ────────────────────────────────────────── */
   .res-sec{ margin-bottom:34px }
-  .res-sec__h{ font-family:"Zen Kaku Gothic New",sans-serif; font-weight:900; font-size:1.15rem; margin:0 0 4px; display:flex; align-items:center; gap:9px }
+  .res-sec__h{ font-family:"Potta One",sans-serif; font-weight:900; font-size:1.15rem; margin:0 0 4px; display:flex; align-items:center; gap:9px }
   .res-sec__h svg{ width:22px; height:22px; flex:none; color:var(--red) }
   .res-sec__sub{ color:var(--muted); font-size:.86rem; margin:0 0 16px }
   .res-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px }
