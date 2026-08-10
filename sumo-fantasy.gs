@@ -343,7 +343,9 @@ function sendWelcomeDm(toHandle){
 function register(body) {
   var handle = cleanHandle(body.handle);
   if (!handle) return { ok: false, error: 'Handle: 2\u201340 letters, digits, _ . -' };
-  if (handle.toLowerCase() === ADMIN_HANDLE) return { ok: false, error: 'That handle is reserved \u2014 pick another.' };
+  var claimingAdmin = handle.toLowerCase() === ADMIN_HANDLE;   // the reserved "Sumo Slapdown" identity
+  if (claimingAdmin && PropertiesService.getScriptProperties().getProperty('ALLOW_ADMIN_CLAIM') !== '1')
+    return { ok: false, error: 'That handle is reserved \u2014 pick another.' };
   var auth = String(body.auth || '').slice(0, 80);
   if (!auth) return { ok: false, error: 'missing auth' };
   var name = String(body.name || handle).trim().slice(0, 60);
@@ -360,14 +362,14 @@ function register(body) {
       if (String(v[r][0]).trim().toLowerCase() === key) {
         if (String(v[r][2] || '') === '') {          // unclaimed v1 account — claim it
           sh.getRange(r + 1, 1, 1, 6).setValues([[handle, name, auth, v[r][3] || '{}', when, avatar || v[r][5] || '']]);
-          sendWelcomeDm(handle);
+          if (claimingAdmin) PropertiesService.getScriptProperties().deleteProperty('ALLOW_ADMIN_CLAIM'); else sendWelcomeDm(handle);
           return { ok: true, claimed: true, handle: handle };
         }
         return { ok: false, error: 'That handle is taken \u2014 sign in instead.' };
       }
     }
     sh.appendRow([handle, name, auth, '{}', when, avatar]);
-    sendWelcomeDm(handle);
+    if (claimingAdmin) PropertiesService.getScriptProperties().deleteProperty('ALLOW_ADMIN_CLAIM'); else sendWelcomeDm(handle);
     return { ok: true, created: true, handle: handle };
   } finally {
     lock.releaseLock();
