@@ -28,7 +28,7 @@
 
   /* banzuke is always the backdrop, filling the space under the tab bar */
   /* banzuke is the backdrop; a single card sits integrated over it */
-  .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:860px; margin-top:0 }
+  .bz-stage{ position:relative; width:100%; max-width:1180px; align-self:center; flex:1 1 auto; height:auto; min-height:860px; margin-top:0 }
   #ggBanzuke{ position:absolute; inset:0 }
 
   /* the always-present card, centred over the brush stroke */
@@ -44,10 +44,10 @@
   .bz-welcome{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; min-height:100%; text-align:center; gap:14px; padding:6px 0 2px }
   .bz-welcome .view-sub{ margin:0 }
   .bz-logo{ width:min(200px,52%); height:auto; margin:0; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)) }
-  .bz-intro{ max-width:52ch; color:var(--dim); font-size:.9rem; line-height:1.5 }
+  .bz-welcome .bz-intro{ width:100%; color:var(--dim); font-size:1rem; line-height:1.55 }
   .bz-intro b{ color:var(--ink) }
-  .bz-features{ list-style:none; margin:0; padding:0; text-align:left; max-width:52ch; display:flex; flex-direction:column; gap:8px }
-  .bz-features li{ position:relative; padding-left:20px; color:var(--dim); font-size:.86rem; line-height:1.45 }
+  .bz-features{ list-style:none; margin:0; padding:0; text-align:left; width:100%; display:flex; flex-direction:column; gap:8px }
+  .bz-features li{ position:relative; padding-left:20px; color:var(--dim); font-size:1rem; line-height:1.55 }
   .bz-features li::before{ content:"\25B8"; position:absolute; left:0; top:0; color:var(--sun) }
   .bz-feat-h{ color:var(--sun); font-weight:700 }
   .view-h{ font-family:"Potta One","Zen Maru Gothic",sans-serif; font-weight:900; font-size:1.5rem; margin:0 0 6px }
