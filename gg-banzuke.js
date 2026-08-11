@@ -55,7 +55,7 @@
   function fig(n, big, style, cap){
     var t = tier(n);
     return '<figure class="ggb-fig'+(big?" ggb-big":"")+' ggb-t'+t+(cap?" ggb-cap-"+cap:"")+'" data-n="'+esc(n)+'"'+(style?' style="'+style+'"':'')+' title="'+esc(rankLabel(n))+' — '+esc(n)+'">'
-      + '<img src="'+RIK[n].src+'" alt="'+esc(n)+'" loading="lazy" decoding="async">'
+      + '<img src="'+RIK[n].src+'" alt="'+esc(n)+'" loading="eager" decoding="async">'
       + '<figcaption>'+(RIK[n].k||n)+'</figcaption>'
       + '</figure>';
   }
@@ -198,10 +198,52 @@
     +'.ggb-big{--fw:clamp(60px,17vw,72px)}.ggb-san .ggb-fig{margin-left:clamp(-46px,-11vw,-22px)}'  /* larger still + tighter on phones */
     +'.ggb-side-h{font-size:15px}.ggb-top{padding:2px 4px 0}}';
 
+  // Adapt the rank-and-file grid so every rikishi stays visible: the sprites are
+  // tall, so a fixed column count can push the bottom rows past the crowd's
+  // height (they get clipped by overflow:hidden). Pick the fewest columns —
+  // largest figures — whose rows still fit the available height, then add more
+  // only if they'd overflow. Recomputed after images load and on resize.
+  var CROWD_MINCOLS = 3, CROWD_MAXCOLS = 14;
+  function fitCrowd(){
+    var host = document.getElementById("ggBanzuke");
+    if (!host) return;
+    var cols = host.querySelectorAll(".ggb-col");
+    if (!cols.length) return;
+    var maxN = Math.max(westFile.length, eastFile.length);
+    if (!maxN) return;
+    var cap = Math.min(CROWD_MAXCOLS, maxN), chosen = cap, i;
+    for (var C = CROWD_MINCOLS; C <= cap; C++){
+      for (i = 0; i < cols.length; i++) cols[i].style.gridTemplateColumns = "repeat("+C+",minmax(0,1fr))";
+      var over = false;
+      for (i = 0; i < cols.length; i++){ if (cols[i].scrollHeight - cols[i].clientHeight > 1.5){ over = true; break; } }
+      if (!over){ chosen = C; break; }
+    }
+    for (i = 0; i < cols.length; i++) cols[i].style.gridTemplateColumns = "repeat("+chosen+",minmax(0,1fr))";
+  }
+  function scheduleFit(){
+    var host = document.getElementById("ggBanzuke");
+    if (!host) return;
+    var imgs = host.querySelectorAll(".ggb-col img"), pending = 0, done = false;
+    function go(){ if (done) return; done = true; requestAnimationFrame(fitCrowd); }
+    for (var i = 0; i < imgs.length; i++){
+      var im = imgs[i];
+      if (im.complete && im.naturalWidth) continue;
+      pending++;
+      im.addEventListener("load",  function(){ if (--pending <= 0) go(); }, { once:true });
+      im.addEventListener("error", function(){ if (--pending <= 0) go(); }, { once:true });
+    }
+    if (pending === 0) go();
+    setTimeout(fitCrowd, 500);   // safety net in case some load events never fire
+  }
+  var fitTimer;
+  function onResize(){ clearTimeout(fitTimer); fitTimer = setTimeout(fitCrowd, 150); }
+
   function mount(){
     if (!document.getElementById("ggBanzuke")) return;
     var st=document.createElement("style"); st.id="ggb-css"; st.textContent=CSS; document.head.appendChild(st);
     build();
+    scheduleFit();
+    window.addEventListener("resize", onResize);
   }
   if (document.readyState==="loading") document.addEventListener("DOMContentLoaded", mount);
   else mount();
