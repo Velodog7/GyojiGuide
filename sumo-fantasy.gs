@@ -112,7 +112,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-08-02-keepers-delete';
+var BACKEND_VERSION = '2026-08-11-gyoji-claim-gate';
 
 /* ---------- one-time: build the tabs ---------- */
 function setup() {
