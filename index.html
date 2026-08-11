@@ -41,9 +41,9 @@
   .bz-mv{ display:none }
   .bz-mv.on{ display:block; animation:bzswap .2s ease }
   @keyframes bzswap{ from{ opacity:0; transform:translateY(4px) } }
-  .bz-welcome{ display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100%; text-align:center; gap:2px; padding:6px 0 }
-  .bz-welcome .view-sub{ margin-bottom:12px }
-  .bz-logo{ width:min(200px,52%); height:auto; margin-bottom:10px; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)) }
+  .bz-welcome{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; min-height:100%; text-align:center; gap:14px; padding:6px 0 2px }
+  .bz-welcome .view-sub{ margin:0 }
+  .bz-logo{ width:min(200px,52%); height:auto; margin:0; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)) }
   .bz-intro{ max-width:52ch; color:var(--dim); font-size:.9rem; line-height:1.5 }
   .bz-intro b{ color:var(--ink) }
   .bz-features{ list-style:none; margin:0; padding:0; text-align:left; max-width:52ch; display:flex; flex-direction:column; gap:8px }
@@ -57,13 +57,16 @@
   footer a{ color:var(--gold); text-decoration:none }
 
   /* ── Learn: interactive guide ─────────────────────────── */
-  .learn-grid{ display:flex; flex-direction:column; gap:14px; align-items:stretch }
-  .learn-nav{ display:flex; flex-direction:row; flex-wrap:wrap; gap:6px; position:static }
+  .learn-grid{ display:flex; flex-direction:column; gap:10px; align-items:stretch }
+  .learn-nav{ display:flex; flex-direction:row; flex-wrap:wrap; gap:8px; position:static }
+  /* chapter buttons share the Resources card look: rounded tile, boxed icon, gold hover-lift */
   .learn-navb{ text-align:left; background:var(--surface); border:1px solid var(--line); color:var(--dim); font:inherit;
-        font-size:.76rem; font-weight:600; padding:6px 11px; border-radius:999px; cursor:pointer; transition:.12s; display:inline-flex; align-items:center; gap:6px; line-height:1.1; white-space:nowrap; flex:0 0 auto }
-  .learn-navb:hover{ border-color:var(--sun); color:var(--ink) }
+        font-size:.8rem; font-weight:700; padding:5px 12px 5px 5px; border-radius:12px; cursor:pointer; transition:.14s; display:inline-flex; align-items:center; gap:9px; line-height:1.1; white-space:nowrap; flex:0 0 auto }
+  .learn-navb:hover{ border-color:var(--sun); background:var(--surface2); color:var(--ink); transform:translateY(-2px) }
   .learn-navb[aria-current="true"]{ border-color:var(--sun); background:var(--surface2); color:var(--sun) }
-  .learn-navb .lb-i{ font-size:1.05rem; flex:none }
+  .learn-navb .lb-i{ width:24px; height:24px; border-radius:7px; flex:none; display:grid; place-items:center;
+        background:var(--surface2); color:var(--sun); font-size:.98rem; line-height:1 }
+  .learn-navb[aria-current="true"] .lb-i{ background:rgba(216,178,90,.16) }
   .learn-panel{ min-height:0 }
   .learn-step{ display:none; animation:fadein .25s ease }
   .learn-step.on{ display:block }
