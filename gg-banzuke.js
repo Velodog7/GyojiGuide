@@ -107,9 +107,9 @@
   /* ---- gyōji (either side) & yobidashi (middle) — sits on the sanyaku row ---- */
   function officials(){
     return '<div class="ggb-sancenter">'
-      + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI_IMG+'" alt="Gyōji" decoding="async"><figcaption>行司</figcaption></figure>'
-      + '<figure class="ggb-off ggb-yobi"><img src="'+YOBI_IMG+'" alt="Yobidashi" decoding="async"><figcaption>呼出</figcaption></figure>'
-      + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI2_IMG+'" alt="Gyōji" decoding="async"><figcaption>行司</figcaption></figure>'
+      + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI_IMG+'" alt="Gyōji" decoding="async"></figure>'
+      + '<figure class="ggb-off ggb-yobi"><img src="'+YOBI_IMG+'" alt="Yobidashi" decoding="async"></figure>'
+      + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI2_IMG+'" alt="Gyōji" decoding="async"></figure>'
       + '</div>';
   }
 
@@ -199,9 +199,6 @@
   +'.ggb-gyojirow{display:flex;align-items:flex-end;justify-content:center;gap:4px}'
   +'.ggb-off{margin:0;position:relative;width:clamp(40px,5vw,60px)}'
   +'.ggb-off img{width:100%;height:auto;display:block}'
-  +'.ggb-sancenter .ggb-off figcaption{position:absolute;top:1px;left:50%;transform:translateX(-50%);'
-    +'writing-mode:vertical-rl;font-size:8px;font-weight:800;color:#241608;background:rgba(244,236,216,.78);'
-    +'border-radius:2px;padding:1px;line-height:1;z-index:4}'
   +'@media(max-width:760px){.ggb-fig{--fw:clamp(30px,5.4vw,32px)}.ggb-big{--fw:clamp(58px,15vw,64px)}.ggb-fig figcaption{font-size:7px}'
     +'.ggb-sanyaku{gap:clamp(2px,1vw,20px)}.ggb-center{width:clamp(120px,28vw,220px)}}'
   +'@media(max-width:520px){.ggb-fig figcaption{display:none}.ggb-off figcaption{display:none}'
