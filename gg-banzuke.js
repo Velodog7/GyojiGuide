@@ -198,27 +198,74 @@
     +'.ggb-big{--fw:clamp(60px,17vw,72px)}.ggb-san .ggb-fig{margin-left:clamp(-46px,-11vw,-22px)}'  /* larger still + tighter on phones */
     +'.ggb-side-h{font-size:15px}.ggb-top{padding:2px 4px 0}}';
 
-  // Adapt the rank-and-file grid so every rikishi stays visible: the sprites are
-  // tall, so a fixed column count can push the bottom rows past the crowd's
-  // height (they get clipped by overflow:hidden). Pick the fewest columns —
-  // largest figures — whose rows still fit the available height, then add more
-  // only if they'd overflow. Recomputed after images load and on resize.
-  var CROWD_MINCOLS = 3, CROWD_MAXCOLS = 14;
+  // Adapt the rank-and-file grid so every rikishi stays visible AND none sit
+  // under the centred card. Approach: (1) find the column count that would fill
+  // each side's width and fit its height; (2) drop two columns and shrink the
+  // figures a touch, packing each side toward its OUTER edge so the inner space
+  // (where the card floats) is left clear; (3) guard vertically so the bottom
+  // row never clips, and nudge columns down further if the card still overlaps.
+  // Recomputed after images load and on resize.
+  var CROWD_MINCOLS = 3, CROWD_MAXCOLS = 14, CROWD_MINW = 18;
+  function colsArr(host){ return Array.prototype.slice.call(host.querySelectorAll(".ggb-col")); }
+  function overflowsV(cols){
+    for (var i = 0; i < cols.length; i++){ if (cols[i].scrollHeight - cols[i].clientHeight > 1.5) return true; }
+    return false;
+  }
+  function applyStretch(cols, C){
+    for (var i = 0; i < cols.length; i++){
+      cols[i].style.gridTemplateColumns = "repeat("+C+",minmax(0,1fr))";
+      cols[i].style.justifyContent = "";
+    }
+  }
+  function applyPacked(cols, C, w){
+    for (var i = 0; i < cols.length; i++){
+      var west = cols[i].classList.contains("ggb-colW");
+      cols[i].style.gridTemplateColumns = "repeat("+C+","+w+"px)";
+      cols[i].style.justifyContent = west ? "start" : "end";   // pack to each side's outer edge
+    }
+  }
   function fitCrowd(){
     var host = document.getElementById("ggBanzuke");
     if (!host) return;
-    var cols = host.querySelectorAll(".ggb-col");
+    var cols = colsArr(host);
     if (!cols.length) return;
     var maxN = Math.max(westFile.length, eastFile.length);
     if (!maxN) return;
-    var cap = Math.min(CROWD_MAXCOLS, maxN), chosen = cap, i;
+    var colW = cols[0].clientWidth, availH = cols[0].clientHeight;
+    if (!colW || !availH) return;
+
+    // (1) fill-fit: fewest stretched columns whose rows fit the height
+    var cap = Math.min(CROWD_MAXCOLS, maxN), fill = cap;
     for (var C = CROWD_MINCOLS; C <= cap; C++){
-      for (i = 0; i < cols.length; i++) cols[i].style.gridTemplateColumns = "repeat("+C+",minmax(0,1fr))";
-      var over = false;
-      for (i = 0; i < cols.length; i++){ if (cols[i].scrollHeight - cols[i].clientHeight > 1.5){ over = true; break; } }
-      if (!over){ chosen = C; break; }
+      applyStretch(cols, C);
+      if (!overflowsV(cols)){ fill = C; break; }
     }
-    for (i = 0; i < cols.length; i++) cols[i].style.gridTemplateColumns = "repeat("+chosen+",minmax(0,1fr))";
+
+    // (2) two fewer columns, ~10% smaller, packed to the outer edges
+    var T = Math.max(1, fill - 2);
+    var w = Math.max(CROWD_MINW, Math.floor((colW / fill) * 0.90));
+    if (w * T > colW) w = Math.floor(colW / T);
+    applyPacked(cols, T, w);
+
+    // (3a) vertical guard — shrink until the last row fits
+    var guard = 0;
+    while (overflowsV(cols) && w > CROWD_MINW && guard++ < 40){ w = Math.floor(w * 0.94); applyPacked(cols, T, w); }
+
+    // (3b) card guard — if packed content would still slip under the card, drop a column
+    var card = document.querySelector(".bz-card");
+    if (card){
+      var cr = card.getBoundingClientRect(), tries = 0;
+      function overlaps(){
+        for (var i = 0; i < cols.length; i++){
+          var r = cols[i].getBoundingClientRect(), west = cols[i].classList.contains("ggb-colW");
+          var edge = west ? (r.left + T * w) : (r.right - T * w);
+          if (west ? (edge > cr.left - 4) : (edge < cr.right + 4)) return true;
+        }
+        return false;
+      }
+      while (overlaps() && T > 1 && tries++ < 8){ T--; applyPacked(cols, T, w); }
+      while (overflowsV(cols) && w > CROWD_MINW && guard++ < 60){ w = Math.floor(w * 0.94); applyPacked(cols, T, w); }
+    }
   }
   function scheduleFit(){
     var host = document.getElementById("ggBanzuke");
