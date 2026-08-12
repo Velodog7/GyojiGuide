@@ -165,9 +165,10 @@
   +'.ggb-col{position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));'
     +'gap:2px 1px;align-content:start;justify-items:stretch;padding:4px 4px 0}'
   +'.ggb-fig{position:relative;width:var(--fw,46px);flex:0 0 auto;text-align:center;margin:0}'
-  +'.ggb-col .ggb-fig{position:relative;width:100%;--fw:auto}'              /* fill the cell — column count sets the size, so every rikishi fits */
+  +'.ggb-col .ggb-fig{position:relative;width:100%;--fw:auto;aspect-ratio:3/5}'  /* uniform box: same size for every rikishi in the crowd */
   +'.ggb-col .ggb-fig figcaption{display:none}'                            /* names off in the crowd — like a printed banzuke sheet */
   +'.ggb-fig img{width:100%;height:auto;display:block}'
+  +'.ggb-col .ggb-fig img{height:100%;object-fit:contain;object-position:center bottom}'  /* stand every rikishi on the box floor — feet align across each row */
   +'.ggb-fig[data-n="Hoshoryu"] img{transform:scale(1.22);transform-origin:50% 100%}'  /* was rendering small */
   /* names: vertical, alternating above / below the figure so neighbours never collide */
   +'.ggb-fig figcaption{position:absolute;left:50%;transform:translateX(-50%);writing-mode:vertical-rl;'
