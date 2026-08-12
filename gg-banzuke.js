@@ -120,8 +120,8 @@
       + '<div class="ggb-top">'
       +   '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
       +   '<div class="ggb-sanyaku">'
-      +     '<div class="ggb-san ggb-sanW">'+sanW.map(function(n){return fig(n,true,null,"down");}).join("")+'</div>'
-      +     '<div class="ggb-san ggb-sanE">'+sanE.map(function(n){return fig(n,true,null,"down");}).join("")+'</div>'
+      +     '<div class="ggb-san ggb-sanW">'+sanW.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
+      +     '<div class="ggb-san ggb-sanE">'+sanE.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
       +   '</div>'
       +   '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
       + '</div>'
@@ -181,6 +181,9 @@
   +'.ggb-cap-up figcaption{bottom:100%;margin-bottom:1px}'
   +'.ggb-cap-down figcaption{top:100%;margin-top:1px}'
   +'.ggb-big{--fw:clamp(46px,8vw,78px)}.ggb-big figcaption{font-size:10px}'    /* sanyaku scale down on narrow screens so none get cropped */
+  +'.ggb-san .ggb-fig figcaption{top:1px;bottom:auto;left:auto;right:auto;transform:none}'  /* sanyaku names in a top corner, same logic as the crowd */
+  +'.ggb-sanE .ggb-fig figcaption{right:1px;left:auto}'   /* East (right) → top-right */
+  +'.ggb-sanW .ggb-fig figcaption{left:1px;right:auto}'   /* West (left) → top-left */
   +'.ggb-tY figcaption{background:#e7d38f}.ggb-tO figcaption{background:#e9c98c}'
   +'.ggb-tS figcaption{background:#e6b8a2}.ggb-tK figcaption{background:#e6c2b0}'
   +'.ggb-center{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;'
@@ -196,11 +199,9 @@
   +'.ggb-off img{width:100%;height:auto;display:block}'
   +'.ggb-off figcaption{font-size:9px;font-weight:800;color:#3a2c12;margin-top:1px}'
   +'@media(max-width:760px){.ggb-fig{--fw:clamp(30px,5.4vw,32px)}.ggb-big{--fw:clamp(58px,15vw,64px)}.ggb-fig figcaption{font-size:7px}'
-    +'.ggb-sanyaku{gap:clamp(2px,1vw,20px)}.ggb-center{width:clamp(120px,28vw,220px)}'
-    +'.ggb-san{flex:0 1 auto;justify-content:center}'                            /* compact cluster on small screens */
-    +'.ggb-san .ggb-fig{margin-left:clamp(-40px,-9vw,-16px)}}'                   /* bigger sanyaku, packed tight so they stay large on thin screens */
+    +'.ggb-sanyaku{gap:clamp(2px,1vw,20px)}.ggb-center{width:clamp(120px,28vw,220px)}}'
   +'@media(max-width:520px){.ggb-fig figcaption{display:none}.ggb-off figcaption{display:none}'
-    +'.ggb-big{--fw:clamp(60px,17vw,72px)}.ggb-san .ggb-fig{margin-left:clamp(-46px,-11vw,-22px)}'  /* larger still + tighter on phones */
+    +'.ggb-big{--fw:clamp(60px,17vw,72px)}'
     +'.ggb-side-h{font-size:15px}.ggb-top{padding:2px 4px 0}}';
 
   // Adapt the rank-and-file grid so every rikishi stays visible AND none sit
@@ -276,11 +277,34 @@
       cols[j].style.justifyContent = "space-between";   // spread the row from the outer edge to the card edge
     }
   }
+  // Size the sanyaku so they fit their flank width (no overlap, no crop) with a
+  // height cap so they never dominate the sheet. Runs before fitCrowd because it
+  // changes the top row's height, which changes the room the crowd gets.
+  var SAN_MAXFW = 78, SAN_MINFW = 22, SAN_GAPX = 4, SAN_ASPECT = 2.2;
+  function fitSanyaku(){
+    var host = document.getElementById("ggBanzuke");
+    if (!host) return;
+    var sans = host.querySelectorAll(".ggb-san");
+    if (!sans.length) return;
+    var stageH = host.clientHeight || 0;
+    var heightBudget = Math.max(90, stageH * 0.30);
+    var fw = SAN_MAXFW;
+    for (var i = 0; i < sans.length; i++){
+      var n = sans[i].querySelectorAll(".ggb-fig").length;
+      if (!n) continue;
+      var byW = Math.floor((sans[i].clientWidth - (n - 1) * SAN_GAPX) / n);
+      if (byW < fw) fw = byW;
+    }
+    fw = Math.max(SAN_MINFW, Math.min(fw, Math.floor(heightBudget / SAN_ASPECT)));
+    var figs = host.querySelectorAll(".ggb-san .ggb-fig");
+    for (var j = 0; j < figs.length; j++) figs[j].style.setProperty("--fw", fw + "px");
+  }
+  function fitAll(){ fitSanyaku(); fitCrowd(); }
   function scheduleFit(){
     var host = document.getElementById("ggBanzuke");
     if (!host) return;
     var imgs = host.querySelectorAll(".ggb-col img"), pending = 0, done = false;
-    function go(){ if (done) return; done = true; requestAnimationFrame(fitCrowd); }
+    function go(){ if (done) return; done = true; requestAnimationFrame(fitAll); }
     for (var i = 0; i < imgs.length; i++){
       var im = imgs[i];
       if (im.complete && im.naturalWidth) continue;
@@ -289,10 +313,10 @@
       im.addEventListener("error", function(){ if (--pending <= 0) go(); }, { once:true });
     }
     if (pending === 0) go();
-    setTimeout(fitCrowd, 500);   // safety net in case some load events never fire
+    setTimeout(fitAll, 500);   // safety net in case some load events never fire
   }
   var fitTimer;
-  function onResize(){ clearTimeout(fitTimer); fitTimer = setTimeout(fitCrowd, 150); }
+  function onResize(){ clearTimeout(fitTimer); fitTimer = setTimeout(fitAll, 150); }
 
   function mount(){
     if (!document.getElementById("ggBanzuke")) return;
