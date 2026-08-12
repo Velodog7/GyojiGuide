@@ -100,14 +100,12 @@
     return out;
   }
 
-  /* ---- gyōji (both) & yobidashi (real art from the Dohyō page) ---- */
+  /* ---- gyōji (either side) & yobidashi (middle) — sits on the sanyaku row ---- */
   function officials(){
-    return '<div class="ggb-officials">'
-      + '<div class="ggb-gyojirow">'
-      +   '<figure class="ggb-off"><img src="'+GYOJI_IMG+'" alt="Gyōji" decoding="async"><figcaption>行司</figcaption></figure>'
-      +   '<figure class="ggb-off"><img src="'+GYOJI2_IMG+'" alt="Gyōji" decoding="async"><figcaption>行司</figcaption></figure>'
-      + '</div>'
+    return '<div class="ggb-sancenter">'
+      + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI_IMG+'" alt="Gyōji" decoding="async"><figcaption>行司</figcaption></figure>'
       + '<figure class="ggb-off ggb-yobi"><img src="'+YOBI_IMG+'" alt="Yobidashi" decoding="async"><figcaption>呼出</figcaption></figure>'
+      + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI2_IMG+'" alt="Gyōji" decoding="async"><figcaption>行司</figcaption></figure>'
       + '</div>';
   }
 
@@ -121,15 +119,14 @@
       +   '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
       +   '<div class="ggb-sanyaku">'
       +     '<div class="ggb-san ggb-sanW">'+sanW.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
+      +     officials()
       +     '<div class="ggb-san ggb-sanE">'+sanE.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
       +   '</div>'
       +   '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
       + '</div>'
       + '<div class="ggb-body">'
       +   '<div class="ggb-col ggb-colW">'+westFile.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
-      +   '<div class="ggb-center">'
-      +     officials()
-      +   '</div>'
+      +   '<div class="ggb-center"></div>'
       +   '<div class="ggb-col ggb-colE">'+eastFile.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
       + '</div>'
       + '</div>';
@@ -158,10 +155,12 @@
   +'.ggb-top{display:grid;grid-template-columns:auto 1fr auto;align-items:flex-end;gap:6px;padding:2px 12px 0;position:relative;z-index:6;max-width:100%}'
   +'.ggb-side-h{font-size:20px;font-weight:900;color:#2a2018;text-shadow:0 1px 0 rgba(255,255,255,.35);line-height:1;text-align:center}'
   +'.ggb-side-h em{display:block;font-style:normal;font-family:"WDXL Lubrifont TC",monospace;font-size:9px;letter-spacing:.16em;color:#7a6a4a;margin-top:2px}'
-  +'.ggb-sanyaku{display:flex;justify-content:center;gap:clamp(200px,26vw,340px);min-width:0;flex-wrap:nowrap}'  /* centre gap widened by JS to clear the card */
+  +'.ggb-sanyaku{display:flex;align-items:flex-end;justify-content:center;gap:0;min-width:0;flex-wrap:nowrap}'  /* centre element (set by JS) holds the officials and clears the card */
   +'.ggb-san{display:flex;align-items:flex-end;justify-content:space-between;flex:1 1 0;min-width:0}'  /* spread from the outer edge to the card edge, like the grid below */
-  +'.ggb-san .ggb-fig{margin-left:0;aspect-ratio:3/5}'   /* uniform box: same size, tops (names) and feet aligned across the row */
+  +'.ggb-san .ggb-fig{margin-left:0;aspect-ratio:1/2}'   /* taller uniform box: fuller figures, tops (names) and feet aligned */
   +'.ggb-san .ggb-fig img{height:100%;object-fit:contain;object-position:center bottom}'
+  +'.ggb-sancenter{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:center;gap:clamp(2px,1vw,12px);min-width:0}'  /* gyōji · yobidashi · gyōji, peeking above the card */
+  +'.ggb-sancenter .ggb-off{margin:0;flex:0 0 auto}'
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));'
     +'gap:2px 1px;align-content:start;justify-items:stretch;padding:4px 4px 0}'
@@ -174,7 +173,6 @@
   +'.ggb-colW .ggb-fig figcaption{left:1px;right:auto}'   /* left side  → top-left corner */
   +'.ggb-fig img{width:100%;height:auto;display:block}'
   +'.ggb-col .ggb-fig img{height:100%;object-fit:contain;object-position:center bottom}'  /* stand every rikishi on the box floor — feet align across each row */
-  +'.ggb-fig[data-n="Hoshoryu"] img{transform:scale(1.22);transform-origin:50% 100%}'  /* was rendering small */
   /* names: vertical, alternating above / below the figure so neighbours never collide */
   +'.ggb-fig figcaption{position:absolute;left:50%;transform:translateX(-50%);writing-mode:vertical-rl;'
     +'font-size:9px;font-weight:800;color:#241608;background:rgba(244,236,216,.78);'
@@ -195,10 +193,11 @@
   +'.ggb-logo svg,.ggb-logo img{width:100%;height:auto;display:block}'
   +'.ggb-officials{display:flex;flex-direction:column;align-items:center;gap:2px;margin-top:6px;position:relative;z-index:6}'
   +'.ggb-gyojirow{display:flex;align-items:flex-end;justify-content:center;gap:4px}'
-  +'.ggb-off{margin:0;display:flex;flex-direction:column;align-items:center;width:clamp(40px,5vw,60px)}'
-  +'.ggb-yobi{margin-top:2px}'
+  +'.ggb-off{margin:0;position:relative;width:clamp(40px,5vw,60px)}'
   +'.ggb-off img{width:100%;height:auto;display:block}'
-  +'.ggb-off figcaption{font-size:9px;font-weight:800;color:#3a2c12;margin-top:1px}'
+  +'.ggb-sancenter .ggb-off figcaption{position:absolute;top:1px;left:50%;transform:translateX(-50%);'
+    +'writing-mode:vertical-rl;font-size:8px;font-weight:800;color:#241608;background:rgba(244,236,216,.78);'
+    +'border-radius:2px;padding:1px;line-height:1;z-index:4}'
   +'@media(max-width:760px){.ggb-fig{--fw:clamp(30px,5.4vw,32px)}.ggb-big{--fw:clamp(58px,15vw,64px)}.ggb-fig figcaption{font-size:7px}'
     +'.ggb-sanyaku{gap:clamp(2px,1vw,20px)}.ggb-center{width:clamp(120px,28vw,220px)}}'
   +'@media(max-width:520px){.ggb-fig figcaption{display:none}.ggb-off figcaption{display:none}'
@@ -212,7 +211,7 @@
   // height, and spread them with space-between so the rows reach in toward the
   // centre with no whitespace band beside the card and no extra columns.
   // Recomputed after images load and on resize.
-  var CROWD_MINCOLS = 3, CROWD_MAXCOLS = 14, CROWD_MINW = 18;
+  var CROWD_MINCOLS = 3, CROWD_MAXCOLS = 14, CROWD_MINW = 18, crowdCellW = 0;
   function colsArr(host){ return Array.prototype.slice.call(host.querySelectorAll(".ggb-col")); }
   function overflowsV(cols){
     for (var i = 0; i < cols.length; i++){ if (cols[i].scrollHeight - cols[i].clientHeight > 1.5) return true; }
@@ -271,6 +270,7 @@
     var cellW_h = Math.floor(rowSpace * 3 / 5);                // box is 3:5 (w:h) — height caps width
     var cellW_w = Math.floor((minClear - (T - 1) * GAP) / T);  // clear width caps width
     var cellW = Math.max(CROWD_MINW, Math.min(cellW_w, cellW_h));
+    crowdCellW = cellW;
     for (var j = 0; j < cols.length; j++){
       cols[j].style.paddingLeft  = pads[j][0] + "px";
       cols[j].style.paddingRight = pads[j][1] + "px";
@@ -282,26 +282,29 @@
   // height cap, and widen the centre gap so the innermost (the yokozuna) clear
   // the card instead of hiding behind it. Runs before fitCrowd because it changes
   // the top row's height, which changes the room the crowd gets.
-  var SAN_MAXFW = 78, SAN_MINFW = 22, SAN_GAPX = 4, SAN_MARGIN = 14, SAN_MINFLANK = 60;
+  var SAN_MAXFW = 108, SAN_MINFW = 24, SAN_GAPX = 6, SAN_MARGIN = 16, SAN_MINFLANK = 60, SAN_BOX = 2.0;
   function fitSanyaku(){
     var host = document.getElementById("ggBanzuke");
     if (!host) return;
     var container = host.querySelector(".ggb-sanyaku");
+    var center = host.querySelector(".ggb-sancenter");
     var sans = host.querySelectorAll(".ggb-san");
     if (!container || !sans.length) return;
     var containerW = container.clientWidth || 0;
     if (!containerW) return;
     var stageH = host.clientHeight || 0;
 
-    // centre gap = card width (+ margin) so each group sits entirely outside the
-    // card; clamp so a minimum flank survives on very narrow windows
+    // centre element = card width (+ margin) so each group sits outside the card;
+    // the officials live inside it and peek above the card's top edge. Clamp so a
+    // minimum flank survives on very narrow windows.
     var card = document.querySelector(".bz-card");
-    var wantGap = card ? Math.round(card.getBoundingClientRect().width + 2 * SAN_MARGIN) : 340;
-    var gap = Math.min(wantGap, Math.max(0, containerW - 2 * SAN_MINFLANK));
-    container.style.gap = gap + "px";
-    var flankW = (containerW - gap) / 2;
+    var wantC = card ? Math.round(card.getBoundingClientRect().width + 2 * SAN_MARGIN) : 340;
+    var centerW = Math.min(wantC, Math.max(0, containerW - 2 * SAN_MINFLANK));
+    if (center) center.style.width = centerW + "px";
+    var flankW = (containerW - centerW) / 2;
 
-    var heightBudget = Math.max(90, stageH * 0.30);
+    // fill the flank, capped by a height budget (taller box → box height = fw*SAN_BOX)
+    var heightBudget = Math.max(120, stageH * 0.34);
     var fw = SAN_MAXFW;
     for (var i = 0; i < sans.length; i++){
       var n = sans[i].querySelectorAll(".ggb-fig").length;
@@ -309,11 +312,15 @@
       var byW = Math.floor((flankW - (n - 1) * SAN_GAPX) / n);
       if (byW < fw) fw = byW;
     }
-    fw = Math.max(SAN_MINFW, Math.min(fw, Math.floor(heightBudget * 3 / 5)));  // box height = fw*5/3
+    fw = Math.max(SAN_MINFW, Math.min(fw, Math.floor(heightBudget / SAN_BOX)));
+    // never smaller than a crowd cell — the sanyaku should read as the biggest figures
+    if (crowdCellW && fw < crowdCellW * 1.15) fw = Math.min(Math.round(crowdCellW * 1.15), Math.floor((flankW - 4 * SAN_GAPX) / 5));
     var figs = host.querySelectorAll(".ggb-san .ggb-fig");
     for (var j = 0; j < figs.length; j++) figs[j].style.setProperty("--fw", fw + "px");
+    var offs = host.querySelectorAll(".ggb-sancenter .ggb-off");
+    for (var k = 0; k < offs.length; k++) offs[k].style.width = fw + "px";
   }
-  function fitAll(){ fitSanyaku(); fitCrowd(); }
+  function fitAll(){ fitCrowd(); fitSanyaku(); fitCrowd(); }
   function scheduleFit(){
     var host = document.getElementById("ggBanzuke");
     if (!host) return;

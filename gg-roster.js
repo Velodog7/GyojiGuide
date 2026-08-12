@@ -205,8 +205,39 @@
     return null;
   }
 
+  /* Fetch the most recent `count` published basho (newest first) and build a
+     per-wrestler record history. Reuses fetchBanzuke, so the shape matches
+     load(). Returns { ok, byName: { name: [{bashoId,label,rk,record,wins,losses}, ...] }, basho:[...] }
+     with the newest basho first for each wrestler. */
+  function recent(opts) {
+    opts = opts || {};
+    var count = opts.count || 4;
+    var cands = bashoCandidates(opts.date);
+    var byName = {}, basho = [], i = 0, got = 0;
+    function step() {
+      if (got >= count || i >= cands.length) return { ok: got > 0, byName: byName, basho: basho };
+      var id = cands[i++];
+      return Promise.all([fetchBanzuke(id, "Makuuchi"), fetchBanzuke(id, "Juryo")])
+        .then(function (pair) {
+          var rows = pair[0].concat(pair[1]);
+          if (rows.length >= 30) {                    // a real, published basho
+            got++; basho.push({ bashoId: id, label: label(id) });
+            rows.forEach(function (w) {
+              if (!w.record) return;
+              (byName[w.name] = byName[w.name] || []).push({
+                bashoId: id, label: label(id), rk: w.rk, record: w.record, wins: w.wins, losses: w.losses
+              });
+            });
+          }
+          return step();                               // keep walking back
+        })
+        .catch(function () { return step(); });
+    }
+    return Promise.resolve().then(step);
+  }
+
   window.GGRoster = {
-    load: load, applyTo: applyTo, headToHead: headToHead,
+    load: load, recent: recent, applyTo: applyTo, headToHead: headToHead,
     bashoCandidates: bashoCandidates, deriveFromRank: deriveFromRank, label: label,
     _fetchBanzuke: fetchBanzuke
   };
