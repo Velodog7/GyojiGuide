@@ -54,17 +54,23 @@
   .view-sub{ color:var(--muted); font-size:.92rem; line-height:1.55; margin:0 0 20px; max-width:60ch }
 
   /* ── Learn: interactive guide ─────────────────────────── */
-  .learn-grid{ display:flex; flex-direction:column; gap:10px; align-items:stretch }
-  .learn-nav{ display:flex; flex-direction:row; flex-wrap:wrap; gap:8px; position:static }
+  .learn-grid{ display:flex; flex-direction:row; gap:16px; align-items:stretch }
+  .learn-nav{ display:flex; flex-direction:column; flex-wrap:nowrap; gap:6px; flex:0 0 33%; width:33%; align-self:flex-start;
+        border-right:1px solid var(--line); padding-right:16px }
   /* chapter buttons share the Resources card look: rounded tile, boxed icon, gold hover-lift */
   .learn-navb{ text-align:left; background:var(--surface); border:1px solid var(--line); color:var(--dim); font:inherit;
-        font-size:.8rem; font-weight:700; padding:5px 12px 5px 5px; border-radius:12px; cursor:pointer; transition:.14s; display:inline-flex; align-items:center; gap:9px; line-height:1.1; white-space:nowrap; flex:0 0 auto }
+        font-size:.8rem; font-weight:700; padding:7px 10px; border-radius:12px; cursor:pointer; transition:.14s; display:flex; align-items:center; gap:8px; line-height:1.15; white-space:normal; width:100%; flex:0 0 auto }
   .learn-navb:hover{ border-color:var(--sun); background:var(--surface2); color:var(--ink); transform:translateY(-2px) }
   .learn-navb[aria-current="true"]{ border-color:var(--sun); background:var(--surface2); color:var(--sun) }
   .learn-navb .lb-i{ width:24px; height:24px; border-radius:7px; flex:none; display:grid; place-items:center;
         background:var(--surface2); color:var(--sun); font-size:.98rem; line-height:1 }
   .learn-navb[aria-current="true"] .lb-i{ background:rgba(216,178,90,.16) }
-  .learn-panel{ min-height:0 }
+  .learn-panel{ min-height:0; flex:1 1 auto; min-width:0 }
+  @media (max-width:560px){
+    .learn-grid{ flex-direction:column; gap:10px }
+    .learn-nav{ flex-direction:row; flex-wrap:wrap; width:auto; flex:none; border-right:none; padding-right:0; gap:8px }
+    .learn-navb{ width:auto; white-space:nowrap }
+  }
   .learn-step{ display:none; animation:fadein .25s ease }
   .learn-step.on{ display:block }
   @keyframes fadein{ from{ opacity:0; transform:translateY(4px) } }
@@ -114,15 +120,15 @@
   .res-sec__h{ font-family:"Potta One",sans-serif; font-weight:900; font-size:1.15rem; margin:0 0 4px; display:flex; align-items:center; gap:9px }
   .res-sec__h svg{ width:22px; height:22px; flex:none; color:var(--red) }
   .res-sec__sub{ color:var(--muted); font-size:.86rem; margin:0 0 16px }
-  .res-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px }
-  .res-card{ display:flex; align-items:center; gap:13px; background:var(--surface); border:1px solid var(--line); border-radius:12px;
-        padding:14px 16px; text-decoration:none; color:var(--ink); transition:.14s }
+  .res-grid{ display:grid; grid-template-columns:1fr; gap:10px }
+  .res-card{ display:flex; align-items:flex-start; gap:14px; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+        padding:15px 18px; text-decoration:none; color:var(--ink); transition:.14s }
   .res-card:hover{ border-color:var(--sun); background:var(--surface2); transform:translateY(-2px) }
-  .res-card__ico{ width:38px; height:38px; border-radius:9px; flex:none; display:grid; place-items:center; background:var(--surface2); color:var(--sun) }
-  .res-card__ico svg{ width:22px; height:22px }
-  .res-card__b{ min-width:0; display:flex; flex-direction:column; gap:1px }
-  .res-card__nm{ font-weight:700; font-size:.94rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-  .res-card__d{ color:var(--muted); font-size:.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+  .res-card__ico{ width:42px; height:42px; border-radius:10px; flex:none; display:grid; place-items:center; background:var(--surface2); color:var(--sun) }
+  .res-card__ico svg{ width:24px; height:24px }
+  .res-card__b{ min-width:0; display:flex; flex-direction:column; gap:3px }
+  .res-card__nm{ font-weight:700; font-size:1rem; line-height:1.2 }
+  .res-card__d{ color:var(--dim); font-size:.86rem; line-height:1.45 }
 </style>
 <script src="gg-config.js"></script><script src="gg-account.js"></script>
 </head>
