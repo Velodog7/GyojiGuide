@@ -158,9 +158,10 @@
   +'.ggb-top{display:grid;grid-template-columns:auto 1fr auto;align-items:flex-end;gap:6px;padding:2px 12px 0;position:relative;z-index:6;max-width:100%}'
   +'.ggb-side-h{font-size:20px;font-weight:900;color:#2a2018;text-shadow:0 1px 0 rgba(255,255,255,.35);line-height:1;text-align:center}'
   +'.ggb-side-h em{display:block;font-style:normal;font-family:"WDXL Lubrifont TC",monospace;font-size:9px;letter-spacing:.16em;color:#7a6a4a;margin-top:2px}'
-  +'.ggb-sanyaku{display:flex;justify-content:center;gap:clamp(200px,26vw,340px);min-width:0;flex-wrap:nowrap}'  /* centre gap = cartouche width, so each group spans its flank */
-  +'.ggb-san{display:flex;align-items:flex-end;justify-content:space-evenly;flex:1 1 0;min-width:0}'  /* spread evenly across the flank, like the grid below */
-  +'.ggb-san .ggb-fig{margin-left:0}'
+  +'.ggb-sanyaku{display:flex;justify-content:center;gap:clamp(200px,26vw,340px);min-width:0;flex-wrap:nowrap}'  /* centre gap widened by JS to clear the card */
+  +'.ggb-san{display:flex;align-items:flex-end;justify-content:space-between;flex:1 1 0;min-width:0}'  /* spread from the outer edge to the card edge, like the grid below */
+  +'.ggb-san .ggb-fig{margin-left:0;aspect-ratio:3/5}'   /* uniform box: same size, tops (names) and feet aligned across the row */
+  +'.ggb-san .ggb-fig img{height:100%;object-fit:contain;object-position:center bottom}'
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));'
     +'gap:2px 1px;align-content:start;justify-items:stretch;padding:4px 4px 0}'
@@ -278,24 +279,37 @@
     }
   }
   // Size the sanyaku so they fit their flank width (no overlap, no crop) with a
-  // height cap so they never dominate the sheet. Runs before fitCrowd because it
-  // changes the top row's height, which changes the room the crowd gets.
-  var SAN_MAXFW = 78, SAN_MINFW = 22, SAN_GAPX = 4, SAN_ASPECT = 2.2;
+  // height cap, and widen the centre gap so the innermost (the yokozuna) clear
+  // the card instead of hiding behind it. Runs before fitCrowd because it changes
+  // the top row's height, which changes the room the crowd gets.
+  var SAN_MAXFW = 78, SAN_MINFW = 22, SAN_GAPX = 4, SAN_MARGIN = 14, SAN_MINFLANK = 60;
   function fitSanyaku(){
     var host = document.getElementById("ggBanzuke");
     if (!host) return;
+    var container = host.querySelector(".ggb-sanyaku");
     var sans = host.querySelectorAll(".ggb-san");
-    if (!sans.length) return;
+    if (!container || !sans.length) return;
+    var containerW = container.clientWidth || 0;
+    if (!containerW) return;
     var stageH = host.clientHeight || 0;
+
+    // centre gap = card width (+ margin) so each group sits entirely outside the
+    // card; clamp so a minimum flank survives on very narrow windows
+    var card = document.querySelector(".bz-card");
+    var wantGap = card ? Math.round(card.getBoundingClientRect().width + 2 * SAN_MARGIN) : 340;
+    var gap = Math.min(wantGap, Math.max(0, containerW - 2 * SAN_MINFLANK));
+    container.style.gap = gap + "px";
+    var flankW = (containerW - gap) / 2;
+
     var heightBudget = Math.max(90, stageH * 0.30);
     var fw = SAN_MAXFW;
     for (var i = 0; i < sans.length; i++){
       var n = sans[i].querySelectorAll(".ggb-fig").length;
       if (!n) continue;
-      var byW = Math.floor((sans[i].clientWidth - (n - 1) * SAN_GAPX) / n);
+      var byW = Math.floor((flankW - (n - 1) * SAN_GAPX) / n);
       if (byW < fw) fw = byW;
     }
-    fw = Math.max(SAN_MINFW, Math.min(fw, Math.floor(heightBudget / SAN_ASPECT)));
+    fw = Math.max(SAN_MINFW, Math.min(fw, Math.floor(heightBudget * 3 / 5)));  // box height = fw*5/3
     var figs = host.querySelectorAll(".ggb-san .ggb-fig");
     for (var j = 0; j < figs.length; j++) figs[j].style.setProperty("--fw", fw + "px");
   }
