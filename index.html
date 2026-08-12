@@ -78,11 +78,26 @@
   .learn-step .jp{ color:var(--sun); font-size:.85rem; letter-spacing:.06em; margin:0 0 14px }
   .learn-step p{ color:var(--dim); line-height:1.55; margin:0 0 11px }
   .learn-step b{ color:var(--ink) }
-  .vocab-list{ display:flex; flex-direction:column; gap:10px }
-  .vocab-item{ border-left:2px solid var(--sun); padding:1px 0 1px 12px }
-  .vocab-item h4{ margin:0; font-family:"Potta One","Zen Maru Gothic",sans-serif; font-weight:400; font-size:1rem; color:var(--ink); display:flex; align-items:baseline; gap:8px; flex-wrap:wrap }
-  .vocab-item h4 .jp{ font-family:"WDXL Lubrifont TC",sans-serif; font-size:0.92rem; color:var(--sun); letter-spacing:.04em }
-  .vocab-item p{ margin:2px 0 0; color:var(--dim); font-size:.85rem; line-height:1.45 }
+  /* vocabulary flash cards — fixed height, one term at a time */
+  .flash{ display:flex; flex-direction:column; gap:12px; margin:4px 0 2px }
+  .flash-top{ display:flex; align-items:center; justify-content:space-between; color:var(--muted); font-size:.76rem; letter-spacing:.04em }
+  .flash-top .fc-count{ font-family:"WDXL Lubrifont TC",monospace; color:var(--dim) }
+  .flash-card{ perspective:1200px; cursor:pointer; height:176px }
+  .flash-inner{ position:relative; width:100%; height:100%; transition:transform .45s cubic-bezier(.2,.7,.2,1); transform-style:preserve-3d }
+  .flash-card.flipped .flash-inner{ transform:rotateY(180deg) }
+  .flash-face{ position:absolute; inset:0; -webkit-backface-visibility:hidden; backface-visibility:hidden;
+        border:1px solid var(--line); border-radius:14px; background:var(--surface);
+        display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:16px; gap:6px }
+  .flash-card:hover .flash-face{ border-color:var(--sun) }
+  .flash-front .fc-rom{ font-family:"Potta One",sans-serif; font-weight:900; font-size:1.5rem; color:var(--ink) }
+  .flash-front .fc-jp{ font-family:"WDXL Lubrifont TC",sans-serif; font-size:1.1rem; color:var(--sun); letter-spacing:.04em }
+  .flash-front .fc-hint{ margin-top:8px; font-size:.68rem; color:var(--muted); letter-spacing:.14em; text-transform:uppercase }
+  .flash-back{ transform:rotateY(180deg); background:var(--surface2); justify-content:flex-start; gap:8px }
+  .flash-back .fc-rom{ font-weight:800; font-size:.95rem; color:var(--sun) }
+  .flash-back .fc-rom .jp{ font-family:"WDXL Lubrifont TC",sans-serif; color:var(--dim); font-weight:400; margin-left:4px }
+  .flash-back p{ margin:0; color:var(--dim); font-size:.9rem; line-height:1.5; overflow-y:auto }
+  .flash-nav{ display:flex; align-items:center; gap:10px }
+  .flash-nav .btn{ flex:1 1 0; text-align:center }
   .rank-ladder{ display:flex; flex-direction:column; gap:3px; margin:10px 0 12px }
   .rank-row{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:5px 11px; transition:.12s; font-size:.9rem }
   .rank-row:hover{ border-color:var(--sun); transform:translateX(3px) }
@@ -220,7 +235,23 @@
   };
 
   /* ---------------- LEARN ---------------- */
-  var learnBuilt = false, curStep = 0;
+  var learnBuilt = false, curStep = 0, flashIdx = 0;
+  // Vocab as flash cards, ordered from the most concrete/foundational terms up to
+  // ones that lean on the earlier ones to make sense.
+  var VOCAB = [
+    { term:"Mawashi", jp:"\u307e\u308f\u3057", def:"The heavy silk belt \u2014 the only thing a rikishi wears in the ring, and the anchor for most grips and throws." },
+    { term:"Tawara", jp:"\u4ff5", def:"The straw rice-bales half-buried in the clay that mark the edge of the dohy\u014d. Cross them and the bout is lost." },
+    { term:"Chankonabe", jp:"\u3061\u3083\u3093\u3053\u9358", def:"The protein-packed hot-pot stew that is the staple of a wrestler\u2019s diet \u2014 eaten in huge quantities to build mass." },
+    { term:"Heya (-beya)", jp:"\u90e8\u5c4b", def:"A training stable \u2014 where wrestlers live, train, and eat together under one master. Stable names end in \u2018-beya\u2019." },
+    { term:"Oyakata", jp:"\u89aa\u65b9", def:"A stablemaster \u2014 a retired elder, usually a former top wrestler, who owns and runs a heya." },
+    { term:"Shikona", jp:"\u56db\u80a1\u540d", def:"A wrestler\u2019s ring name \u2014 often poetic and steeped in tradition, chosen by his stable." },
+    { term:"Sekitori", jp:"\u95a2\u53d6", def:"A salaried wrestler \u2014 anyone ranked J\u016bry\u014d or above (the top two divisions). Everyone below them is an unpaid trainee." },
+    { term:"Dohy\u014d-iri", jp:"\u571f\u4ff5\u5165\u308a", def:"The ring-entering ceremony \u2014 most spectacular when a yokozuna performs his own in a braided white rope." },
+    { term:"Kachi-koshi", jp:"\u52dd\u3061\u8d8a\u3057", def:"A winning record \u2014 8 or more wins in the 15 days. It moves you up the banzuke." },
+    { term:"Make-koshi", jp:"\u8ca0\u3051\u8d8a\u3057", def:"A losing record \u2014 8 or more losses. It slides you down the banzuke." },
+    { term:"Kinboshi", jp:"\u91d1\u661f", def:"The \u2018gold star\u2019 a maegashira earns for beating a yokozuna \u2014 a career highlight (and a bonus paid for life)." },
+    { term:"Monoii", jp:"\u7269\u8a00\u3044", def:"When the ringside judges step onto the dohy\u014d to confer over a too-close-to-call finish \u2014 sumo\u2019s instant replay." }
+  ];
   var CHAPTERS = [
     { id:"basics", icon:"\u76ee", title:"What is sumo?", jp:"\u76f8\u64b2 \u30fb s\u016dm\u014d",
       html:
@@ -255,22 +286,7 @@
         "<p>Before a bout, wrestlers throw <b>salt</b> to purify the ring and perform <b>shiko</b> \u2014 the high leg stomps that drive off evil spirits.</p>"+
         "<p>The <b>gy\u014dji</b> (referee) directs the bout; a <b>yobidashi</b> announces the wrestlers. A <b>yokozuna</b> gets his own <b>dohy\u014d-iri</b> ring-entering ceremony in the sacred white rope.</p>"+
         "<p>These aren\u2019t just for show \u2014 they connect a modern sport to centuries of tradition, and they\u2019re a huge part of what makes watching sumo special.</p>" },
-    { id:"vocab", icon:"\u8a9e", title:"Words to know", jp:"\u7528\u8a9e \u30fb y\u014dgo",
-      html:
-        "<div class='vocab-list'>" +
-          "<div class='vocab-item'><h4>Sekitori <span class='jp'>\u95a2\u53d6</span></h4><p>A salaried wrestler \u2014 anyone ranked J\u016bry\u014d or above (the top two divisions). Everyone below them is an unpaid trainee.</p></div>" +
-          "<div class='vocab-item'><h4>Tawara <span class='jp'>\u4ff5</span></h4><p>The straw rice-bales half-buried in the clay that mark the edge of the dohy\u014d. Cross them and the bout is lost.</p></div>" +
-          "<div class='vocab-item'><h4>Heya (-beya) <span class='jp'>\u90e8\u5c4b</span></h4><p>A training stable \u2014 where wrestlers live, train, and eat together under one master. Stable names end in \u2018-beya\u2019.</p></div>" +
-          "<div class='vocab-item'><h4>Monoii <span class='jp'>\u7269\u8a00\u3044</span></h4><p>When the ringside judges step onto the dohy\u014d to confer over a too-close-to-call finish \u2014 sumo\u2019s instant replay.</p></div>" +
-          "<div class='vocab-item'><h4>Dohy\u014d-iri <span class='jp'>\u571f\u4ff5\u5165\u308a</span></h4><p>The ring-entering ceremony \u2014 most spectacular when a yokozuna performs his own in a braided white rope.</p></div>" +
-          "<div class='vocab-item'><h4>Chankonabe <span class='jp'>\u3061\u3083\u3093\u3053\u9358</span></h4><p>The protein-packed hot-pot stew that is the staple of a wrestler\u2019s diet \u2014 eaten in huge quantities to build mass.</p></div>" +
-          "<div class='vocab-item'><h4>Mawashi <span class='jp'>\u307e\u308f\u3057</span></h4><p>The heavy silk belt \u2014 the only thing a rikishi wears in the ring, and the anchor for most grips and throws.</p></div>" +
-          "<div class='vocab-item'><h4>Oyakata <span class='jp'>\u89aa\u65b9</span></h4><p>A stablemaster \u2014 a retired elder, usually a former top wrestler, who owns and runs a heya.</p></div>" +
-          "<div class='vocab-item'><h4>Shikona <span class='jp'>\u56db\u80a1\u540d</span></h4><p>A wrestler\u2019s ring name \u2014 often poetic and steeped in tradition, chosen by his stable.</p></div>" +
-          "<div class='vocab-item'><h4>Kachi-koshi <span class='jp'>\u52dd\u3061\u8d8a\u3057</span></h4><p>A winning record \u2014 8 or more wins in the 15 days. It moves you up the banzuke.</p></div>" +
-          "<div class='vocab-item'><h4>Make-koshi <span class='jp'>\u8ca0\u3051\u8d8a\u3057</span></h4><p>A losing record \u2014 8 or more losses. It slides you down the banzuke.</p></div>" +
-          "<div class='vocab-item'><h4>Kinboshi <span class='jp'>\u91d1\u661f</span></h4><p>The \u2018gold star\u2019 a maegashira earns for beating a yokozuna \u2014 a career highlight (and a bonus paid for life).</p></div>" +
-        "</div>" },
+    { id:"vocab", icon:"\u8a9e", title:"Words to know", jp:"\u7528\u8a9e \u30fb y\u014dgo", flash:true },
     { id:"quiz", icon:"\u554f", title:"Test yourself", jp:"\u30af\u30a4\u30ba \u30fb quiz", quiz:true }
   ];
   var QUIZ = [
@@ -297,7 +313,7 @@
       btn.onclick = function(){ showStep(+btn.dataset.i); };
     });
     $("learnPanel").innerHTML = CHAPTERS.map(function(c,i){
-      return "<div class='learn-step' data-i='"+i+"'>"+ (c.quiz ? "" :
+      return "<div class='learn-step' data-i='"+i+"'>"+ (c.quiz || c.flash ? "" :
         "<h3>"+esc(c.title)+"</h3><div class='jp'>"+esc(c.jp)+"</div>"+c.html) +
         renderNavCta(i) + "</div>";
     }).join("");
@@ -317,10 +333,37 @@
       b.setAttribute("aria-current", +b.dataset.i===i ? "true":"false");
     });
     if (CHAPTERS[i].quiz) renderQuiz();
+    if (CHAPTERS[i].flash) renderFlash();
     // wire the prev/next buttons of the now-visible step
     var step = $("learnPanel").querySelector(".learn-step[data-i='"+i+"'].on");
     if (step) Array.prototype.forEach.call(step.querySelectorAll("[data-goto]"), function(btn){
       btn.onclick = function(){ showStep(+btn.dataset.goto); var c=document.getElementById("bzCard"); if(c) c.scrollTo({top:0,behavior:"smooth"}); };
+    });
+  }
+  function renderFlash(){
+    var vi = -1;
+    for (var k=0;k<CHAPTERS.length;k++){ if (CHAPTERS[k].flash){ vi=k; break; } }
+    if (vi<0) return;
+    var step = $("learnPanel").querySelector(".learn-step[data-i='"+vi+"']");
+    if (!step) return;
+    var c = CHAPTERS[vi], v = VOCAB[flashIdx];
+    step.innerHTML =
+      "<h3>"+esc(c.title)+"</h3><div class='jp'>"+esc(c.jp)+"</div>"+
+      "<div class='flash'>"+
+        "<div class='flash-top'><span>Tap the card to flip</span><span class='fc-count'>"+(flashIdx+1)+" / "+VOCAB.length+"</span></div>"+
+        "<div class='flash-card' id='flashCard'><div class='flash-inner'>"+
+          "<div class='flash-face flash-front'><div class='fc-rom'>"+esc(v.term)+"</div><div class='fc-jp'>"+esc(v.jp)+"</div><div class='fc-hint'>tap to flip</div></div>"+
+          "<div class='flash-face flash-back'><div class='fc-rom'>"+esc(v.term)+" <span class='jp'>"+esc(v.jp)+"</span></div><p>"+esc(v.def)+"</p></div>"+
+        "</div></div>"+
+        "<div class='flash-nav'><button class='btn ghost' id='flashPrev'>\u2039 Prev</button><button class='btn' id='flashNext'>Next \u203a</button></div>"+
+      "</div>"+
+      renderNavCta(vi);
+    var card = step.querySelector("#flashCard");
+    card.onclick = function(){ card.classList.toggle("flipped"); };
+    step.querySelector("#flashPrev").onclick = function(e){ e.stopPropagation(); flashIdx = (flashIdx-1+VOCAB.length)%VOCAB.length; renderFlash(); };
+    step.querySelector("#flashNext").onclick = function(e){ e.stopPropagation(); flashIdx = (flashIdx+1)%VOCAB.length; renderFlash(); };
+    Array.prototype.forEach.call(step.querySelectorAll("[data-goto]"), function(btn){
+      btn.onclick = function(){ showStep(+btn.dataset.goto); var cc=document.getElementById("bzCard"); if(cc) cc.scrollTo({top:0,behavior:"smooth"}); };
     });
   }
   function renderQuiz(){
