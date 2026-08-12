@@ -48,7 +48,7 @@
   // sanyaku: West group (highest rank nearest the centre) | East group
   var sanW = group(sanyaku,"W").reverse();   // so Yokozuna sits next to the centre column
   var sanE = group(sanyaku,"E");
-  var westFile = group(rankfile,"W");
+  var westFile = group(rankfile,"W");   // rendered in the left column, which is mirrored (direction:rtl) so its top rank sits nearest the centre
   var eastFile = group(rankfile,"E");
 
   /* ---- figure tile ---- */
@@ -164,6 +164,8 @@
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));'
     +'gap:2px 1px;align-content:start;justify-items:stretch;padding:4px 4px 0}'
+  +'.ggb-colW{direction:rtl}'   /* mirror the left column: top rank nearest the centre, reading in→out — a reflection of the East side, not a copy */
+  +'.ggb-colW .ggb-fig{direction:ltr}'  /* keep each figure/caption itself upright */
   +'.ggb-fig{position:relative;width:var(--fw,46px);flex:0 0 auto;text-align:center;margin:0}'
   +'.ggb-col .ggb-fig{position:relative;width:100%;--fw:auto;aspect-ratio:3/5}'  /* uniform box: same size for every rikishi in the crowd */
   +'.ggb-col .ggb-fig figcaption{display:block;top:auto;bottom:2px;font-size:8px;padding:1px;z-index:4}'  /* every rikishi labelled, same spot: at the feet, bottom-centre */
