@@ -166,7 +166,7 @@
     +'gap:2px 1px;align-content:start;justify-items:stretch;padding:4px 4px 0}'
   +'.ggb-fig{position:relative;width:var(--fw,46px);flex:0 0 auto;text-align:center;margin:0}'
   +'.ggb-col .ggb-fig{position:relative;width:100%;--fw:auto;aspect-ratio:3/5}'  /* uniform box: same size for every rikishi in the crowd */
-  +'.ggb-col .ggb-fig figcaption{display:none}'                            /* names off in the crowd — like a printed banzuke sheet */
+  +'.ggb-col .ggb-fig figcaption{display:block;top:auto;bottom:2px;font-size:8px;padding:1px;z-index:4}'  /* every rikishi labelled, same spot: at the feet, bottom-centre */
   +'.ggb-fig img{width:100%;height:auto;display:block}'
   +'.ggb-col .ggb-fig img{height:100%;object-fit:contain;object-position:center bottom}'  /* stand every rikishi on the box floor — feet align across each row */
   +'.ggb-fig[data-n="Hoshoryu"] img{transform:scale(1.22);transform-origin:50% 100%}'  /* was rendering small */
@@ -201,10 +201,10 @@
 
   // Adapt the rank-and-file grid so every rikishi stays visible AND none sit
   // under the centred card. Approach: (1) find the column count that would fill
-  // each side's width and fit its height; (2) drop two columns and shrink the
-  // figures a touch, packing each side toward its OUTER edge so the inner space
-  // (where the card floats) is left clear; (3) guard vertically so the bottom
-  // row never clips, and nudge columns down further if the card still overlaps.
+  // each side's width and fit its height; (2) keep two fewer columns, size them
+  // as large as fit both the clear width (outer edge → card edge) and the
+  // height, and spread them with space-between so the rows reach in toward the
+  // centre with no whitespace band beside the card and no extra columns.
   // Recomputed after images load and on resize.
   var CROWD_MINCOLS = 3, CROWD_MAXCOLS = 14, CROWD_MINW = 18;
   function colsArr(host){ return Array.prototype.slice.call(host.querySelectorAll(".ggb-col")); }
@@ -218,13 +218,6 @@
       cols[i].style.justifyContent = "";
     }
   }
-  function applyPacked(cols, C, w){
-    for (var i = 0; i < cols.length; i++){
-      var west = cols[i].classList.contains("ggb-colW");
-      cols[i].style.gridTemplateColumns = "repeat("+C+","+w+"px)";
-      cols[i].style.justifyContent = west ? "start" : "end";   // pack to each side's outer edge
-    }
-  }
   function fitCrowd(){
     var host = document.getElementById("ggBanzuke");
     if (!host) return;
@@ -232,6 +225,9 @@
     if (!cols.length) return;
     var maxN = Math.max(westFile.length, eastFile.length);
     if (!maxN) return;
+
+    // clear any side padding / justify from a prior run so the fill-fit measures cleanly
+    for (var p = 0; p < cols.length; p++){ cols[p].style.paddingLeft = ""; cols[p].style.paddingRight = ""; cols[p].style.justifyContent = ""; }
     var colW = cols[0].clientWidth, availH = cols[0].clientHeight;
     if (!colW || !availH) return;
 
@@ -241,31 +237,39 @@
       applyStretch(cols, C);
       if (!overflowsV(cols)){ fill = C; break; }
     }
+    for (var q = 0; q < cols.length; q++) cols[q].style.justifyContent = "";  // undo stretch justify before measuring geometry
 
-    // (2) two fewer columns, ~10% smaller, packed to the outer edges
+    // (2) keep two fewer columns, but size them as large as fit BOTH the clear
+    //     width (outer edge → card edge) and the height, then spread them with
+    //     space-between so the rows reach in toward the centre — no dead band of
+    //     whitespace beside the card, and no extra columns.
     var T = Math.max(1, fill - 2);
-    var w = Math.max(CROWD_MINW, Math.floor((colW / fill) * 0.90));
-    if (w * T > colW) w = Math.floor(colW / T);
-    applyPacked(cols, T, w);
-
-    // (3a) vertical guard — shrink until the last row fits
-    var guard = 0;
-    while (overflowsV(cols) && w > CROWD_MINW && guard++ < 40){ w = Math.floor(w * 0.94); applyPacked(cols, T, w); }
-
-    // (3b) card guard — if packed content would still slip under the card, drop a column
     var card = document.querySelector(".bz-card");
-    if (card){
-      var cr = card.getBoundingClientRect(), tries = 0;
-      function overlaps(){
-        for (var i = 0; i < cols.length; i++){
-          var r = cols[i].getBoundingClientRect(), west = cols[i].classList.contains("ggb-colW");
-          var edge = west ? (r.left + T * w) : (r.right - T * w);
-          if (west ? (edge > cr.left - 4) : (edge < cr.right + 4)) return true;
-        }
-        return false;
+    var cardR = card ? card.getBoundingClientRect() : null;
+    var MARGIN = 12, GAP = 1, BASEPAD = 4;
+    var minClear = Infinity, minH = Infinity, pads = [];
+    for (var i = 0; i < cols.length; i++){
+      var r = cols[i].getBoundingClientRect(), west = cols[i].classList.contains("ggb-colW");
+      var padL = BASEPAD, padR = BASEPAD;
+      if (cardR){
+        if (west){ var ce = cardR.left - MARGIN; if (ce < r.right - BASEPAD) padR = Math.max(BASEPAD, Math.round(r.right - ce)); }
+        else     { var cs = cardR.right + MARGIN; if (cs > r.left + BASEPAD) padL = Math.max(BASEPAD, Math.round(cs - r.left)); }
       }
-      while (overlaps() && T > 1 && tries++ < 8){ T--; applyPacked(cols, T, w); }
-      while (overflowsV(cols) && w > CROWD_MINW && guard++ < 60){ w = Math.floor(w * 0.94); applyPacked(cols, T, w); }
+      pads.push([padL, padR]);
+      var contentW = r.width - padL - padR;
+      if (contentW < minClear) minClear = contentW;
+      if (cols[i].clientHeight < minH) minH = cols[i].clientHeight;
+    }
+    var rows = Math.ceil(maxN / T);
+    var rowSpace = (minH - BASEPAD - (rows - 1) * 2) / rows;   // 2px row-gap between rows
+    var cellW_h = Math.floor(rowSpace * 3 / 5);                // box is 3:5 (w:h) — height caps width
+    var cellW_w = Math.floor((minClear - (T - 1) * GAP) / T);  // clear width caps width
+    var cellW = Math.max(CROWD_MINW, Math.min(cellW_w, cellW_h));
+    for (var j = 0; j < cols.length; j++){
+      cols[j].style.paddingLeft  = pads[j][0] + "px";
+      cols[j].style.paddingRight = pads[j][1] + "px";
+      cols[j].style.gridTemplateColumns = "repeat(" + T + "," + cellW + "px)";
+      cols[j].style.justifyContent = "space-between";   // spread the row from the outer edge to the card edge
     }
   }
   function scheduleFit(){
