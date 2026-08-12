@@ -168,7 +168,9 @@
   +'.ggb-colW .ggb-fig{direction:ltr}'  /* keep each figure/caption itself upright */
   +'.ggb-fig{position:relative;width:var(--fw,46px);flex:0 0 auto;text-align:center;margin:0}'
   +'.ggb-col .ggb-fig{position:relative;width:100%;--fw:auto;aspect-ratio:3/5}'  /* uniform box: same size for every rikishi in the crowd */
-  +'.ggb-col .ggb-fig figcaption{display:block;top:auto;bottom:2px;font-size:8px;padding:1px;z-index:4}'  /* every rikishi labelled, same spot: at the feet, bottom-centre */
+  +'.ggb-col .ggb-fig figcaption{display:block;top:1px;bottom:auto;left:auto;right:auto;transform:none;font-size:8px;padding:1px;z-index:4}'  /* label in a top corner, off the faces */
+  +'.ggb-colE .ggb-fig figcaption{right:1px;left:auto}'   /* right side → top-right corner */
+  +'.ggb-colW .ggb-fig figcaption{left:1px;right:auto}'   /* left side  → top-left corner */
   +'.ggb-fig img{width:100%;height:auto;display:block}'
   +'.ggb-col .ggb-fig img{height:100%;object-fit:contain;object-position:center bottom}'  /* stand every rikishi on the box floor — feet align across each row */
   +'.ggb-fig[data-n="Hoshoryu"] img{transform:scale(1.22);transform-origin:50% 100%}'  /* was rendering small */
