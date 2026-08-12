@@ -295,12 +295,23 @@
       '<button class="gga-primary" id="ggaSubmit">'+(signup?"Create account":"Log in")+'</button>'+
       '<div class="gga-switch">'+(signup
         ? 'Already have an account? <a id="ggaToLogin">Log in</a>'
-        : 'New here? <a id="ggaToSignup">Sign up</a>')+'</div>'+
+        : 'New here? <a id="ggaToSignup">Sign up</a> \u00b7 <a id="ggaForgot">Forgot PIN?</a>')+'</div>'+
       '<div class="gga-status"></div>';
     modal.querySelector(".gga-x").onclick = A.close;
     var sw = modal.querySelector("#ggaToLogin") || modal.querySelector("#ggaToSignup");
     if (sw) sw.onclick = function(){ mode = signup ? "login" : "signup"; renderModal(); setTimeout(focusFirst, 0); };
     modal.querySelector("#ggaSubmit").onclick = submit;
+    var fp = modal.querySelector("#ggaForgot");
+    if (fp) fp.onclick = async function(){
+      var h = (modal.querySelector("#ggaHandle").value || "").trim();
+      if (!h){ status("Enter your handle first, then tap Forgot PIN.", "err"); modal.querySelector("#ggaHandle").focus(); return; }
+      status("Requesting reset\u2026");
+      try {
+        var r = (GG.apiPost) ? await GG.apiPost({ action:"requestPinReset", handle:h }) : null;
+        if (r && r.ok) status("Reset requested \u2014 once an admin approves it, re-open Create account to set a new PIN.", "ok");
+        else status((r && r.error) || "Couldn\u2019t request a reset. Try again.", "err");
+      } catch(e){ status("Network error \u2014 try again.", "err"); }
+    };
     modal.querySelector("#ggaPin").addEventListener("keydown", function(e){ if (e.key === "Enter") submit(); });
     setTimeout(focusFirst, 0);
   }

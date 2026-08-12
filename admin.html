@@ -248,6 +248,7 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     <section class="view" id="v-users">
       <h2 class="v-title">Users</h2>
       <p class="v-sub">Everyone with an account. Warn leaves a message they'll see next time they log in; ban blocks login and posting until unbanned; delete removes the account row (their past posts and league history stay).</p>
+      <div id="pinResetsBox"></div>
       <div class="toolbar">
         <input class="filter" id="userFilter" placeholder="Filter by handle or name…" />
         <button class="btn" id="usersRefresh">Refresh</button>
@@ -498,6 +499,7 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     $("usersTable").innerHTML = rows || '<tr class="empty-row"><td colspan="7">No users match.</td></tr>';
   }
   async function loadUsers(){
+    loadPinResets();
     $("usersTable").innerHTML = '<tr class="load-row"><td colspan="7"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr>';
     var res = await aPost("adminUsers");
     if (res && res.ok){ allUsers = res.users || []; state.loaded.users = true; $("userN").textContent = allUsers.length; renderUsers(); }
@@ -505,6 +507,30 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
   }
   $("usersRefresh").onclick = function(){ loadUsers(); };
   $("userFilter").addEventListener("input", renderUsers);
+
+  async function loadPinResets(){
+    var box = $("pinResetsBox"); if (!box) return;
+    var res = await aPost("adminPinResets");
+    var list = (res && res.ok && res.resets) ? res.resets : [];
+    if (!list.length){ box.innerHTML = ""; return; }
+    var rows = list.map(function(x){
+      var when = x.requested ? new Date(x.requested).toLocaleString() : "";
+      var h = esc(x.handle).replace(/'/g, "\\'");
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border:1px solid #2a2e3a;border-radius:8px;margin-top:6px">'+
+               '<span>@'+esc(x.handle)+(x.name?' \u00b7 '+esc(x.name):'')+' <span style="color:#878da0;font-size:.8rem">'+esc(when)+'</span></span>'+
+               '<button class="btn" onclick="adminApproveReset(\''+h+'\')">Approve reset</button>'+
+             '</div>';
+    }).join("");
+    box.innerHTML = '<div style="margin:0 0 14px;padding:12px;border:1px solid rgba(224,162,58,.35);border-radius:10px;background:rgba(224,162,58,.06)">'+
+        '<div style="font-weight:700;color:#e0a23a">PIN reset requests ('+list.length+')</div>'+rows+
+        '<div style="color:#878da0;font-size:.8rem;margin-top:8px">Approving clears the account\u2019s PIN \u2014 the user then opens Create account, enters the same handle, and picks a new PIN.</div></div>';
+  }
+  window.adminApproveReset = async function(handle){
+    if (!confirm("Reset @"+handle+"\u2019s PIN? They\u2019ll set a new one via Create account.")) return;
+    var res = await aPost("adminResetPin", { handle: handle });
+    if (res && res.ok){ loadPinResets(); loadUsers(); }
+    else alert((res && res.error) || "Couldn\u2019t reset that PIN.");
+  };
 
   window.adminWarn = async function(handle){
     var msg = prompt("Warning message for @" + handle + " (shown next time they log in):");
