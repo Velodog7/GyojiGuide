@@ -157,7 +157,7 @@
     +'background:url('+WATER+') center/cover no-repeat;transform:rotate(-8deg);'
     +'mix-blend-mode:color-burn;opacity:.34}'
   +'.ggb-top{display:grid;grid-template-columns:auto 1fr auto;align-items:flex-end;gap:6px;padding:2px 12px 0;position:relative;z-index:6;max-width:100%}'
-  +'.ggb-side-h{font-size:20px;font-weight:900;color:#2a2018;text-shadow:0 1px 0 rgba(255,255,255,.35);line-height:1;text-align:center}'
+  +'.ggb-side-h{align-self:center;font-size:20px;font-weight:900;color:#2a2018;text-shadow:0 1px 0 rgba(255,255,255,.35);line-height:1;text-align:center}'
   +'.ggb-side-h em{display:block;font-style:normal;font-family:"WDXL Lubrifont TC",monospace;font-size:9px;letter-spacing:.16em;color:#7a6a4a;margin-top:2px}'
   +'.ggb-sanyaku{display:flex;align-items:flex-end;justify-content:center;gap:0;min-width:0;flex-wrap:nowrap}'  /* centre element (set by JS) holds the officials and clears the card */
   +'.ggb-san{display:flex;align-items:flex-end;justify-content:space-between;flex:1 1 0;min-width:0}'  /* spread from the outer edge to the card edge, like the grid below */
