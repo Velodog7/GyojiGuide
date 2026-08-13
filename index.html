@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Potta+One&family=WDXL+Lubrifont+TC&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  :root{ --bg:#000; --ink:#f1f2f6; --muted:#878da0; --gold:#d8b25a;
-         --sun:#d8b25a; --red:#e23b2e; --line:#2a2e3a; --dim:#a7adbe; --faint:#7d8496; --surface:#181a22; --surface2:#20232d; }
+  :root{ --bg:#000; --ink:#f1f2f6; --muted:#a6acbd; --gold:#d8b25a;
+         --sun:#d8b25a; --red:#e23b2e; --line:#2a2e3a; --dim:#c3c8d6; --faint:#929aad; --surface:#181a22; --surface2:#20232d; }
   *{ box-sizing:border-box }
   html,body{ margin:0 }
   body{ background:var(--bg); color:var(--ink); font-family:"Zen Maru Gothic",system-ui,sans-serif;
@@ -55,40 +55,48 @@
 
   /* ── Learn: interactive guide ─────────────────────────── */
   .learn-grid{ display:flex; flex-direction:row; gap:16px; align-items:stretch }
-  .learn-nav{ display:flex; flex-direction:column; flex-wrap:nowrap; gap:6px; flex:0 0 33%; width:33%; align-self:flex-start;
-        border-right:1px solid var(--line); padding-right:16px }
+  .learn-nav{ display:flex; flex-direction:column; flex-wrap:nowrap; gap:6px; flex:0 0 37%; width:37%; align-self:stretch;
+        border-right:1px solid var(--line); padding-right:14px }
   /* chapter buttons share the Resources card look: rounded tile, boxed icon, gold hover-lift */
   .learn-navb{ text-align:left; background:var(--surface); border:1px solid var(--line); color:var(--dim); font:inherit;
-        font-size:.8rem; font-weight:700; padding:7px 10px; border-radius:12px; cursor:pointer; transition:.14s; display:flex; align-items:center; gap:8px; line-height:1.15; white-space:normal; width:100%; flex:0 0 auto }
+        font-size:.72rem; font-weight:700; padding:5px 8px; border-radius:10px; cursor:pointer; transition:.14s; display:flex; align-items:center; gap:6px; line-height:1.15; white-space:normal; width:100%; min-width:0; flex:0 0 auto }
   .learn-navb:hover{ border-color:var(--sun); background:var(--surface2); color:var(--ink); transform:translateY(-2px) }
   .learn-navb[aria-current="true"]{ border-color:var(--sun); background:var(--surface2); color:var(--sun) }
-  .learn-navb .lb-i{ width:24px; height:24px; border-radius:7px; flex:none; display:grid; place-items:center;
-        background:var(--surface2); color:var(--sun); font-size:.98rem; line-height:1 }
+  .learn-navb .lb-i{ width:19px; height:19px; border-radius:6px; flex:none; display:grid; place-items:center;
+        background:var(--surface2); color:var(--sun); font-size:.8rem; line-height:1 }
   .learn-navb[aria-current="true"] .lb-i{ background:rgba(216,178,90,.16) }
-  .learn-panel{ min-height:0; flex:1 1 auto; min-width:0 }
+  .learn-panel{ min-height:0; flex:1 1 auto; min-width:0; display:grid }
   @media (max-width:560px){
     .learn-grid{ flex-direction:column; gap:10px }
     .learn-nav{ flex-direction:row; flex-wrap:wrap; width:auto; flex:none; border-right:none; padding-right:0; gap:8px }
     .learn-navb{ width:auto; white-space:nowrap }
   }
-  .learn-step{ display:none; animation:fadein .25s ease }
-  .learn-step.on{ display:block }
+  /* every step shares one grid cell → the panel is always as tall as the tallest
+     lesson, so the card is a fixed height. Inactive steps are hidden but still
+     occupy the cell (they don't grab clicks). */
+  .learn-step{ grid-area:1/1; visibility:hidden; pointer-events:none }
+  .learn-step.on{ visibility:visible; pointer-events:auto; animation:fadein .25s ease }
   @keyframes fadein{ from{ opacity:0; transform:translateY(4px) } }
   .learn-step h3{ font-family:"Potta One",sans-serif; font-weight:900; font-size:1.3rem; margin:0 0 4px }
   .learn-step .jp{ color:var(--sun); font-size:.85rem; letter-spacing:.06em; margin:0 0 14px }
   .learn-step p{ color:var(--dim); line-height:1.55; margin:0 0 11px }
   .learn-step b{ color:var(--ink) }
-  /* vocabulary flash cards — fixed height, one term at a time */
-  .flash{ display:flex; flex-direction:column; gap:12px; margin:4px 0 2px }
+  /* vocabulary / kimarite flash cards — fixed height, one term at a time */
+  .flash{ display:flex; flex-direction:column; gap:10px; margin:6px 0 2px }
+  .flash-modes{ display:flex; gap:4px; background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:3px }
+  .flash-modes .fmode{ flex:1; background:none; border:none; color:var(--muted); font:inherit; font-weight:700; font-size:.78rem; padding:6px 8px; border-radius:8px; cursor:pointer; transition:.12s }
+  .flash-modes .fmode:hover{ color:var(--ink) }
+  .flash-modes .fmode.on{ background:var(--surface2); color:var(--sun) }
   .flash-top{ display:flex; align-items:center; justify-content:space-between; color:var(--muted); font-size:.76rem; letter-spacing:.04em }
   .flash-top .fc-count{ font-family:"WDXL Lubrifont TC",monospace; color:var(--dim) }
   .flash-card{ perspective:1200px; cursor:pointer; height:176px }
+  .flash-card.study{ cursor:default }
   .flash-inner{ position:relative; width:100%; height:100%; transition:transform .45s cubic-bezier(.2,.7,.2,1); transform-style:preserve-3d }
   .flash-card.flipped .flash-inner{ transform:rotateY(180deg) }
   .flash-face{ position:absolute; inset:0; -webkit-backface-visibility:hidden; backface-visibility:hidden;
         border:1px solid var(--line); border-radius:14px; background:var(--surface);
         display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:16px; gap:6px }
-  .flash-card:hover .flash-face{ border-color:var(--sun) }
+  .flash-card:not(.study):hover .flash-face{ border-color:var(--sun) }
   .flash-front .fc-rom{ font-family:"Potta One",sans-serif; font-weight:900; font-size:1.5rem; color:var(--ink) }
   .flash-front .fc-jp{ font-family:"WDXL Lubrifont TC",sans-serif; font-size:1.1rem; color:var(--sun); letter-spacing:.04em }
   .flash-front .fc-hint{ margin-top:8px; font-size:.68rem; color:var(--muted); letter-spacing:.14em; text-transform:uppercase }
@@ -96,6 +104,11 @@
   .flash-back .fc-rom{ font-weight:800; font-size:.95rem; color:var(--sun) }
   .flash-back .fc-rom .jp{ font-family:"WDXL Lubrifont TC",sans-serif; color:var(--dim); font-weight:400; margin-left:4px }
   .flash-back p{ margin:0; color:var(--dim); font-size:.9rem; line-height:1.5; overflow-y:auto }
+  .flash-static{ height:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:14px; background:var(--surface);
+        display:flex; flex-direction:column; gap:8px; padding:16px; overflow-y:auto }
+  .flash-static .fc-rom{ font-family:"Potta One",sans-serif; font-weight:900; font-size:1.2rem; color:var(--ink) }
+  .flash-static .fc-rom .jp{ font-family:"WDXL Lubrifont TC",sans-serif; color:var(--sun); font-weight:400; font-size:.95rem; margin-left:6px }
+  .flash-static p{ margin:0; color:var(--dim); font-size:.9rem; line-height:1.55 }
   .flash-nav{ display:flex; align-items:center; gap:10px }
   .flash-nav .btn{ flex:1 1 0; text-align:center }
   .rank-ladder{ display:flex; flex-direction:column; gap:3px; margin:10px 0 12px }
@@ -105,12 +118,6 @@
   .rank-row .rn{ font-weight:700 }
   .rank-row .rd{ color:var(--muted); font-size:.78rem; margin-left:auto; text-align:right }
   .rank-row.sanyaku{ border-left:3px solid var(--sun) }
-  .kimarite-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:12px 0 14px }
-  .kimarite{ background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:9px 11px }
-  @media (max-width:560px){ .kimarite-grid{ grid-template-columns:repeat(2,1fr) } }
-  .kimarite h4{ margin:0 0 3px; font-size:.92rem }
-  .kimarite .jp{ color:var(--sun); font-size:.76rem; margin:0 0 5px }
-  .kimarite p{ font-size:.8rem; margin:0; color:var(--muted); line-height:1.5 }
   .quiz{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px; margin-top:8px }
   .quiz__q{ font-weight:700; font-size:1.05rem; margin:0 0 14px }
   .quiz__opts{ display:flex; flex-direction:column; gap:8px }
@@ -124,6 +131,7 @@
   .quiz__fb.ok{ color:#43c08a } .quiz__fb.no{ color:#f0655a }
   .quiz__next{ margin-top:16px }
   .learn-cta{ display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; padding-top:20px; border-top:1px solid var(--line) }
+  .learn-cta .btn{ font-size:.8rem; font-weight:700; padding:8px 12px; white-space:nowrap }
   .btn{ background:var(--sun); color:#141620; border:1px solid var(--sun); font:inherit; font-weight:700; padding:11px 18px;
         border-radius:10px; cursor:pointer; text-decoration:none; display:inline-block; transition:filter .12s }
   .btn:hover{ filter:brightness(1.08) }
@@ -235,22 +243,49 @@
   };
 
   /* ---------------- LEARN ---------------- */
-  var learnBuilt = false, curStep = 0, flashIdx = 0;
+  var learnBuilt = false, curStep = 0;
   // Vocab as flash cards, ordered from the most concrete/foundational terms up to
   // ones that lean on the earlier ones to make sense.
   var VOCAB = [
+    { term:"Rikishi", jp:"\u529b\u58eb", def:"A sumo wrestler \u2014 the word means \u2018strong person\u2019; politely, an o-sum\u014d-san." },
+    { term:"Dohy\u014d", jp:"\u571f\u4ff5", def:"The raised ring of packed clay, about 4.55 m across, where every bout is fought." },
     { term:"Mawashi", jp:"\u307e\u308f\u3057", def:"The heavy silk belt \u2014 the only thing a rikishi wears in the ring, and the anchor for most grips and throws." },
     { term:"Tawara", jp:"\u4ff5", def:"The straw rice-bales half-buried in the clay that mark the edge of the dohy\u014d. Cross them and the bout is lost." },
+    { term:"Basho", jp:"\u5834\u6240", def:"A grand tournament \u2014 15 days of bouts, held six times a year." },
     { term:"Chankonabe", jp:"\u3061\u3083\u3093\u3053\u9358", def:"The protein-packed hot-pot stew that is the staple of a wrestler\u2019s diet \u2014 eaten in huge quantities to build mass." },
     { term:"Heya (-beya)", jp:"\u90e8\u5c4b", def:"A training stable \u2014 where wrestlers live, train, and eat together under one master. Stable names end in \u2018-beya\u2019." },
     { term:"Oyakata", jp:"\u89aa\u65b9", def:"A stablemaster \u2014 a retired elder, usually a former top wrestler, who owns and runs a heya." },
     { term:"Shikona", jp:"\u56db\u80a1\u540d", def:"A wrestler\u2019s ring name \u2014 often poetic and steeped in tradition, chosen by his stable." },
+    { term:"Shiko", jp:"\u56db\u80a1", def:"The ceremonial high leg-stomps before a bout, driving off evil spirits (and loosening the hips)." },
+    { term:"Tachiai", jp:"\u7acb\u5408\u3044", def:"The explosive charge from the crouch that starts every bout \u2014 often where it\u2019s won or lost." },
+    { term:"Oshi-zumo", jp:"\u62bc\u3057\u76f8\u64b2", def:"A pushing-and-thrusting style \u2014 win by shoving, without ever gripping the belt." },
+    { term:"Yotsu-zumo", jp:"\u56db\u3064\u76f8\u64b2", def:"A grappling style \u2014 lock onto the mawashi and work for a belt-throw." },
     { term:"Sekitori", jp:"\u95a2\u53d6", def:"A salaried wrestler \u2014 anyone ranked J\u016bry\u014d or above (the top two divisions). Everyone below them is an unpaid trainee." },
     { term:"Dohy\u014d-iri", jp:"\u571f\u4ff5\u5165\u308a", def:"The ring-entering ceremony \u2014 most spectacular when a yokozuna performs his own in a braided white rope." },
     { term:"Kachi-koshi", jp:"\u52dd\u3061\u8d8a\u3057", def:"A winning record \u2014 8 or more wins in the 15 days. It moves you up the banzuke." },
     { term:"Make-koshi", jp:"\u8ca0\u3051\u8d8a\u3057", def:"A losing record \u2014 8 or more losses. It slides you down the banzuke." },
+    { term:"Y\u016bsh\u014d", jp:"\u512a\u52dd", def:"The tournament championship, taken by the best win/loss record over the 15 days." },
     { term:"Kinboshi", jp:"\u91d1\u661f", def:"The \u2018gold star\u2019 a maegashira earns for beating a yokozuna \u2014 a career highlight (and a bonus paid for life)." },
     { term:"Monoii", jp:"\u7269\u8a00\u3044", def:"When the ringside judges step onto the dohy\u014d to confer over a too-close-to-call finish \u2014 sumo\u2019s instant replay." }
+  ];
+  // Winning techniques (kimarite) as a deck, common staples first.
+  var KIMARITE = [
+    { term:"Oshidashi", jp:"\u62bc\u3057\u51fa\u3057", def:"Push out \u2014 hands to the chest, no belt grip, and drive them over the bales." },
+    { term:"Yorikiri", jp:"\u5bc4\u308a\u5207\u308a", def:"Force out \u2014 take a belt grip and march them straight out of the ring." },
+    { term:"Tsukidashi", jp:"\u7a81\u304d\u51fa\u3057", def:"Thrust out \u2014 a barrage of open-palm thrusts pushes them out before they can grip." },
+    { term:"Oshitaoshi", jp:"\u62bc\u3057\u5012\u3057", def:"Push down \u2014 push into the chest and force them out and down to the clay." },
+    { term:"Yoritaoshi", jp:"\u5bc4\u308a\u5012\u3057", def:"Force out and down \u2014 with a belt grip, drive them over the edge and topple them." },
+    { term:"Hatakikomi", jp:"\u306f\u305f\u304d\u8fbc\u307f", def:"Slap down \u2014 sidestep the charge and slap them to the clay. (Our namesake!)" },
+    { term:"Hikiotoshi", jp:"\u5f15\u304d\u843d\u3068\u3057", def:"Pull down \u2014 grab an arm or the belt and yank them forward off balance." },
+    { term:"Tsukiotoshi", jp:"\u7a81\u304d\u843d\u3068\u3057", def:"Thrust down \u2014 a sharp side thrust that topples them sideways." },
+    { term:"Uwatenage", jp:"\u4e0a\u624b\u6295\u3052", def:"Overarm throw \u2014 throw them down with an outside grip on the belt." },
+    { term:"Shitatenage", jp:"\u4e0b\u624b\u6295\u3052", def:"Underarm throw \u2014 throw them down with an inside grip on the belt." },
+    { term:"Sukuinage", jp:"\u639b\u3044\u6295\u3052", def:"Scoop throw \u2014 a beltless throw, swinging an arm around the body." },
+    { term:"Kotenage", jp:"\u5c0f\u624b\u6295\u3052", def:"Armlock throw \u2014 clamp their arm against your body and swing them down." },
+    { term:"Tsuridashi", jp:"\u540a\u308a\u51fa\u3057", def:"Lift out \u2014 hoist them up by the belt and carry them clear of the ring." },
+    { term:"Okuridashi", jp:"\u9001\u308a\u51fa\u3057", def:"Rear push out \u2014 slip behind them and shove them out from behind." },
+    { term:"Katasukashi", jp:"\u80a9\u900f\u304b\u3057", def:"Under-shoulder swing down \u2014 pull an arm and slap the shoulder to spin them down." },
+    { term:"Utchari", jp:"\u6253\u3063\u68c4\u308a", def:"Backward pivot throw \u2014 at the very edge, twist and dump them out first." }
   ];
   var CHAPTERS = [
     { id:"basics", icon:"\u76ee", title:"What is sumo?", jp:"\u76f8\u64b2 \u30fb s\u016dm\u014d",
@@ -271,22 +306,14 @@
         "</div>"+
         "<p>A <b>maegashira</b> beating a yokozuna earns a <b>kinboshi</b> (gold star) \u2014 a prized upset.</p>" },
     { id:"winning", icon:"\u5df4", title:"Winning a bout", jp:"\u53d6\u7d44 \u30fb torikumi",
-      html:
-        "<p>A bout starts with the <b>tachiai</b> (initial charge) and may settle into a grip battle at the <b>mawashi</b> (belt). The finishing move is the <b>kimarite</b> \u2014 82 exist; here are the staples:</p>"+
-        "<div class='kimarite-grid'>"+
-          "<div class='kimarite'><h4>Oshidashi</h4><div class='jp'>\u62bc\u3057\u51fa\u3057</div><p>Push out, no belt grip.</p></div>"+
-          "<div class='kimarite'><h4>Yorikiri</h4><div class='jp'>\u5bc4\u308a\u5207\u308a</div><p>Belt grip, march them out.</p></div>"+
-          "<div class='kimarite'><h4>Hatakikomi</h4><div class='jp'>\u306f\u305f\u304d\u8fbc\u307f</div><p>Slap a charger down. (Our namesake!)</p></div>"+
-          "<div class='kimarite'><h4>Uwatenage</h4><div class='jp'>\u4e0a\u624b\u6295\u3052</div><p>Throw with an outside belt grip.</p></div>"+
-          "<div class='kimarite'><h4>Tsukidashi</h4><div class='jp'>\u7a81\u304d\u51fa\u3057</div><p>Rapid palm thrusts out.</p></div>"+
-          "<div class='kimarite'><h4>Okuridashi</h4><div class='jp'>\u9001\u308a\u51fa\u3057</div><p>Shove them out from behind.</p></div>"+
-        "</div>" },
+      intro:"<p>A bout starts with the <b>tachiai</b> (initial charge) and may settle into a grip battle at the <b>mawashi</b> (belt). The finishing move is the <b>kimarite</b> \u2014 82 exist; here are the staples:</p>",
+      deck:KIMARITE },
     { id:"ritual", icon:"\u5869", title:"Ritual & ceremony", jp:"\u5100\u5f0f \u30fb gishiki",
       html:
         "<p>Before a bout, wrestlers throw <b>salt</b> to purify the ring and perform <b>shiko</b> \u2014 the high leg stomps that drive off evil spirits.</p>"+
         "<p>The <b>gy\u014dji</b> (referee) directs the bout; a <b>yobidashi</b> announces the wrestlers. A <b>yokozuna</b> gets his own <b>dohy\u014d-iri</b> ring-entering ceremony in the sacred white rope.</p>"+
         "<p>These aren\u2019t just for show \u2014 they connect a modern sport to centuries of tradition, and they\u2019re a huge part of what makes watching sumo special.</p>" },
-    { id:"vocab", icon:"\u8a9e", title:"Words to know", jp:"\u7528\u8a9e \u30fb y\u014dgo", flash:true },
+    { id:"vocab", icon:"\u8a9e", title:"Words to know", jp:"\u7528\u8a9e \u30fb y\u014dgo", deck:VOCAB },
     { id:"quiz", icon:"\u554f", title:"Test yourself", jp:"\u30af\u30a4\u30ba \u30fb quiz", quiz:true }
   ];
   var QUIZ = [
@@ -313,17 +340,17 @@
       btn.onclick = function(){ showStep(+btn.dataset.i); };
     });
     $("learnPanel").innerHTML = CHAPTERS.map(function(c,i){
-      return "<div class='learn-step' data-i='"+i+"'>"+ (c.quiz || c.flash ? "" :
+      return "<div class='learn-step' data-i='"+i+"'>"+ (c.quiz || c.deck ? "" :
         "<h3>"+esc(c.title)+"</h3><div class='jp'>"+esc(c.jp)+"</div>"+c.html) +
         renderNavCta(i) + "</div>";
     }).join("");
+    // Render every deck/quiz once so all steps carry their real content. They're
+    // stacked in one grid cell (see CSS), so the panel is always as tall as the
+    // tallest lesson and the card never resizes between chapters.
+    for (var i=0;i<CHAPTERS.length;i++){ if (CHAPTERS[i].deck) renderDeck(i); else if (CHAPTERS[i].quiz) renderQuiz(); }
     showStep(0);
   }
-  function renderNavCta(i){
-    var prev = i>0 ? "<button class='btn ghost' data-goto='"+(i-1)+"'>\u2039 "+esc(CHAPTERS[i-1].title)+"</button>" : "";
-    var next = i<CHAPTERS.length-1 ? "<button class='btn' data-goto='"+(i+1)+"'>"+esc(CHAPTERS[i+1].title)+" \u203a</button>" : "";
-    return "<div class='learn-cta'>"+prev+next+"</div>";
-  }
+  function renderNavCta(){ return ""; }  /* bottom prev/next removed — navigation is via the left chapter list */
   function showStep(i){
     curStep = i;
     Array.prototype.forEach.call($("learnPanel").querySelectorAll(".learn-step"), function(s){
@@ -333,35 +360,46 @@
       b.setAttribute("aria-current", +b.dataset.i===i ? "true":"false");
     });
     if (CHAPTERS[i].quiz) renderQuiz();
-    if (CHAPTERS[i].flash) renderFlash();
+    if (CHAPTERS[i].deck) renderDeck(i);
     // wire the prev/next buttons of the now-visible step
     var step = $("learnPanel").querySelector(".learn-step[data-i='"+i+"'].on");
     if (step) Array.prototype.forEach.call(step.querySelectorAll("[data-goto]"), function(btn){
       btn.onclick = function(){ showStep(+btn.dataset.goto); var c=document.getElementById("bzCard"); if(c) c.scrollTo({top:0,behavior:"smooth"}); };
     });
   }
-  function renderFlash(){
-    var vi = -1;
-    for (var k=0;k<CHAPTERS.length;k++){ if (CHAPTERS[k].flash){ vi=k; break; } }
-    if (vi<0) return;
-    var step = $("learnPanel").querySelector(".learn-step[data-i='"+vi+"']");
+  function renderDeck(i){
+    var c = CHAPTERS[i];
+    if (c._idx == null || c._idx >= c.deck.length) c._idx = 0;
+    if (!c._mode) c._mode = "test";
+    var data = c.deck, v = data[c._idx], test = c._mode === "test";
+    var step = $("learnPanel").querySelector(".learn-step[data-i='"+i+"']");
     if (!step) return;
-    var c = CHAPTERS[vi], v = VOCAB[flashIdx];
-    step.innerHTML =
-      "<h3>"+esc(c.title)+"</h3><div class='jp'>"+esc(c.jp)+"</div>"+
-      "<div class='flash'>"+
-        "<div class='flash-top'><span>Tap the card to flip</span><span class='fc-count'>"+(flashIdx+1)+" / "+VOCAB.length+"</span></div>"+
-        "<div class='flash-card' id='flashCard'><div class='flash-inner'>"+
+    var inner = test
+      ? "<div class='flash-inner'>"+
           "<div class='flash-face flash-front'><div class='fc-rom'>"+esc(v.term)+"</div><div class='fc-jp'>"+esc(v.jp)+"</div><div class='fc-hint'>tap to flip</div></div>"+
           "<div class='flash-face flash-back'><div class='fc-rom'>"+esc(v.term)+" <span class='jp'>"+esc(v.jp)+"</span></div><p>"+esc(v.def)+"</p></div>"+
-        "</div></div>"+
+        "</div>"
+      : "<div class='flash-static'><div class='fc-rom'>"+esc(v.term)+" <span class='jp'>"+esc(v.jp)+"</span></div><p>"+esc(v.def)+"</p></div>";
+    step.innerHTML =
+      "<h3>"+esc(c.title)+"</h3><div class='jp'>"+esc(c.jp)+"</div>"+
+      (c.intro || "")+
+      "<div class='flash'>"+
+        "<div class='flash-modes'>"+
+          "<button class='fmode"+(test?" on":"")+"' data-mode='test'>Test me</button>"+
+          "<button class='fmode"+(!test?" on":"")+"' data-mode='study'>Show definitions</button>"+
+        "</div>"+
+        "<div class='flash-top'><span>"+(test?"Tap the card to flip":"Browse all "+data.length)+"</span><span class='fc-count'>"+(c._idx+1)+" / "+data.length+"</span></div>"+
+        "<div class='flash-card"+(test?"":" study")+"' id='flashCard'>"+inner+"</div>"+
         "<div class='flash-nav'><button class='btn ghost' id='flashPrev'>\u2039 Prev</button><button class='btn' id='flashNext'>Next \u203a</button></div>"+
       "</div>"+
-      renderNavCta(vi);
+      renderNavCta(i);
     var card = step.querySelector("#flashCard");
-    card.onclick = function(){ card.classList.toggle("flipped"); };
-    step.querySelector("#flashPrev").onclick = function(e){ e.stopPropagation(); flashIdx = (flashIdx-1+VOCAB.length)%VOCAB.length; renderFlash(); };
-    step.querySelector("#flashNext").onclick = function(e){ e.stopPropagation(); flashIdx = (flashIdx+1)%VOCAB.length; renderFlash(); };
+    if (test) card.onclick = function(){ card.classList.toggle("flipped"); };
+    Array.prototype.forEach.call(step.querySelectorAll(".fmode"), function(b){
+      b.onclick = function(){ c._mode = b.dataset.mode; renderDeck(i); };
+    });
+    step.querySelector("#flashPrev").onclick = function(e){ e.stopPropagation(); c._idx = (c._idx-1+data.length)%data.length; renderDeck(i); };
+    step.querySelector("#flashNext").onclick = function(e){ e.stopPropagation(); c._idx = (c._idx+1)%data.length; renderDeck(i); };
     Array.prototype.forEach.call(step.querySelectorAll("[data-goto]"), function(btn){
       btn.onclick = function(){ showStep(+btn.dataset.goto); var cc=document.getElementById("bzCard"); if(cc) cc.scrollTo({top:0,behavior:"smooth"}); };
     });

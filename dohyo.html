@@ -363,6 +363,18 @@
   .shout--kim b{ font-size:3cqw; color:var(--win) }
   .shout--kim span{ letter-spacing:.3em }
   .shout--kim.on{ animation:kimCall 2.4s cubic-bezier(.2,.9,.3,1) both }
+  .shout--kinboshi b{ font-size:3.4cqw; color:var(--sun); text-shadow:0 0 10px rgba(var(--sun-rgb),.7) }
+  .shout--kinboshi span{ letter-spacing:.28em; color:var(--sun) }
+  .shout--kinboshi.on{ animation:kimCall 2.4s cubic-bezier(.2,.9,.3,1) both }
+  .bout__kb{ font-style:normal; color:var(--sun); font-size:12px; margin:0 5px;
+        text-shadow:0 0 7px rgba(var(--sun-rgb),.75) }
+  .kb-banner{ margin:4px 0 14px; padding:11px 14px; border:1px solid rgba(var(--sun-rgb),.4);
+        border-radius:8px; background:rgba(var(--sun-rgb),.08) }
+  .kb-banner__h{ font-family:"WDXL Lubrifont TC",ui-monospace,monospace; letter-spacing:.16em;
+        text-transform:uppercase; font-size:12px; color:var(--sun); margin-bottom:6px }
+  .kb-line{ font-size:14px; color:var(--ink) }
+  .kb-line b{ color:var(--sun) }
+  .kb-line span{ color:var(--dim); font-size:12px }
   /* よいしょ — called out on each of the yokozuna's shiko stomps. Sits just
      above his head mid-squat, low enough to stay clear of the ceremony
      caption above. */
@@ -1564,6 +1576,7 @@
   <div class="shout shout--yoisho" id="yoisho"><b>よいしょ！</b><span>Yoisho!</span></div>
   <div class="kk" id="kachi"><b>勝ち越し</b><span>Kachi-koshi · winning record clinched</span></div>
   <div class="shout shout--kim" id="kimCall"><b></b><span></span></div>
+  <div class="shout shout--kinboshi" id="kbCall"><b>&#37329;&#26143;</b><span>Kinboshi!</span></div>
   <div class="ceremony" id="ceremony" aria-hidden="true"></div>
   <div class="ceremony__cap" id="cerCap"><b></b><span></span></div>
   <button class="slot slot--east" id="east" aria-label="East side"></button>
@@ -1952,6 +1965,18 @@ function showResult(celebrate){
    on the clay. Everything that says "he won" lives here, nothing before. */
 const CALL_MS = 700;      // just past the end of the fall (60ms delay + 620ms)
 let callT = null;
+/* Kinboshi — a maegashira (M) toppling a yokozuna (Y). Rank codes start with
+   the tier letter, so we just check the winning side's tier against the loser's. */
+function isKinboshi(b){
+  if(!b||!b[2]) return false;
+  var eT=String(b[0]||"")[0], wT=String(b[4]||"")[0];
+  return (b[2]==="e" && eT==="M" && wT==="Y") || (b[2]==="w" && wT==="M" && eT==="Y");
+}
+/* the gold star, shown on the giant-killer's name in a bout row */
+function kbTag(b, side){
+  return (isKinboshi(b) && b[2]===side) ? '<i class="bout__kb" title="Kinboshi — beat a yokozuna">\u2605</i>' : "";
+}
+
 function declareWin(b, winner){
   if (!current) return;
   const live = card[current.div][current.i];
@@ -1961,6 +1986,7 @@ function declareWin(b, winner){
   slots[winner].classList.add("won");                   // the lift, the light
   bar.classList.add("won");
   if (!still) callKimarite(b[3]);                       // …and called out over the ring
+  if (!still && isKinboshi(b)) callKinboshi();          // a giant felled — mark the gold star
   renderSplit(b[6], b[2]);
   if (calls[winner].classList.contains("on")) calls[winner].classList.add("win");
   const wname = b[2] === "e" ? b[1] : b[5];
@@ -2130,6 +2156,14 @@ function callKimarite(kim){
   kimCall.classList.add("on");
 }
 const endKimCall = () => kimCall.classList.remove("on");
+/* the gold-star call — a maegashira has toppled a yokozuna */
+const kbCall = document.getElementById("kbCall");
+function callKinboshi(){
+  if(!kbCall) return;
+  kbCall.classList.remove("on");
+  void kbCall.offsetWidth;
+  kbCall.classList.add("on");
+}
 
 /* the clash — run on the two wrestlers during the hold, then handed off to
    the win/loss animations. Duration is kept just under the hold so they've
@@ -2674,10 +2708,10 @@ function mountDay(d){
       el.dataset.i = i;
       el.setAttribute("aria-current", "false");
       el.innerHTML = `
-        <span class="bout__e"><span class="bout__rank">${b[0]}</span><span class="bout__name${me(b[1])}">${mine.has(b[1]) ? `<i class="bout__star">★</i>` : ""}${b[1]}</span></span>
+        <span class="bout__e"><span class="bout__rank">${b[0]}</span><span class="bout__name${me(b[1])}">${mine.has(b[1]) ? `<i class="bout__star">&#9670;</i>` : ""}${b[1]}${kbTag(b,"e")}</span></span>
         <span class="bout__mid${b[2] ? "" : " pending"}">${b[2] ? b[3] : "upcoming"}${
           b[2] ? `<span>${b[2] === "e" ? "East wins" : "West wins"}</span>` : ""}</span>
-        <span class="bout__w"><span class="bout__name${me(b[5])}">${b[5]}${mine.has(b[5]) ? `<i class="bout__star">★</i>` : ""}</span><span class="bout__rank">${b[4]}</span></span>
+        <span class="bout__w"><span class="bout__name${me(b[5])}">${b[5]}${kbTag(b,"w")}${mine.has(b[5]) ? `<i class="bout__star">&#9670;</i>` : ""}</span><span class="bout__rank">${b[4]}</span></span>
         <span class="bout__past" title="Head-to-head, east–west">${b[6]}</span>`;
       el.onclick = () => { stop(); revealBout(div, i); loadBout(div, i); };
       list.appendChild(el);
@@ -3023,6 +3057,16 @@ function buildDayModal(){
   const upto = Number(day);
   dayModalTitle.innerHTML = `<b>${card.label}</b><span>the day's bouts</span>`;
   let html = "";
+  const kbList = [];                                     // gold stars earned today
+  const dd = DAYS[String(upto)];
+  if (dd) for (const dv of ["makuuchi","juryo"]) for (const b of (dd[dv]||[])) {
+    if (isKinboshi(b)) kbList.push({ m: b[2]==="e"?b[1]:b[5], y: b[2]==="e"?b[5]:b[1], kim: b[3] });
+  }
+  if (kbList.length) {
+    html += `<div class="kb-banner"><div class="kb-banner__h"><i class="bout__kb">\u2605</i> Kinboshi</div>` +
+      kbList.map(k => `<div class="kb-line"><b>${k.m}</b> def. ${k.y}${k.kim ? ` <span>\u00b7 ${k.kim}</span>` : ""}</div>`).join("") +
+      `</div>`;
+  }
   for (const [divName, label] of [["makuuchi","Makuuchi"], ["juryo","Jūryō"]]) {
     const mine = (typeof myPicks === "function") ? myPicks() : new Set();
     const bouts = (DAYS[String(upto)] && DAYS[String(upto)][divName]) || [];
@@ -3033,9 +3077,9 @@ function buildDayModal(){
       const cls = "bout revealed" + (b[2] ? ` won-${b[2]}` : "") +
                   (mine.has(b[1]) ? " mine-e" : "") + (mine.has(b[5]) ? " mine-w" : "");
       html += `<div class="${cls}">` +
-        `<span class="bout__e"><span class="bout__rank">${b[0]}</span><span class="bout__name${meE}">${mine.has(b[1]) ? '<i class="bout__star">&#9733;</i>' : ""}${b[1]}</span></span>` +
+        `<span class="bout__e"><span class="bout__rank">${b[0]}</span><span class="bout__name${meE}">${mine.has(b[1]) ? '<i class="bout__star">&#9670;</i>' : ""}${b[1]}${kbTag(b,"e")}</span></span>` +
         `<span class="bout__mid${b[2] ? "" : " pending"}">${b[2] ? b[3] : "\u2014"}${b[2] ? `<span>${b[2] === "e" ? "East wins" : "West wins"}</span>` : ""}</span>` +
-        `<span class="bout__w"><span class="bout__name${meW}">${b[5]}${mine.has(b[5]) ? '<i class="bout__star">&#9733;</i>' : ""}</span><span class="bout__rank">${b[4]}</span></span>` +
+        `<span class="bout__w"><span class="bout__name${meW}">${b[5]}${kbTag(b,"w")}${mine.has(b[5]) ? '<i class="bout__star">&#9670;</i>' : ""}</span><span class="bout__rank">${b[4]}</span></span>` +
         `<span class="bout__past" title="Head-to-head, east\u2013west">${b[6] || ""}</span>` +
       `</div>`;
     }

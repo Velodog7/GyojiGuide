@@ -112,7 +112,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-08-11-gyoji-claim-gate';
+var BACKEND_VERSION = '2026-08-12-pin-reset-fix';
 
 /* ---------- one-time: build the tabs ---------- */
 function setup() {
@@ -279,6 +279,9 @@ function doPost(e) {
     if (body.action === 'adminBanUser')       return json(adminBanUser(body));
     if (body.action === 'adminUnbanUser')     return json(adminUnbanUser(body));
     if (body.action === 'adminDeleteUser')    return json(adminDeleteUser(body));
+    if (body.action === 'requestPinReset')    return json(requestPinReset(body));
+    if (body.action === 'adminPinResets')     return json(adminPinResets(body.adminKey));
+    if (body.action === 'adminResetPin')      return json(adminResetPin(body));
     if (body.action === 'adminDeleteMessage') return json(adminDeleteMessageFn(body));
     if (body.action === 'adminSetFeedbackStatus') return json(adminSetFeedbackStatus(body));
     if (body.action === 'adminDeleteFeedback')    return json(adminDeleteFeedback(body));
@@ -1475,6 +1478,78 @@ function accountSummary(handle) {
    a stranger spamming wrong keys can briefly lock YOU out too — acceptable
    for a single-admin site, and the window is short. A correct key clears the
    counter immediately. */
+var SHEET_RESETS = 'PinResets';
+
+/* A user who has forgotten their PIN asks for a reset. We record a pending
+   request and drop the admin a DM. No account details are exposed. */
+function requestPinReset(body) {
+  var handle = cleanHandle(body.handle);
+  if (!handle) return { ok: false, error: 'Enter your handle.' };
+  var u = findUser(handle);
+  if (!u) return { ok: false, error: 'No account with that handle.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(15000);
+  try {
+    var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_RESETS,
+      ['id', 'handle', 'name', 'requested', 'status']);
+    var v = sh.getDataRange().getValues();
+    for (var r = 1; r < v.length; r++) {                       // don't stack duplicate pending requests
+      if (String(v[r][1]).toLowerCase() === handle.toLowerCase() && v[r][4] === 'pending')
+        return { ok: true, already: true };
+    }
+    sh.appendRow([newId('rst_'), u.handle, u.name, new Date().toISOString(), 'pending']);
+  } finally { lock.releaseLock(); }
+  try {                                                         // notify the admin inbox
+    sh_(SHEET_DMS).appendRow([newId('dm_'), u.handle, u.name, ADMIN_HANDLE,
+      'PIN reset requested \u2014 approve it from the admin page.', new Date().toISOString(), '']);
+  } catch (e) {}
+  return { ok: true };
+}
+
+/* Admin read: the pending reset requests. */
+function adminPinResets(key) {
+  var bad = adminGate(key); if (bad) return bad;
+  var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_RESETS,
+    ['id', 'handle', 'name', 'requested', 'status']);
+  var v = sh.getDataRange().getValues(), out = [];
+  for (var r = 1; r < v.length; r++)
+    if (v[r][4] === 'pending') out.push({ id: v[r][0], handle: v[r][1], name: v[r][2], requested: v[r][3] });
+  return { ok: true, resets: out };
+}
+
+/* Admin write: approve a reset. Because the PIN is only ever hashed in the
+   user's browser, we can't set a plaintext PIN here \u2014 instead we clear the
+   stored hash, which returns the account to "unclaimed". The user then opens
+   Create account, enters the same handle, and picks a new PIN (that claims the
+   row again via register()'s claim path). */
+function adminResetPin(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var handle = cleanHandle(body.handle);
+  if (!handle) return { ok: false, error: 'Missing handle.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var users = sh_(SHEET_USERS), uv = users.getDataRange().getValues(), found = false;
+    for (var r = 1; r < uv.length; r++) {
+      if (String(uv[r][0]).toLowerCase() === handle.toLowerCase()) {
+        users.getRange(r + 1, 3).setValue('');                 // col 3 = auth (the PIN hash)
+        found = true; break;
+      }
+    }
+    if (!found) return { ok: false, error: 'No account with that handle.' };
+    var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_RESETS,
+      ['id', 'handle', 'name', 'requested', 'status']);
+    var v = sh.getDataRange().getValues();
+    for (var i = 1; i < v.length; i++)
+      if (String(v[i][1]).toLowerCase() === handle.toLowerCase() && v[i][4] === 'pending')
+        sh.getRange(i + 1, 5).setValue('done');
+  } finally { lock.releaseLock(); }
+  try {                                                         // tell the user how to finish
+    sh_(SHEET_DMS).appendRow([newId('dm_'), ADMIN_HANDLE, ADMIN_NAME, handle,
+      'Your PIN has been reset. Open \u201cCreate account\u201d, enter your handle, and choose a new PIN to get back in.',
+      new Date().toISOString(), '']);
+  } catch (e) {}
+  return { ok: true };
+}
+
 function adminGate(key) {
   var MAX_FAILS = 8, FAIL_WINDOW = 600, LOCKOUT_SECS = 300;
   var cache = CacheService.getScriptCache();
