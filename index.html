@@ -40,6 +40,8 @@
   @media (max-width:640px){ .bz-card{ top:10px; transform:translateX(-50%); padding:20px 16px 24px; width:94%; max-height:calc(100% - 20px); overflow-y:auto } }
   .bz-mv{ display:none }
   .bz-mv.on{ display:block; animation:bzswap .2s ease }
+  #mv-resources.on{ display:flex; flex-direction:column }        /* fixed height (= Welcome), list scrolls */
+  #mv-resources #resList{ flex:1 1 auto; min-height:0; overflow-y:auto }
   @keyframes bzswap{ from{ opacity:0; transform:translateY(4px) } }
   .bz-welcome{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; text-align:center; gap:14px; padding:6px 0 2px }
   .bz-welcome .view-sub{ margin:0 }
@@ -239,8 +241,18 @@
     });
     var card = $("bzCard");
     card.scrollTop = 0;
+    syncResHeight();
     try { history.replaceState(null,"","#"+v); } catch(e){}
   };
+  // Make the Resources card the same height as the Welcome card: capture the
+  // Welcome view's height whenever it's visible, then pin the Resources view to it.
+  var welcomeH = 0;
+  function syncResHeight(){
+    var w = $("mv-welcome"), r = $("mv-resources");
+    if (!w || !r) return;
+    if (w.classList.contains("on") && w.offsetHeight) welcomeH = w.offsetHeight;
+    if (welcomeH) r.style.height = welcomeH + "px";
+  }
 
   /* ---------------- LEARN ---------------- */
   var learnBuilt = false, curStep = 0;
@@ -476,8 +488,11 @@
   }
 
   /* honor a #hash on load (index.html#learn / #resources) */
+  syncResHeight();  // Welcome is the default-visible view here — measure it first
   var h = (location.hash||"").replace("#","");
   setView(h==="learn"||h==="resources" ? h : "welcome");
+  window.addEventListener("load", syncResHeight);
+  (function(){ var t; window.addEventListener("resize", function(){ clearTimeout(t); t=setTimeout(syncResHeight, 160); }); })();
 })();
 </script>
 </body>
