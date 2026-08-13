@@ -1046,8 +1046,8 @@ function setAcct(a){
   saveLocal(); acctUI();
   // keep the leagues tab in sync with sign-in/out
   if (typeof loadLeagues === "function" && $("tab-leagues").getAttribute("aria-selected")==="true") loadLeagues();
-  // keep the leaderboard board's own-post/vote state in sync with sign-in/out
-  if (typeof loadLbBoard === "function" && $("tab-team").getAttribute("aria-selected")==="true") loadLbBoard();
+  // keep the leaderboard chat's locked/post + own-vote state in sync with every sign-in/out
+  if (typeof loadLbBoard === "function") loadLbBoard();
   // a just-signed-in user with a pending invite link should auto-join
   if (a && wasOut && typeof handlePendingJoin === "function" && pendingJoin) handlePendingJoin();
   // a just-signed-in user arriving via an account-modal league quick link should land there
@@ -2059,6 +2059,7 @@ function boardThreadHTML(msgs, parentId){
   }).join("");
 }
 function renderLbBoard(){
+  if (!$("boardLocked") || !$("boardMain") || !$("boardMsgs")) return;   // board not mounted (defensive)
   $("boardLocked").hidden = !!acct;
   $("boardMain").hidden = !acct;
   const box = $("boardMsgs");
@@ -2237,6 +2238,7 @@ syncTeam();
 handlePendingJoin();   // if arriving via an invite link (?join=…)
 handlePendingLeague(); // if arriving via an account-modal league quick link (?league=…)
 loadBoard();           // populates the countdown + auto-archive check on the landing view too
+loadLbBoard();         // the leaderboard chat lives in the default (team) view — load it on boot so it's always present
 if (acct) loadHistory();
 
 /* ---------- unified account control (gg-auth.js) ----------

@@ -42,6 +42,8 @@
   .bz-mv.on{ display:block; animation:bzswap .2s ease }
   #mv-resources.on{ display:flex; flex-direction:column }        /* fixed height (= Welcome), list scrolls */
   #mv-resources #resList{ flex:1 1 auto; min-height:0; overflow-y:auto }
+  #mv-learn.on{ display:flex; flex-direction:column }            /* fixed height (= Welcome), panel scrolls */
+  #mv-learn .learn-grid{ flex:1 1 auto; min-height:0 }
   @keyframes bzswap{ from{ opacity:0; transform:translateY(4px) } }
   .bz-welcome{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; text-align:center; gap:14px; padding:6px 0 2px }
   .bz-welcome .view-sub{ margin:0 }
@@ -67,17 +69,14 @@
   .learn-navb .lb-i{ width:19px; height:19px; border-radius:6px; flex:none; display:grid; place-items:center;
         background:var(--surface2); color:var(--sun); font-size:.8rem; line-height:1 }
   .learn-navb[aria-current="true"] .lb-i{ background:rgba(216,178,90,.16) }
-  .learn-panel{ min-height:0; flex:1 1 auto; min-width:0; display:grid }
+  .learn-panel{ min-height:0; flex:1 1 auto; min-width:0; overflow-y:auto }
   @media (max-width:560px){
     .learn-grid{ flex-direction:column; gap:10px }
     .learn-nav{ flex-direction:row; flex-wrap:wrap; width:auto; flex:none; border-right:none; padding-right:0; gap:8px }
     .learn-navb{ width:auto; white-space:nowrap }
   }
-  /* every step shares one grid cell → the panel is always as tall as the tallest
-     lesson, so the card is a fixed height. Inactive steps are hidden but still
-     occupy the cell (they don't grab clicks). */
-  .learn-step{ grid-area:1/1; visibility:hidden; pointer-events:none }
-  .learn-step.on{ visibility:visible; pointer-events:auto; animation:fadein .25s ease }
+  .learn-step{ display:none; animation:fadein .25s ease }
+  .learn-step.on{ display:block }
   @keyframes fadein{ from{ opacity:0; transform:translateY(4px) } }
   .learn-step h3{ font-family:"Potta One",sans-serif; font-weight:900; font-size:1.3rem; margin:0 0 4px }
   .learn-step .jp{ color:var(--sun); font-size:.85rem; letter-spacing:.06em; margin:0 0 14px }
@@ -244,14 +243,17 @@
     syncResHeight();
     try { history.replaceState(null,"","#"+v); } catch(e){}
   };
-  // Make the Resources card the same height as the Welcome card: capture the
-  // Welcome view's height whenever it's visible, then pin the Resources view to it.
+  // Make the Learn and Resources cards the same height as the Welcome card:
+  // capture the Welcome view's height whenever it's visible, then pin the others.
   var welcomeH = 0;
   function syncResHeight(){
-    var w = $("mv-welcome"), r = $("mv-resources");
-    if (!w || !r) return;
+    var w = $("mv-welcome");
+    if (!w) return;
     if (w.classList.contains("on") && w.offsetHeight) welcomeH = w.offsetHeight;
-    if (welcomeH) r.style.height = welcomeH + "px";
+    if (welcomeH){
+      var r = $("mv-resources"); if (r) r.style.height = welcomeH + "px";
+      var l = $("mv-learn"); if (l) l.style.height = welcomeH + "px";
+    }
   }
 
   /* ---------------- LEARN ---------------- */
@@ -356,10 +358,6 @@
         "<h3>"+esc(c.title)+"</h3><div class='jp'>"+esc(c.jp)+"</div>"+c.html) +
         renderNavCta(i) + "</div>";
     }).join("");
-    // Render every deck/quiz once so all steps carry their real content. They're
-    // stacked in one grid cell (see CSS), so the panel is always as tall as the
-    // tallest lesson and the card never resizes between chapters.
-    for (var i=0;i<CHAPTERS.length;i++){ if (CHAPTERS[i].deck) renderDeck(i); else if (CHAPTERS[i].quiz) renderQuiz(); }
     showStep(0);
   }
   function renderNavCta(){ return ""; }  /* bottom prev/next removed — navigation is via the left chapter list */
