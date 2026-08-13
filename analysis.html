@@ -283,12 +283,12 @@ el.innerHTML=`
      <div class="stat"><div class="k">Highest</div><div class="v">${r.high?r.high:'<span class="dim">—</span>'}</div></div>
      <div class="stat"><div class="k">Country</div><div class="v">${r.country?(r.country+(r.pref?", "+r.pref:"")):v(r.from)}</div></div>
    </div>
-   <div class="form"><div class="blk-head"><span class="lab">Recent</span></div><p class="blk-txt${((r.hist&&r.hist.length)||r.form)?"":" none"}">${(r.hist&&r.hist.length)?recentLine(r):(r.form||"No recent form notes available.")}</p></div>
+   <div class="form"><div class="blk-head"><span class="lab">Recent</span></div><p class="blk-txt${r.form?"":" none"}">${r.form||"No recent form notes available."}</p></div>
    ${styleBlock(r)}
    ${tierProj}
    ${projBox(r)}
    ${r.live?liveBox(r):""}
-   ${(r.hist&&r.hist.length>1)?histBoxes(r):(r.rec?bashoBox(r,0,"May 2026",(r.chg&&r.chg.t&&r.chg.t.includes("\u2192"))?r.chg.t.split("\u2192")[0]:"")+bashoBox(r,1,"March 2026",MARCH_RANK[r.n]||"")+bashoBox(r,2,"January 2026",JAN_RANK[r.n]||""):"")}
+   ${r.rec?bashoBox(r,0,"May 2026",(r.chg&&r.chg.t&&r.chg.t.includes("\u2192"))?r.chg.t.split("\u2192")[0]:"")+bashoBox(r,1,"March 2026",MARCH_RANK[r.n]||"")+bashoBox(r,2,"January 2026",JAN_RANK[r.n]||""):""}
    ${r.inj?`<div class="injury ${r.lv}"><div class="blk-head"><span class="lab">Health</span><span class="hpill ${r.lv}">${hLabel(r.lv)}</span></div><p class="blk-txt">${r.inj}</p></div>`:""}
    <div class="c-actions">
      <button class="act cmpbtn ${cmp?"on":""}">${cmp?"✓ Comparing":"Compare"}</button>
@@ -583,18 +583,6 @@ return c.length?'<span class="awards">'+c.join("")+'</span>':"";
 }
 const JAN_RANK={"Hoshoryu":"Y","Onosato":"Y","Kotozakura":"O","Aonishiki":"O","Kirishima":"S","Takayasu":"S","Oho":"K","Wakamotoharu":"K","Ichiyamamoto":"M1","Yoshinofuji":"M1","Ura":"M2","Wakatakakage":"M2","Takanosho":"M3","Hakunofuji":"M3","Daieisho":"M4","Atamifuji":"M4","Tamawashi":"M5","Churanoumi":"M5","Hiradoumi":"M6","Onokatsu":"M6","Oshoma":"M7","Fujinokawa":"M7","Shodai":"M8","Kinbozan":"M8","Gonoyama":"M9","Roga":"M9","Tokihayate":"M10","Kotoshoho":"M10","Chiyoshoma":"M11","Nishikifuji":"M11","Midorifuji":"M12","Abi":"M12","Tobizaru":"M13","Tomokaze":"M13","Shishi":"M14","Mitakeumi":"M14","Ryuden":"M15","Asakoryu":"M15","Asanoyama":"M16","Oshoumi":"M16","Asahakuryu":"M17","Hatsuyama":"M17","Kotoeiho":"J1","Fujiseiun":"J1","Daiseizan":"J2","Kagayaki":"J2","Fujiryoga":"J3","Shirokuma":"J3","Sadanoumi":"J4","Shonannoumi":"J4","Tamashoho":"J5","Takerufuji":"J5","Nishinoryu":"J6","Tochitaikai":"J7","Asasuiryu":"J7","Meisei":"J8","Kitanowaka":"J8","Hitoshi":"J9","Kayo":"J9","Kazekeno":"J10","Tohakuryu":"J10","Wakanosho":"J11","Nishikigi":"J12","Kyokukaiyu":"J12","Dewanoryu":"J13","Hakuyozan":"J14","Kazuma":"J14"};
 const MARCH_RANK={"Kirishima":"S","Hoshoryu":"Y","Kotoshoho":"M5","Kotozakura":"O","Gonoyama":"M10","Fujiseiun":"M13","Chiyoshoma":"M14","Asahakuryu":"M16","Atamifuji":"K","Takanosho":"M4","Ichiyamamoto":"M6","Asakoryu":"M12","Nishikifuji":"M14","Kinbozan":"M16","Kotoeiho":"M17","Wakatakakage":"M1","Fujinokawa":"M2","Shodai":"M8","Asanoyama":"M12","Mitakeumi":"M15","Aonishiki":"O","Takayasu":"S","Yoshinofuji":"M1","Oho":"M3","Hiradoumi":"M3","Daieisho":"M4","Fujiryoga":"M17","Oshoma":"M7","Shishi":"M11","Tobizaru":"M13","Hakunofuji":"M7","Ura":"M8","Tokihayate":"M9","Tamawashi":"M9","Roga":"M10","Oshoumi":"M11","Churanoumi":"M2","Abi":"M5","Wakamotoharu":"K","Onokatsu":"M6","Onosato":"Y","Midorifuji":"M15","Ryuden":"J1","Sadanoumi":"J1","Asasuiryu":"J2","Tomokaze":"J2","Daiseizan":"J3","Wakanosho":"J3","Nishinoryu":"J4","Takerufuji":"J4","Kagayaki":"J5","Shirokuma":"J5","Hitoshi":"J6","Kayo":"J6","Meisei":"J7","Kyokukaiyu":"J7","Shonannoumi":"J8","Kitanowaka":"J8","Tamashoho":"J9","Hatsuyama":"J9","Dewanoryu":"J10","Tohakuryu":"J10","Kazuma":"J11","Toshinofuji":"J11","Nishikigi":"J12","Tsurugisho":"J12","Shimazuumi":"J13","Fujitensei":"J13","Kazekeno":"J14","Kotokuzan":"J14"};
-function histBoxes(r){
-  if(!r.hist||r.hist.length<2)return "";
-  return r.hist.slice(1,4).map(function(e){          // skip [0]=current basho (shown in liveBox)
-    if(!e.record)return "";
-    var p=String(e.record).split("-").map(Number),w=p[0]||0,a=p[2]||0;
-    return `<div class="basho"><span class="lab">${e.label}</span><span class="brank">${e.rk||""}</span><b>${String(e.record).replace(/-/g,"")}</b><span class="kkc">${kkTag(w,a)}</span></div>`;
-  }).join("");
-}
-function recentLine(r){
-  if(!r.hist||!r.hist.length)return "";
-  return r.hist.slice(0,3).map(function(e){ return `${e.label}: ${e.record}`; }).join("  \u00b7  ");
-}
 function bashoBox(r,idx,label,rk){
 const rc=r.rec&&r.rec[idx]; if(!rc)return "";
 const rankTag=`<span class="brank">${rk||""}</span>`;
@@ -877,14 +865,6 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
       r.rank = (w.tier === "M" || w.tier === "J") ? (word + " " + w.num) : word;
       if (w.record) r.live = w.record;
     });
-    if (GGRoster.recent){
-      GGRoster.recent().then(function(h){
-        if (h && h.ok && h.byName){
-          R.forEach(function(r){ if (h.byName[r.n]) r.hist = h.byName[r.n]; });
-          try { renderCards(); } catch(e){}
-        }
-      });
-    }
     try { renderPills(); renderCards(); if (typeof renderTiers === "function") renderTiers(); } catch(e){}
     show("live", "Up to date with the <b>" + res.label + "</b> banzuke \u2014 ranks and records live from sumo-api.");
   });
