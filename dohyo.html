@@ -3021,14 +3021,24 @@ function bzCell(name, side, upto){
 }
 function buildDayModal(){
   const upto = Number(day);
-  dayModalTitle.innerHTML = `<b>${card.label}</b><span>standings after the day</span>`;
+  dayModalTitle.innerHTML = `<b>${card.label}</b><span>the day's bouts</span>`;
   let html = "";
   for (const [divName, label] of [["makuuchi","Makuuchi"], ["juryo","Jūryō"]]) {
-    html += `<section class="bz"><div class="bz__div">${label}</div>` +
-            `<div class="bz__row bz__head"><span>East</span><span>Rank</span><span>West</span></div>`;
-    for (const row of banzukeRows(divName))
-      html += `<div class="bz__row">${bzCell(row.east,"e",upto)}` +
-              `<div class="bz__rank">${row.rank}</div>${bzCell(row.west,"w",upto)}</div>`;
+    const mine = (typeof myPicks === "function") ? myPicks() : new Set();
+    const bouts = (DAYS[String(upto)] && DAYS[String(upto)][divName]) || [];
+    if (!bouts.length) continue;
+    html += `<section class="bz"><div class="bz__div">${label}</div>`;
+    for (const b of bouts) {
+      const meE = mine.has(b[1]) ? " is-mine" : "", meW = mine.has(b[5]) ? " is-mine" : "";
+      const cls = "bout revealed" + (b[2] ? ` won-${b[2]}` : "") +
+                  (mine.has(b[1]) ? " mine-e" : "") + (mine.has(b[5]) ? " mine-w" : "");
+      html += `<div class="${cls}">` +
+        `<span class="bout__e"><span class="bout__rank">${b[0]}</span><span class="bout__name${meE}">${mine.has(b[1]) ? '<i class="bout__star">&#9733;</i>' : ""}${b[1]}</span></span>` +
+        `<span class="bout__mid${b[2] ? "" : " pending"}">${b[2] ? b[3] : "\u2014"}${b[2] ? `<span>${b[2] === "e" ? "East wins" : "West wins"}</span>` : ""}</span>` +
+        `<span class="bout__w"><span class="bout__name${meW}">${b[5]}${mine.has(b[5]) ? '<i class="bout__star">&#9733;</i>' : ""}</span><span class="bout__rank">${b[4]}</span></span>` +
+        `<span class="bout__past" title="Head-to-head, east\u2013west">${b[6] || ""}</span>` +
+      `</div>`;
+    }
     html += `</section>`;
   }
   dayModalBody.innerHTML = html;
