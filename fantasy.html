@@ -1441,7 +1441,7 @@ function renderBoard(){
 
   $("lbFoot").textContent = model.started
     ? "Scores update from the Results sheet as each day's bouts come in. Tap a row for full cards; tap ☆ to pin friends."
-    : "Drafts are open. Once Aki begins, scores tally here live. Tap a row for full cards; tap ☆ to pin friends.";
+    : "";
 }
 $("lbSearch").addEventListener("input", e => { lbQuery = e.target.value; renderBoard(); });
 const esc = s => String(s).replace(/[&<>"]/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
@@ -1733,6 +1733,7 @@ async function renderKeepers(lg, meCommish){
       ${meCommish
         ? `<button class="btn" id="lgStartDraft"${(lg.members||[]).length<2 ? ' disabled title="Need at least two members"' : ""}>Start snake draft</button><span class="status" id="lgDraftStartStatus"></span>`
         : `<p class="lg-waiting">Waiting for the commissioner to start the draft…</p>`}
+      <div class="lg-mockrow" style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="btn ghost" id="lgMockDraft">Mock draft</button><span class="lg-myteam__hint" style="margin:0">Practice the snake draft against bot versions of your league &mdash; nothing here affects the real draft.</span></div>
     </div>`;
     const startBtn = $("lgStartDraft");
     if (startBtn) startBtn.onclick = async ()=>{
@@ -1744,6 +1745,16 @@ async function renderKeepers(lg, meCommish){
       const r = await GyojiGuide.startDraft(lg.id);
       if (r && r.ok) loadLeagues(lg.id);
       else { st.textContent=(r&&r.error)||"Couldn't start."; st.className="status err"; startBtn.disabled=false; }
+    };
+    const mockBtn = $("lgMockDraft");
+    if (mockBtn) mockBtn.onclick = ()=>{
+      try{ localStorage.setItem("GG_MOCK_DRAFT", JSON.stringify({
+        league: lg.name,
+        you: acct ? { handle: acct.handle, name: acct.name } : { handle:"you", name:"You" },
+        members: (lg.members||[]).map(m=>({ handle:m.handle, name:m.name })),
+        rosterSize: lg.rosterSize || 6, pickClock: 120
+      })); }catch(e){}
+      location.href = "keepers-mock-draft.html";
     };
     return;
   }
