@@ -225,7 +225,23 @@
     +'.ggb-col .ggb-fig{aspect-ratio:3/5}'
     +'.ggb-col .ggb-fig figcaption{display:none}'
     +'.ggb-side-h{align-self:flex-start;font-size:14px}'
-  +'}';
+  +'}'
+  /* ── click-to-spotlight a rikishi + info popover ── */
+  +'.ggb-fig[data-n]{cursor:pointer}'
+  +'.ggb-spotting .ggb-fig{opacity:.2;transition:opacity .18s ease}'
+  +'.ggb-spotting .ggb-fig.ggb-sel{opacity:1}'
+  +'.ggb-fig.ggb-sel{z-index:14}'
+  +'.ggb-fig.ggb-sel img{filter:drop-shadow(0 0 5px rgba(216,178,90,.95)) drop-shadow(0 0 12px rgba(216,178,90,.65))}'
+  +'.ggb-info{position:fixed;z-index:60;width:196px;max-width:74vw;text-align:center;color:#f1f2f6;'
+    +'background:rgba(15,17,22,.96);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);'
+    +'border:1px solid rgba(216,178,90,.5);border-radius:14px;padding:14px 14px 12px;box-shadow:0 16px 44px rgba(0,0,0,.6)}'
+  +'.ggb-info-x{position:absolute;top:4px;right:8px;background:none;border:none;color:#a6acbd;font-size:22px;line-height:1;cursor:pointer;padding:2px 4px}'
+  +'.ggb-info-x:hover{color:#fff}'
+  +'.ggb-info-img{width:104px;height:auto;display:block;margin:2px auto 8px;filter:drop-shadow(0 3px 8px rgba(0,0,0,.55))}'
+  +'.ggb-info-jp{font-family:"WDXL Lubrifont TC",serif;font-size:1.55rem;color:#d8b25a;line-height:1.1}'
+  +'.ggb-info-rom{font-family:"Potta One",sans-serif;font-weight:400;font-size:1.05rem;margin-top:3px}'
+  +'.ggb-info-rank{color:#c3c8d6;font-size:.82rem;margin-top:5px;letter-spacing:.02em}'
+  +'.ggb-info-side{display:block;color:#878da0;font-size:.74rem;margin-top:2px}';
 
   // Adapt the rank-and-file grid so every rikishi stays visible AND none sit
   // under the centred card. Approach: (1) find the column count that would fill
@@ -382,12 +398,79 @@
   var fitTimer;
   function onResize(){ clearTimeout(fitTimer); fitTimer = setTimeout(fitAll, 150); }
 
+  /* ---- click a rikishi to spotlight them + show basic info ---- */
+  function ensureInfoEl(){
+    var el = document.getElementById("ggbInfo");
+    if (!el){
+      el = document.createElement("div");
+      el.id = "ggbInfo"; el.className = "ggb-info"; el.style.display = "none";
+      document.body.appendChild(el);
+      el.addEventListener("click", function(e){
+        if (e.target.classList.contains("ggb-info-x")) clearSpotlight();
+        e.stopPropagation();
+      });
+    }
+    return el;
+  }
+  var _selFig = null;
+  function positionInfo(el, fig){
+    var r = fig.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
+    var vw = window.innerWidth, vh = window.innerHeight, M = 10;
+    var left = r.right + 12;                        // prefer to the figure's right
+    if (left + w > vw - M) left = r.left - w - 12;  // else to its left
+    if (left < M) left = Math.max(M, Math.min((vw - w) / 2, vw - w - M));
+    var top = r.top + r.height / 2 - h / 2;
+    top = Math.max(M, Math.min(top, vh - h - M));
+    el.style.left = Math.round(left) + "px";
+    el.style.top = Math.round(top) + "px";
+  }
+  function selectRikishi(name, fig){
+    var host = document.getElementById("ggBanzuke"), R = RIK[name];
+    if (!host || !R) return;
+    var root = host.querySelector(".ggb"); if (root) root.classList.add("ggb-spotting");
+    var prev = host.querySelector(".ggb-fig.ggb-sel"); if (prev) prev.classList.remove("ggb-sel");
+    fig.classList.add("ggb-sel"); _selFig = fig;
+    var el = ensureInfoEl();
+    el.innerHTML =
+      '<button class="ggb-info-x" aria-label="Close">\u00d7</button>'+
+      '<img class="ggb-info-img" src="'+R.src+'" alt="">'+
+      '<div class="ggb-info-jp">'+esc(R.k || name)+'</div>'+
+      '<div class="ggb-info-rom">'+esc(name)+'</div>'+
+      '<div class="ggb-info-rank">'+esc(TIER_ROM[tier(name)])+(num(name)?(" "+num(name)):"")+
+        '<span class="ggb-info-side">'+(side(name)==="E"?"East \u6771":"West \u897f")+'</span></div>';
+    el.style.display = "block";
+    positionInfo(el, fig);
+  }
+  function clearSpotlight(){
+    var host = document.getElementById("ggBanzuke");
+    if (host){ var root=host.querySelector(".ggb"); if(root) root.classList.remove("ggb-spotting");
+      var s = host.querySelector(".ggb-fig.ggb-sel"); if (s) s.classList.remove("ggb-sel"); }
+    var el = document.getElementById("ggbInfo"); if (el) el.style.display = "none";
+    _selFig = null;
+  }
+  function onBanzukeClick(e){
+    var t = e.target, fig = t.closest ? t.closest(".ggb-fig[data-n]") : null;
+    if (fig){
+      if (fig.classList.contains("ggb-sel")) clearSpotlight();
+      else selectRikishi(fig.getAttribute("data-n"), fig);
+    } else {
+      clearSpotlight();
+    }
+  }
+
   function mount(){
     if (!document.getElementById("ggBanzuke")) return;
     var st=document.createElement("style"); st.id="ggb-css"; st.textContent=CSS; document.head.appendChild(st);
     build();
     scheduleFit();
     window.addEventListener("resize", onResize);
+    var host = document.getElementById("ggBanzuke");
+    host.style.cursor = "default";
+    host.addEventListener("click", onBanzukeClick);
+    document.addEventListener("keydown", function(e){ if (e.key === "Escape") clearSpotlight(); });
+    var rp; function reposition(){ if (_selFig && document.body.contains(_selFig)){ var el=document.getElementById("ggbInfo"); if(el && el.style.display!=="none") positionInfo(el,_selFig); } else if(_selFig){ clearSpotlight(); } }
+    window.addEventListener("resize", function(){ clearTimeout(rp); rp=setTimeout(reposition,120); });
+    window.addEventListener("scroll", reposition, { passive:true });
   }
   if (document.readyState==="loading") document.addEventListener("DOMContentLoaded", mount);
   else mount();
