@@ -226,22 +226,25 @@
     +'.ggb-col .ggb-fig figcaption{display:none}'
     +'.ggb-side-h{align-self:flex-start;font-size:14px}'
   +'}'
-  /* ── click-to-spotlight a rikishi + info popover ── */
+  /* ── click-to-spotlight: the figure lifts forward onto a card revealed behind it ── */
   +'.ggb-fig[data-n]{cursor:pointer}'
-  +'.ggb-spotting .ggb-fig{opacity:.2;transition:opacity .18s ease}'
-  +'.ggb-spotting .ggb-fig.ggb-sel{opacity:1}'
-  +'.ggb-fig.ggb-sel{z-index:14}'
-  +'.ggb-fig.ggb-sel img{filter:drop-shadow(0 0 5px rgba(216,178,90,.95)) drop-shadow(0 0 12px rgba(216,178,90,.65))}'
-  +'.ggb-info{position:fixed;z-index:60;width:196px;max-width:74vw;text-align:center;color:#f1f2f6;'
-    +'background:rgba(15,17,22,.96);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);'
-    +'border:1px solid rgba(216,178,90,.5);border-radius:14px;padding:14px 14px 12px;box-shadow:0 16px 44px rgba(0,0,0,.6)}'
-  +'.ggb-info-x{position:absolute;top:4px;right:8px;background:none;border:none;color:#a6acbd;font-size:22px;line-height:1;cursor:pointer;padding:2px 4px}'
-  +'.ggb-info-x:hover{color:#fff}'
-  +'.ggb-info-img{width:104px;height:auto;display:block;margin:2px auto 8px;filter:drop-shadow(0 3px 8px rgba(0,0,0,.55))}'
-  +'.ggb-info-jp{font-family:"WDXL Lubrifont TC",serif;font-size:1.55rem;color:#d8b25a;line-height:1.1}'
-  +'.ggb-info-rom{font-family:"Potta One",sans-serif;font-weight:400;font-size:1.05rem;margin-top:3px}'
-  +'.ggb-info-rank{color:#c3c8d6;font-size:.82rem;margin-top:5px;letter-spacing:.02em}'
-  +'.ggb-info-side{display:block;color:#878da0;font-size:.74rem;margin-top:2px}';
+  +'.ggb-spot{position:fixed;inset:0;z-index:60}'
+  +'.ggb-spot::before{content:"";position:absolute;inset:0;background:rgba(6,8,12,.5);opacity:0;transition:opacity .3s ease}'
+  +'.ggb-spot.on::before{opacity:1}'
+  +'.ggb-spot-card{position:absolute;width:210px;max-width:78vw;padding:18px 16px 14px;text-align:center;color:#f1f2f6}'
+  +'.ggb-spot-panel{position:absolute;inset:0;border-radius:16px;background:rgba(15,17,22,.97);'
+    +'border:1px solid rgba(216,178,90,.5);box-shadow:0 20px 50px rgba(0,0,0,.6);'
+    +'opacity:0;transform:scale(.88);transform-origin:center;transition:opacity .28s ease,transform .28s cubic-bezier(.2,.8,.2,1)}'
+  +'.ggb-spot.on .ggb-spot-panel{opacity:1;transform:scale(1)}'
+  +'.ggb-spot-x{position:absolute;top:4px;right:8px;background:none;border:none;color:#a6acbd;font-size:22px;line-height:1;cursor:pointer;padding:2px 4px;z-index:2}'
+  +'.ggb-spot-x:hover{color:#fff}'
+  +'.ggb-spot-fig{position:relative;z-index:1;display:block;margin:2px auto 8px;max-height:188px;max-width:150px;width:auto;height:auto;'
+    +'filter:drop-shadow(0 8px 16px rgba(0,0,0,.55));transition:transform .36s cubic-bezier(.2,.8,.2,1);will-change:transform}'
+  +'.ggb-spot-jp,.ggb-spot-rom,.ggb-spot-rank{position:relative;z-index:1;opacity:0;transition:opacity .3s ease .12s}'
+  +'.ggb-spot.on .ggb-spot-jp,.ggb-spot.on .ggb-spot-rom,.ggb-spot.on .ggb-spot-rank{opacity:1}'
+  +'.ggb-spot-jp{font-family:"WDXL Lubrifont TC",serif;font-size:1.55rem;color:#d8b25a;line-height:1.1}'
+  +'.ggb-spot-rom{font-family:"Potta One",sans-serif;font-size:1.05rem;margin-top:3px}'
+  +'.ggb-spot-rank{color:#c3c8d6;font-size:.82rem;margin-top:5px;letter-spacing:.02em}';
 
   // Adapt the rank-and-file grid so every rikishi stays visible AND none sit
   // under the centred card. Approach: (1) find the column count that would fill
@@ -398,63 +401,65 @@
   var fitTimer;
   function onResize(){ clearTimeout(fitTimer); fitTimer = setTimeout(fitAll, 150); }
 
-  /* ---- click a rikishi to spotlight them + show basic info ---- */
-  function ensureInfoEl(){
-    var el = document.getElementById("ggbInfo");
-    if (!el){
-      el = document.createElement("div");
-      el.id = "ggbInfo"; el.className = "ggb-info"; el.style.display = "none";
-      document.body.appendChild(el);
-      el.addEventListener("click", function(e){
-        if (e.target.classList.contains("ggb-info-x")) clearSpotlight();
-        e.stopPropagation();
-      });
-    }
-    return el;
+  /* ---- click a rikishi: lift the banzuke figure forward onto a card that
+          reveals behind it (the same figure animates — no duplicate) ---- */
+  var _spot = null, _spotFig = null;
+  function flipTo(img, rect){
+    var lr = img.getBoundingClientRect();
+    var s = rect.width / lr.width || 1;
+    var dx = (rect.left + rect.width/2) - (lr.left + lr.width/2);
+    var dy = (rect.top + rect.height/2) - (lr.top + lr.height/2);
+    img.style.transform = "translate("+dx+"px,"+dy+"px) scale("+s+")";
   }
-  var _selFig = null;
-  function positionInfo(el, fig){
-    var r = fig.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
-    var vw = window.innerWidth, vh = window.innerHeight, M = 10;
-    var left = r.right + 12;                        // prefer to the figure's right
-    if (left + w > vw - M) left = r.left - w - 12;  // else to its left
-    if (left < M) left = Math.max(M, Math.min((vw - w) / 2, vw - w - M));
-    var top = r.top + r.height / 2 - h / 2;
-    top = Math.max(M, Math.min(top, vh - h - M));
-    el.style.left = Math.round(left) + "px";
-    el.style.top = Math.round(top) + "px";
+  function closeSpot(){
+    if (!_spot) return;
+    var ov = _spot, orig = _spotFig; _spot = null; _spotFig = null;
+    var img = ov.querySelector(".ggb-spot-fig"), f = orig && (orig.querySelector("img") || orig);
+    if (img && f) flipTo(img, f.getBoundingClientRect());   // animate back to the banzuke slot
+    ov.classList.remove("on");
+    setTimeout(function(){ if (ov.parentNode) ov.parentNode.removeChild(ov); if (orig) orig.style.visibility = ""; }, 340);
   }
-  function selectRikishi(name, fig){
-    var host = document.getElementById("ggBanzuke"), R = RIK[name];
-    if (!host || !R) return;
-    var root = host.querySelector(".ggb"); if (root) root.classList.add("ggb-spotting");
-    var prev = host.querySelector(".ggb-fig.ggb-sel"); if (prev) prev.classList.remove("ggb-sel");
-    fig.classList.add("ggb-sel"); _selFig = fig;
-    var el = ensureInfoEl();
-    el.innerHTML =
-      '<button class="ggb-info-x" aria-label="Close">\u00d7</button>'+
-      '<img class="ggb-info-img" src="'+R.src+'" alt="">'+
-      '<div class="ggb-info-jp">'+esc(R.k || name)+'</div>'+
-      '<div class="ggb-info-rom">'+esc(name)+'</div>'+
-      '<div class="ggb-info-rank">'+esc(TIER_ROM[tier(name)])+(num(name)?(" "+num(name)):"")+
-        '<span class="ggb-info-side">'+(side(name)==="E"?"East \u6771":"West \u897f")+'</span></div>';
-    el.style.display = "block";
-    positionInfo(el, fig);
-  }
-  function clearSpotlight(){
-    var host = document.getElementById("ggBanzuke");
-    if (host){ var root=host.querySelector(".ggb"); if(root) root.classList.remove("ggb-spotting");
-      var s = host.querySelector(".ggb-fig.ggb-sel"); if (s) s.classList.remove("ggb-sel"); }
-    var el = document.getElementById("ggbInfo"); if (el) el.style.display = "none";
-    _selFig = null;
+  function openSpot(name, fig){
+    closeSpot();
+    var R = RIK[name]; if (!R) return;
+    var f0 = fig.querySelector("img") || fig, fr = f0.getBoundingClientRect();
+    var ov = document.createElement("div");
+    ov.className = "ggb-spot";
+    ov.innerHTML =
+      '<div class="ggb-spot-card">'+
+        '<div class="ggb-spot-panel"></div>'+
+        '<button class="ggb-spot-x" aria-label="Close">\u00d7</button>'+
+        '<img class="ggb-spot-fig" src="'+R.src+'" alt="">'+
+        '<div class="ggb-spot-jp">'+esc(R.k || name)+'</div>'+
+        '<div class="ggb-spot-rom">'+esc(name)+'</div>'+
+        '<div class="ggb-spot-rank">'+esc(TIER_ROM[tier(name)])+(num(name)?(" "+num(name)):"")+' \u00b7 '+(side(name)==="E"?"East \u6771":"West \u897f")+'</div>'+
+      '</div>';
+    document.body.appendChild(ov);
+    var card = ov.querySelector(".ggb-spot-card"), img = ov.querySelector(".ggb-spot-fig");
+    // centre the card where the rikishi was, clamped to the viewport
+    var cw = card.offsetWidth, ch = card.offsetHeight, M = 10;
+    var cx = fr.left + fr.width/2, cy = fr.top + fr.height/2;
+    card.style.left = Math.round(Math.max(M, Math.min(cx - cw/2, window.innerWidth - cw - M))) + "px";
+    card.style.top  = Math.round(Math.max(M, Math.min(cy - ch/2, window.innerHeight - ch - M))) + "px";
+    // FLIP the figure from its banzuke slot to its place on the card
+    img.style.transition = "none";
+    flipTo(img, fr);
+    void ov.offsetWidth;
+    img.style.transition = "";
+    requestAnimationFrame(function(){ ov.classList.add("on"); img.style.transform = ""; });
+    fig.style.visibility = "hidden";
+    _spot = ov; _spotFig = fig;
+    ov.addEventListener("click", function(e){
+      if (e.target === ov || e.target.classList.contains("ggb-spot-x") || e.target.classList.contains("ggb-spot-panel")) closeSpot();
+    });
   }
   function onBanzukeClick(e){
     var t = e.target, fig = t.closest ? t.closest(".ggb-fig[data-n]") : null;
     if (fig){
-      if (fig.classList.contains("ggb-sel")) clearSpotlight();
-      else selectRikishi(fig.getAttribute("data-n"), fig);
+      if (_spotFig === fig) closeSpot();
+      else openSpot(fig.getAttribute("data-n"), fig);
     } else {
-      clearSpotlight();
+      closeSpot();
     }
   }
 
@@ -465,12 +470,12 @@
     scheduleFit();
     window.addEventListener("resize", onResize);
     var host = document.getElementById("ggBanzuke");
-    host.style.cursor = "default";
     host.addEventListener("click", onBanzukeClick);
-    document.addEventListener("keydown", function(e){ if (e.key === "Escape") clearSpotlight(); });
-    var rp; function reposition(){ if (_selFig && document.body.contains(_selFig)){ var el=document.getElementById("ggbInfo"); if(el && el.style.display!=="none") positionInfo(el,_selFig); } else if(_selFig){ clearSpotlight(); } }
-    window.addEventListener("resize", function(){ clearTimeout(rp); rp=setTimeout(reposition,120); });
-    window.addEventListener("scroll", reposition, { passive:true });
+    document.addEventListener("keydown", function(e){ if (e.key === "Escape") closeSpot(); });
+    // the FLIP positions are pinned to the figure's on-screen slot; if the page
+    // scrolls or resizes that slot moves, so just close the spotlight.
+    window.addEventListener("scroll", function(){ if (_spot) closeSpot(); }, { passive:true });
+    window.addEventListener("resize", function(){ if (_spot) closeSpot(); });
   }
   if (document.readyState==="loading") document.addEventListener("DOMContentLoaded", mount);
   else mount();
