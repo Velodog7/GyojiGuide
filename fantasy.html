@@ -257,6 +257,12 @@
     align-items:center; justify-content:center; font-family:"Noto Serif JP",serif; font-size:.9rem; color:var(--sun); flex:none }
   .lb-ava svg{ width:100%; height:100%; display:block }
   .lb-name b{ font-weight:600 } .lb-name span{ color:var(--faint); font-size:.8rem; margin-left:6px }
+  .lb-banzuke{ display:inline-block; margin-left:8px; padding:1px 7px; border-radius:4px; font-size:.68rem; font-weight:700; letter-spacing:.02em; vertical-align:middle; }
+  .bz-ama{ background:#2a2e3a; color:#9aa0b0; }
+  .bz-jur{ background:#4a3a24; color:#e0b06a; }
+  .bz-mak{ background:#233448; color:#8fc0f0; }
+  .bz-san{ background:#4a3d10; color:#f0c94a; }
+  .bz-yok{ background:#4a1520; color:#ff8a9a; }
   .lb-you{ color:var(--sun); font-family:"WDXL Lubrifont TC",monospace; font-size:0.708rem; letter-spacing:.1em;
         border:1px solid rgba(var(--sun-rgb),.5); border-radius:99px; padding:1px 7px; margin-left:8px }
   .lb-house{ color:var(--muted); font-family:"WDXL Lubrifont TC",monospace; font-size:0.684rem; letter-spacing:.1em;
@@ -1362,6 +1368,11 @@ function expandCards(userTeam, scoreRows){
   }).join("") + `</div>`;
 }
 
+function rankBadge(b){
+  if(!b) return "";
+  const i=b.idx||0, tier = i>=9?"yok":i>=6?"san":i>=5?"mak":i>=4?"jur":"ama";
+  return `<span class="lb-banzuke bz-${tier}" title="Banzuke rank — climbs/falls each basho">${esc(b.label||"Jonokuchi")}</span>`;
+}
 function renderBoard(){
   const model = scoreModel({ results: cache.results, meta: cache.meta });
   const lastDay = model.lastDay;
@@ -1371,7 +1382,7 @@ function renderBoard(){
   $("lbDays").innerHTML = Array.from({length:15}, (_,i)=>{ const d=i+1; return `<i class="${d<=lastDay?"done":""}">${d}</i>`; }).join("");
 
   // rank everyone
-  const ranked = cache.users.map(u=>{ const s=teamScore(u.team||{}, model); return { ...u, ...s }; })
+  const ranked = cache.users.map(u=>{ const s=teamScore(u.team||{}, model); return { ...u, ...s, banzuke: u.rank || {idx:0,label:"Jonokuchi",div:"jonokuchi"} }; })
     .sort((a,b)=> b.pts-a.pts || (a.name||"").localeCompare(b.name||""));
   ranked.forEach((r,i)=> r.rank = i+1);
 
@@ -1421,7 +1432,7 @@ function renderBoard(){
       <td class="lb-pincol"><button class="lb-star ${pin?"on":""}" data-pin="${esc(r.handle)}" title="${pin?"Unpin":"Pin"}">${pin?"★":"☆"}</button></td>
       <td class="lb-rank ${r.rank===1?"p1":""}">${r.rank}</td>
       <td class="lb-avacol"><span class="lb-ava">${ava}</span></td>
-      <td class="lb-name"><b>${esc(r.name||r.handle)}</b>${mine?`<span class="lb-you">You</span>`:""}<span>@${esc(r.handle)}</span></td>
+      <td class="lb-name"><b>${esc(r.name||r.handle)}</b>${mine?`<span class="lb-you">You</span>`:""}${rankBadge(r.banzuke)}<span>@${esc(r.handle)}</span></td>
       <td class="lb-w">${totW}</td>
       <td class="lb-score">${r.pts}</td></tr>
       <tr class="expand" data-h="${esc(r.handle)}" hidden><td colspan="6">${expandCards(r.team||{}, r.rows)}</td></tr>`;

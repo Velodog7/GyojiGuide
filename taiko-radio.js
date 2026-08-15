@@ -363,6 +363,8 @@
 
   /* ==== UI ==== */
   var bar, nameEl, subEl, ppBtn, muteBtn, volInput, eqEl, tickInt=null;
+  var VOL_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3l4.5 3.5v-12L7 9.5H4z" fill="currentColor" stroke="none"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></svg>';
+  var MUTE_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3l4.5 3.5v-12L7 9.5H4z" fill="currentColor" stroke="none"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></svg>';
   function setState(s) { if (bar) bar.dataset.state=s; if (ppBtn) ppBtn.textContent = (s==="playing"||s==="gap") ? "❚❚" : "▶"; }
   function fmt(ms){ ms=Math.max(0,ms); var s=Math.round(ms/1000); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
   function tickNow() {
@@ -413,7 +415,7 @@
       '<div class="tkr-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
       '<div class="tkr-meta"><span class="tkr-name">Taiko Radio</span><span class="tkr-sub">starting…</span></div>' +
       '<button class="tkr-ico tkr-next" title="Next song" aria-label="Next song">⏭</button>' +
-      '<button class="tkr-ico tkr-mute" title="Mute" aria-label="Mute">🔊</button>' +
+      '<button class="tkr-ico tkr-mute" title="Mute" aria-label="Mute">'+VOL_SVG+'</button>' +
       '<input class="tkr-vol" type="range" min="0" max="100" title="Volume" aria-label="Volume">' +
       '<a class="tkr-make" href="taiko.html" title="Create a loop in the constructor" aria-label="Create a loop">＋</a>' +
       '<button class="tkr-toggle" title="Collapse player" aria-label="Collapse player" aria-expanded="true">‹</button>';
@@ -448,7 +450,7 @@
 
     tickInt = setInterval(tickNow, 400);
   }
-  function reflectMute() { if (!muteBtn) return; muteBtn.textContent = prefs.muted?"🔇":"🔊"; muteBtn.title = prefs.muted?"Unmute":"Mute"; }
+  function reflectMute() { if (!muteBtn) return; muteBtn.innerHTML = prefs.muted?MUTE_SVG:VOL_SVG; muteBtn.title = prefs.muted?"Unmute":"Mute"; }
 
   window.addEventListener("pagehide", saveProgress);
   window.addEventListener("beforeunload", saveProgress);

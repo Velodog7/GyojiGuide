@@ -205,7 +205,8 @@
     { id: "faq",        label: "FAQ" },
     { id: "suggestion", label: "Suggestion" },
     { id: "bug",        label: "Report a bug" },
-    { id: "abuse",      label: "Report a user" }
+    { id: "abuse",      label: "Report a user" },
+    { id: "contact",    label: "Contact" }
   ];
   function hesc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
 
@@ -280,6 +281,13 @@
         '<span class="ggh-lab">What happened?</span><textarea class="ggh-ta" id="bgMsg" placeholder="Steps to reproduce, what you expected, what you saw\u2026"></textarea>'+
         '<button type="button" class="ggh-send" data-kind="bug">Send bug report</button>'+
         '<div class="ggh-status"></div>';
+    } else if (htab === "contact"){
+      body =
+        '<p class="ggh-note">For anything the tabs above don\u2019t cover \u2014 account questions, or any other issue or concern \u2014 email us directly. We read every message.</p>'+
+        '<span class="ggh-lab">Email us</span>'+
+        '<a href="mailto:sumoslapdown@gmail.com?subject=Sumo%20Slap%20Down%20%E2%80%94%20Contact" '+
+          'style="display:inline-flex;align-items:center;justify-content:center;padding:12px 18px;border-radius:9px;background:var(--sun,#d8b25a);color:#141620;font-weight:700;text-decoration:none;margin-top:6px;font-size:.95rem">'+
+          'Email sumoslapdown@gmail.com</a>';
     } else {
       body =
         '<span class="ggh-lab">User\u2019s handle</span><input class="ggh-in" id="abUser" maxlength="40" placeholder="e.g. their @handle">'+
@@ -290,7 +298,7 @@
     hmodal.innerHTML =
       '<button class="ggh-x" aria-label="Close">\u2715</button>'+
       '<h2 class="ggh-title">Help &amp; feedback</h2>'+
-      '<p class="ggh-sub">Browse the FAQ, ask a question, suggest an idea, report a bug, or flag a user.</p>'+
+      '<p class="ggh-sub">Browse the FAQ, ask a question, suggest an idea, report a bug, flag a user, or email us directly.</p>'+
       '<div class="ggh-tabs">'+HTABS.map(function(t){ return '<button type="button" class="ggh-tab'+(t.id===htab?" on":"")+'" data-tab="'+t.id+'">'+t.label+'</button>'; }).join("")+'</div>'+
       '<div id="gghBody">'+body+'</div>';
 
