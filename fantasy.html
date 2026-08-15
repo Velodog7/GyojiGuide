@@ -453,6 +453,14 @@
   .lg-myteam__hint b{ color:var(--ink) }
   .lg-slots{ margin:0 0 14px }
 
+  .lg-rostermoves{ margin-top:8px }
+  .lg-rm-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:4px }
+  .lg-rm-head h4{ margin:0 }
+  .lg-rm-window{ font-size:.72rem; font-weight:700; padding:2px 9px; border-radius:20px; letter-spacing:.02em }
+  .lg-rm-window.open{ background:rgba(95,208,138,.14); color:#5fd08a }
+  .lg-rm-window.closed{ background:rgba(224,162,58,.14); color:#e0a23a }
+  .lg-bench{ opacity:.6 }
+  .lg-bench h5{ color:var(--dim) }
   .lg-teams{ margin:0 0 22px }
   .lg-teams h4{ margin:0 0 10px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun);
         display:flex; align-items:center; gap:8px }
@@ -1801,28 +1809,38 @@ async function renderKeepers(lg, meCommish){
     ).join("")}</div>` : `<p class="lg-locked-note">None yet.</p>`;
   const rosterHTML = members.map(m=>{
     const you = acct && m.handle.toLowerCase()===acct.handle.toLowerCase();
-    const r = m.roster || { makuuchi:[], juryo:[] };
+    const r = m.roster || { makuuchi:[], juryo:[], active:[] };
+    const activeSet = new Set((r.active||[]).map(x=>String(x).toLowerCase()));
+    const isAct = n => activeSet.has(String(n).toLowerCase());
+    const mkActive = r.makuuchi.filter(isAct), mkBench = r.makuuchi.filter(n=>!isAct(n));
     return `<div class="lg-team-row" data-h="${esc(m.handle)}">
       <div class="lg-team-row__top">
         <span class="lg-team-row__ava">${esc(initials(m.name))}</span>
         <span class="lg-team-row__name">${esc(m.name)}${you?`<span class="lg-team-row__you">You</span>`:""}<span class="lg-team-row__h">@${esc(m.handle)}</span></span>
       </div>
       <div class="lg-team-expand" hidden>
-        <div class="lg-roster-block"><h5>Makuuchi (active) · ${r.makuuchi.length}/${lg.rosterSize}</h5>${cardsFor(r.makuuchi)}</div>
+        <div class="lg-roster-block"><h5>Active · ${mkActive.length}/${lg.rosterSize}</h5>${cardsFor(mkActive)}</div>
+        ${mkBench.length ? `<div class="lg-roster-block lg-bench"><h5>Bench · ${mkBench.length}</h5>${cardsFor(mkBench)}</div>` : ""}
         <div class="lg-roster-block"><h5>Jūryō (farm) · ${r.juryo.length}/${lg.rosterSize}</h5>${cardsFor(r.juryo)}</div>
       </div>
     </div>`;
   }).join("");
 
   el.innerHTML = `
-    <div class="lg-teams"><h4>Rosters</h4>${rosterHTML}</div>
-    <div class="lg-teams"><h4>Trade center</h4>
-      ${locked ? '<p class="lg-locked-note">Trades are closed while the tournament is underway.</p>' : ''}
-      <div id="lgTradesList"></div>
-      ${!locked ? tradeFormHTML(members) : ""}
-    </div>
-    <div class="lg-teams"><h4>Add / drop</h4>
-      ${locked ? '<p class="lg-locked-note">Adds/drops are closed while the tournament is underway.</p>' : waiverFormHTML()}
+    <div class="lg-rostermoves">
+      <div class="lg-rm-head"><h4>Roster moves</h4><span class="lg-rm-window ${locked ? "closed" : "open"}">${locked ? "Locked — tournament underway" : "Open — between tournaments"}</span></div>
+      <p class="lg-myteam__hint" style="margin-top:0">${locked
+        ? "Your roster is locked while the tournament runs. Lineups, trades and add/drops reopen the moment it ends and stay open until the next banzuke."
+        : "The window is open: set your active lineup, trade with other teams, and add/drop unclaimed wrestlers. Everything locks again when the next tournament begins."}</p>
+      <div class="lg-teams"><h5>Rosters</h5>${rosterHTML}</div>
+      <div class="lg-teams"><h5>Trade center</h5>
+        ${locked ? '<p class="lg-locked-note">Trades are closed while the tournament is underway.</p>' : ''}
+        <div id="lgTradesList"></div>
+        ${!locked ? tradeFormHTML(members) : ""}
+      </div>
+      <div class="lg-teams"><h5>Add / drop</h5>
+        ${locked ? '<p class="lg-locked-note">Adds/drops are closed while the tournament is underway.</p>' : waiverFormHTML()}
+      </div>
     </div>`;
 
   el.querySelectorAll(".lg-team-row").forEach(row=>{
