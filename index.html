@@ -30,6 +30,10 @@
   /* banzuke is the backdrop; a single card sits integrated over it */
   .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:860px; margin-top:0 }
   #ggBanzuke{ position:absolute; inset:0 }
+  /* swap the watercolour wash overlay that gg-banzuke.js draws over the crowd —
+     overridden here (rather than inside gg-banzuke.js's giant embedded-image
+     bundle) so we don't have to touch that file's inline base64 at all. */
+  .ggb-water{ background-image:url('sumo-watercolor-wash.jpg') !important; }
 
   /* the always-present card, centred over the brush stroke */
   .bz-card{ position:absolute; z-index:5; left:50%; top:50%; transform:translate(-50%,-50%);
