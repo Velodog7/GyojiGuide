@@ -39,6 +39,12 @@
   .ggb::before, .ggb::after{ content:none !important; }
   .ggb-texfx{ display:none !important; }
   .ggb-water{ background-image:url('sumo-watercolor-wash.jpg') !important; mix-blend-mode:multiply !important; opacity:.4 !important; }
+  /* the 西/東 side labels used to eat their own grid column beside the sanyaku
+     row, squeezing the yokozuna. A small script (below, after gg-banzuke.js)
+     relocates them to flank the gyōji instead; this just lets the sanyaku
+     row itself claim the full width they vacate. Desktop only — mobile keeps
+     gg-banzuke.js's original 3-column layout untouched. */
+  @media (min-width:641px){ .ggb-top{ grid-template-columns:1fr !important; } }
 
   /* the always-present card, centred over the brush stroke */
   .bz-card{ position:absolute; z-index:5; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -231,6 +237,40 @@
 
 <script src="gg-banzuke.js" defer></script>
 <script src="taiko-radio.js" defer></script>
+<script defer>
+/* Relocate the 西/東 (West/East) side labels from the outer edges of the
+   sanyaku row to flank the gyōji in the centre, so the sanyaku flanks get
+   the width those columns used to take. gg-banzuke.js builds the markup
+   itself (a script tag before this one, also deferred, so it has already
+   run by the time we execute) — this only moves existing nodes around,
+   it doesn't touch gg-banzuke.js's own file. Mobile (<=640px) is left
+   exactly as gg-banzuke.js built it, since it hides the centre officials
+   entirely and needs the labels to stay put at the row's outer edges. */
+(function(){
+  function placeSideLabels(){
+    var top = document.querySelector(".ggb-top");
+    var sanyaku = document.querySelector(".ggb-sanyaku");
+    var center = document.querySelector(".ggb-sancenter");
+    var west = document.querySelector(".ggb-side-h.ggb-west");
+    var east = document.querySelector(".ggb-side-h.ggb-east");
+    if (!top || !sanyaku || !west || !east) return;
+    if (window.innerWidth <= 640 || !center){
+      if (west.parentNode !== top || top.firstChild !== west) top.insertBefore(west, sanyaku);
+      if (east.parentNode !== top || top.lastChild !== east) top.appendChild(east);
+    } else {
+      if (center.firstChild !== west) center.insertBefore(west, center.firstChild);
+      if (center.lastChild !== east) center.appendChild(east);
+    }
+  }
+  function start(){
+    placeSideLabels();
+    var t;
+    window.addEventListener("resize", function(){ clearTimeout(t); t = setTimeout(placeSideLabels, 150); });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
+})();
+</script>
 <script>
 /* ============================================================
    Welcome-page subnav: Welcome (banzuke) · Learn · Resources
