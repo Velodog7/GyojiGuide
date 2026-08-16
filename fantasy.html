@@ -454,6 +454,11 @@
   .lg-slots{ margin:0 0 14px }
 
   .lg-rostermoves{ margin-top:8px }
+  .rd-pool{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px }
+  .rd-pick{ font-size:.82rem; padding:5px 10px }
+  .rd-turn{ margin:8px 0; font-size:.95rem }
+  .lu-item{ display:inline-flex; align-items:center; gap:5px; font-size:.85rem; padding:4px 9px; border:1px solid var(--line,#2a2e3a); border-radius:7px; cursor:pointer }
+  .lu-item input{ accent-color:var(--sun,#d8b25a) }
   .lg-rm-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:4px }
   .lg-rm-head h4{ margin:0 }
   .lg-rm-window{ font-size:.72rem; font-weight:700; padding:2px 9px; border-radius:20px; letter-spacing:.02em }
@@ -1744,6 +1749,7 @@ function renderSchedPanel(lg, meCommish){
    KEEPERS: draft room, rosters, trades, waivers (client)
    ============================================================ */
 let draftPollTimer = null;
+let redraftPollTimer = null;
 function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } }
 function rikDivision(name){ return (RK[name] && RK[name].code && RK[name].code[0]==="J") ? "juryo" : "makuuchi"; }
 function tournamentActiveClient(){ const m = scoreModel({ results:cache.results, meta:cache.meta }); return m.started && m.lastDay < 15; }
@@ -1801,9 +1807,28 @@ async function renderKeepers(lg, meCommish){
     return;
   }
 
+  if (lg.draftStatus === "redraft") {
+    el.innerHTML = `<div class="lg-draftroom"><h4>Supplemental re-draft <span class="lg-rm-window open">new banzuke</span></h4><div id="redraftBody"><p class="lg-locked-note">Loading the re-draft…</p></div></div>`;
+    await renderRedraft(lg);
+    if (redraftPollTimer) clearInterval(redraftPollTimer);
+    redraftPollTimer = setInterval(()=>renderRedraft(lg), 4000);
+    return;
+  }
+
   // complete: rosters + trade center + waivers
   const members = lg.members || [];
   const locked = tournamentActiveClient();
+  const isCommish = acct && lg.commissioner && acct.handle.toLowerCase()===String(lg.commissioner).toLowerCase();
+  const myRoster = acct ? ((members.find(m=>m.handle.toLowerCase()===acct.handle.toLowerCase())||{}).roster||null) : null;
+  const lineupHTML = (roster)=>{
+    if (!roster || locked) return "";
+    const mk = roster.makuuchi||[]; if (!mk.length) return "";
+    const aset = new Set((roster.active||[]).map(x=>String(x).toLowerCase()));
+    return `<div class="lg-teams" id="lgLineup"><h5>Your active lineup <span class="lg-rm-window ${aset.size>lg.rosterSize?"closed":"open"}" id="lgLineupCount">${Math.min(aset.size,mk.length)}/${lg.rosterSize} active</span></h5>
+      <p class="lg-myteam__hint" style="margin-top:0">Only active wrestlers score. Choose up to ${lg.rosterSize}.</p>
+      <div class="rd-pool">${mk.map(n=>`<label class="lu-item"><input type="checkbox" class="lu-cb" value="${esc(n)}" ${aset.has(n.toLowerCase())?"checked":""}> ${esc(n)}</label>`).join("")}</div>
+      <button class="btn" id="lgSaveLineup" style="margin-top:8px">Save lineup</button><span id="lgLineupStatus" class="status"></span></div>`;
+  };
   const cardsFor = list => list.length ? `<div class="expand-cards">${list.map(n=>
       `<div class="ecard"><div class="pcard filled r-${RK[n]?RK[n].code[0]:"M"}">${pcardInner(n, rikDivision(n)==="juryo"?"Jūryō":"Makuuchi", false)}</div></div>`
     ).join("")}</div>` : `<p class="lg-locked-note">None yet.</p>`;
@@ -1841,6 +1866,8 @@ async function renderKeepers(lg, meCommish){
       <div class="lg-teams"><h5>Add / drop</h5>
         ${locked ? '<p class="lg-locked-note">Adds/drops are closed while the tournament is underway.</p>' : waiverFormHTML()}
       </div>
+      ${lineupHTML(myRoster)}
+      ${(isCommish && !locked) ? `<div class="lg-teams"><h5>New banzuke &middot; re-draft</h5><p class="lg-myteam__hint" style="margin-top:0">When the new banzuke is published, open a supplemental draft: anyone demoted out of the top two divisions is released, then every team fills its open slots worst-first.</p><button class="btn" id="lgOpenRedraft">Open re-draft</button><span id="lgRedraftStatus" class="status"></span></div>` : ""}
     </div>`;
 
   el.querySelectorAll(".lg-team-row").forEach(row=>{
@@ -1850,7 +1877,57 @@ async function renderKeepers(lg, meCommish){
   });
 
   if (!locked) wireTradeAndWaiverForms(lg, members);
+  const cbs = [...el.querySelectorAll(".lu-cb")];
+  const updLineup = ()=>{ const n=cbs.filter(c=>c.checked).length; const b=$("lgLineupCount"); if(b){ b.textContent=n+"/"+lg.rosterSize+" active"; b.className="lg-rm-window "+(n>lg.rosterSize?"closed":"open"); } };
+  cbs.forEach(c=>c.onchange=updLineup);
+  const slBtn = $("lgSaveLineup");
+  if (slBtn) slBtn.onclick = async ()=>{
+    const active = cbs.filter(c=>c.checked).map(c=>c.value), st=$("lgLineupStatus");
+    if (active.length > lg.rosterSize){ st.textContent=" Max "+lg.rosterSize+" active."; st.className="status err"; return; }
+    slBtn.disabled=true; st.textContent=" Saving\u2026"; st.className="status";
+    const r = await GyojiGuide.setActive(lg.id, active); slBtn.disabled=false;
+    if (r && r.ok){ st.textContent=" Saved."; st.className="status ok"; renderLeague(); }
+    else { st.textContent=" "+((r&&r.error)||"Couldn\u2019t save."); st.className="status err"; }
+  };
+  const orBtn = $("lgOpenRedraft");
+  if (orBtn) orBtn.onclick = async ()=>{
+    if (!confirm("Open the supplemental re-draft?\n\nThis releases anyone demoted out of the top two divisions and starts a worst-first draft to fill rosters.")) return;
+    orBtn.disabled=true; const st=$("lgRedraftStatus"); st.textContent=" Reading the banzuke\u2026"; st.className="status";
+    const r = await GyojiGuide.openRedraft(lg.id);
+    if (r && r.ok){ lg.draftStatus="redraft"; renderLeague(); }
+    else { orBtn.disabled=false; st.textContent=" "+((r&&r.error)||"Couldn\u2019t open the re-draft."); st.className="status err"; }
+  };
   loadTradesList(lg.id);
+}
+
+async function renderRedraft(lg){
+  const body = document.getElementById("redraftBody"); if (!body) return;
+  let res=null; try { res = await GyojiGuide.redraftState(lg.id); } catch(e){}
+  if (!res || !res.ok){ body.innerHTML = `<p class="status err">Couldn\u2019t load the re-draft.</p>`; return; }
+  if (!res.redraft){                                   // finished -> back to the roster-moves view
+    if (redraftPollTimer) clearInterval(redraftPollTimer);
+    lg.draftStatus = res.draftStatus || "complete"; renderLeague(); return;
+  }
+  const me = acct ? acct.handle.toLowerCase() : "";
+  const turn = res.turn || {};
+  const myTurn = turn.phase === "redraft" && turn.handle && turn.handle.toLowerCase() === me;
+  const pool = res.pool || [];
+  const mk = pool.filter(p=>p.division==="makuuchi"), jr = pool.filter(p=>p.division==="juryo");
+  const poolCard = (list, label) => list.length ? `<div class="lg-roster-block"><h5>${label} · ${list.length} available</h5><div class="rd-pool">${list.map(p=>
+      `<button class="btn rd-pick" data-name="${esc(p.name)}" ${myTurn?"":"disabled"}>${esc(p.name)}</button>`).join("")}</div></div>` : "";
+  body.innerHTML = `
+    <p class="lg-myteam__hint">Pick order (worst first): ${(res.order||[]).map((h,i)=>`${i+1}. @${esc(h)}`).join("  ·  ")}</p>
+    <p class="rd-turn">${turn.phase==="done" ? "Re-draft complete." : (myTurn ? "<b>You\u2019re on the clock</b> — pick a wrestler." : `Waiting on <b>@${esc(turn.handle||"")}</b>…`)}</p>
+    ${poolCard(mk,"Makuuchi")}${poolCard(jr,"Jūryō")}
+    ${(!mk.length && !jr.length) ? '<p class="lg-locked-note">No wrestlers left to draft.</p>' : ""}`;
+  if (myTurn) body.querySelectorAll(".rd-pick").forEach(b=>{
+    b.onclick = async ()=>{
+      body.querySelectorAll(".rd-pick").forEach(x=>x.disabled=true);
+      const r = await GyojiGuide.redraftPick(lg.id, b.dataset.name);
+      if (!(r && r.ok)) alert((r&&r.error)||"Couldn\u2019t pick.");
+      renderRedraft(lg);
+    };
+  });
 }
 
 async function pollDraft(lg){

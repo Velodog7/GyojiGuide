@@ -226,6 +226,10 @@
   GG.respondTrade   = function (tradeId, accept){ return GG.apiPost(authed({ action:"respondTrade", tradeId:tradeId, accept:!!accept })); };
   GG.myTrades       = function (id){ return GG.apiGetQ("trades", { id:id, handle:(GG.account.get()||{}).handle || "" }); };
   GG.addDrop        = function (id, add, drop){ return GG.apiPost(authed({ action:"addDrop", id:id, add:add, drop:drop })); };
+  GG.setActive      = function (id, active){ return GG.apiPost(authed({ action:"setActive", id:id, active:active })); };
+  GG.openRedraft    = function (id){ return GG.apiPost(authed({ action:"openRedraft", id:id })); };
+  GG.redraftState   = function (id){ return GG.apiPost(authed({ action:"redraftState", id:id })); };
+  GG.redraftPick    = function (id, rikishi){ return GG.apiPost(authed({ action:"redraftPick", id:id, rikishi:rikishi })); };
 
   /* ---- leaderboard board: one shared, site-wide board (not per-league) ---- */
   GG.board          = function (){ return GG.apiGetQ("board", { handle: (GG.account.get()||{}).handle || "" }); };
