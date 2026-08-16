@@ -30,9 +30,14 @@
   /* banzuke is the backdrop; a single card sits integrated over it */
   .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:860px; margin-top:0 }
   #ggBanzuke{ position:absolute; inset:0 }
-  /* swap the watercolour wash overlay that gg-banzuke.js draws over the crowd —
-     overridden here (rather than inside gg-banzuke.js's giant embedded-image
-     bundle) so we don't have to touch that file's inline base64 at all. */
+  /* gg-banzuke.js layers several overlays over the crowd art (paper+grunge
+     multiply, an aged-wash foxing gradient, a distressed grunge texfx pass,
+     and a watercolour wash). We only want the watercolour wash — swapped to
+     our own jpg — so the other three are switched off here, and everything
+     is overridden from index.html rather than touching gg-banzuke.js's
+     giant embedded-image bundle directly. */
+  .ggb::before, .ggb::after{ content:none !important; }
+  .ggb-texfx{ display:none !important; }
   .ggb-water{ background-image:url('sumo-watercolor-wash.jpg') !important; }
 
   /* the always-present card, centred over the brush stroke */
