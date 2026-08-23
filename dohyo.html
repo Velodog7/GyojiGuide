@@ -2261,6 +2261,12 @@ function clash(b){
     loseSlot.classList.add("henkaLose");
     winSlot.style.setProperty("--hstep", (winSide === "east" ? -7 : 7) + "cqw");
     loseSlot.style.setProperty("--hmid", (loseSide === "east" ? 16 : -16) + "cqw");
+    // the rush's landing spot must be set BEFORE .clashing starts, or the
+    // henkaRush 100% keyframe falls back to its east-oriented defaults
+    // (+22cqw / +88deg) for one frame — flinging a west loser backwards
+    // until dressFinish() corrects the var. Set them here, by side.
+    loseSlot.style.setProperty("--hend", (loseSide === "east" ? 22 : -22) + "cqw");
+    loseSlot.style.setProperty("--hrot", (loseSide === "east" ? 88 : -88) + "deg");
     stage.style.setProperty("--clashT", HENKA_MS + "ms");     // a quick dodge, not a 3s grind
     clashDur = HENKA_MS;
     stage.classList.remove("clashing"); void stage.offsetWidth; stage.classList.add("clashing");
