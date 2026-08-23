@@ -1,0 +1,6 @@
+# Sumo Slap Down
+User-agent: *
+Allow: /
+Disallow: /admin.html
+
+Sitemap: https://sumoslapdown.com/sitemap.xml
