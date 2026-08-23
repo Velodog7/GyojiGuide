@@ -117,8 +117,6 @@
   .flash-static p{ margin:0; color:var(--dim); font-size:.9rem; line-height:1.55 }
   .flash-nav{ display:flex; align-items:center; gap:10px }
   .flash-nav .btn{ flex:1 1 0; text-align:center }
-  .flash-vid{ display:block; text-align:center; margin:-2px 0 2px; color:var(--sun); font-size:.82rem; font-weight:700; text-decoration:none }
-  .flash-vid:hover{ text-decoration:underline }
   .rank-ladder{ display:flex; flex-direction:column; gap:3px; margin:10px 0 12px }
   .rank-row{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:5px 11px; transition:.12s; font-size:.9rem }
   .rank-row:hover{ border-color:var(--sun); transform:translateX(3px) }
@@ -192,7 +190,14 @@
     <div class="bz-mv on" id="mv-welcome">
       <div class="bz-welcome">
         <img class="bz-logo" src="SumoSlapdown-logoTall.svg" alt="Sumo Slapdown">
-        <p class="view-sub bz-intro">Welcome to <b>Sumo Slap Down</b>! I created this site because my family and friends who love sumo and fantasy sports wanted a single destination to analyze rikishi, mock draft your team, simulate upcoming basho, and customize private and keeper fantasy leagues. The site is still in beta so please reach out with any bug reports or suggestions on how to improve the site. Hakkeyoi!</p>
+        <p class="view-sub bz-intro">Welcome to <b>Sumo Slap Down</b>, the ultimate hub for fantasy sumo! I built this site because my sumo-addicted family and friends wanted a single, one-stop shop to analyze rikishi, simulate upcoming basho, and customize private fantasy leagues.</p>
+        <ul class="bz-features">
+          <li><span class="bz-feat-h">Analyze Wrestlers</span> — Dig into historical stats, monitor health updates, and track performance to scout your perfect lineup.</li>
+          <li><span class="bz-feat-h">Create Mock Drafts</span> — Practice your picks and have your draft instantly graded against our predictions.</li>
+          <li><span class="bz-feat-h">Run Simulations</span> — Watch a day-to-day simulation of the entire tournament using hypothetical matchups.</li>
+          <li><span class="bz-feat-h">Compete in Leagues</span> — Join public games or create private custom fantasy leagues—including dedicated Keeper Leagues that let you build a stable and carry your top wrestlers from one basho to the next.</li>
+          <li><span class="bz-feat-h">Stay Connected</span> — All of our rikishi data and tournament results are powered by the sumo-api, ensuring your stats, rankings, and match history are always accurate and up to date.</li>
+        </ul>
       </div>
     </div>
 
@@ -391,7 +396,6 @@
         "<p>A <b>maegashira</b> beating a yokozuna earns a <b>kinboshi</b> (gold star) \u2014 a prized upset.</p>" },
     { id:"winning", icon:"\u5df4", title:"Winning a bout", jp:"\u53d6\u7d44 \u30fb torikumi",
       intro:"<p>A bout starts with the <b>tachiai</b> (initial charge) and may settle into a grip battle at the <b>mawashi</b> (belt). The finishing move is the <b>kimarite</b> \u2014 all 82, ordered most-common first:</p>",
-      videoUrl:"https://www3.nhk.or.jp/nhkworld/en/tv/sumo/techniques/",
       deck:KIMARITE },
     { id:"ritual", icon:"\u5869", title:"Ritual & ceremony", jp:"\u5100\u5f0f \u30fb gishiki",
       html:
@@ -471,7 +475,6 @@
         "</div>"+
         "<div class='flash-top'><span>"+(test?"Tap the card to flip":"Browse all "+data.length)+"</span><span class='fc-count'>"+(c._idx+1)+" / "+data.length+"</span></div>"+
         "<div class='flash-card"+(test?"":" study")+"' id='flashCard'>"+inner+"</div>"+
-        (c.videoUrl ? "<a class='flash-vid' href='"+c.videoUrl+"' target='_blank' rel='noopener'>\u25b6 Watch these techniques on NHK World \u2197</a>" : "")+
         "<div class='flash-nav'><button class='btn ghost' id='flashPrev'>\u2039 Prev</button><button class='btn' id='flashNext'>Next \u203a</button></div>"+
       "</div>"+
       renderNavCta(i);
