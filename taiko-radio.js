@@ -361,14 +361,21 @@
     for (var i=0;i<eqBars.length;i++) { var r=Math.random(); var h=5 + r*r*12 + kick*(5+Math.random()*7); eqBars[i].style.height = Math.max(5,Math.min(20,h)).toFixed(1)+"px"; }
   }
 
-  /* ==== UI ==== */
-  var bar, nameEl, subEl, ppBtn, muteBtn, volInput, eqEl, tickInt=null;
+  /* ==== UI ====
+     Redesigned to live in the shared nav bar (gg-nav.js) instead of as its
+     own bar pinned to a corner of the page: a compact icon button sits in
+     the nav's account cluster, just left of the account button, with a
+     small "now playing" EQ that pulses whenever the radio is playing —
+     visible at a glance without taking up any real layout space. Clicking
+     it opens a lightweight popover (matching the site's existing chip →
+     panel pattern) with the actual transport controls. */
+  var wrap, btn, panel, nameEl, subEl, ppBtn, muteBtn, volInput, eqEl, tickInt=null, panelOpen=false;
   var VOL_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3l4.5 3.5v-12L7 9.5H4z" fill="currentColor" stroke="none"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></svg>';
   var MUTE_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3l4.5 3.5v-12L7 9.5H4z" fill="currentColor" stroke="none"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></svg>';
-  function setState(s) { if (bar) bar.dataset.state=s; if (ppBtn) ppBtn.textContent = (s==="playing"||s==="gap") ? "❚❚" : "▶"; }
+  function setState(s) { if (wrap) wrap.dataset.state=s; if (ppBtn) ppBtn.textContent = (s==="playing"||s==="gap") ? "❚❚" : "▶"; }
   function fmt(ms){ ms=Math.max(0,ms); var s=Math.round(ms/1000); return Math.floor(s/60)+":"+String(s%60).padStart(2,"0"); }
   function tickNow() {
-    if (!bar) return;
+    if (!wrap) return;
     if (playing && song && songTotalMs) {
       var t = performance.now() - songT0, bar2 = song.spm*15000/song.bpm, cum=0, cur="";
       for (var i=0;i<song.sections.length;i++){ var sec=song.sections[i]; var st=cum*bar2, en=(cum+sec.bars)*bar2; if (t>=st && t<en) cur=sec.type; cum+=sec.bars; }
@@ -376,77 +383,83 @@
       if (subEl) subEl.textContent = song.sig + " · " + (cur?cur+" · ":"") + fmt(t) + " / " + fmt(songTotalMs);
     }
   }
+  function setPanelOpen(v) {
+    panelOpen = v;
+    if (panel) panel.classList.toggle("open", v);
+    if (btn) btn.setAttribute("aria-expanded", String(v));
+  }
 
   function buildUI() {
     var css = document.createElement("style");
     css.textContent =
-      ".tkr{position:fixed;left:14px;bottom:14px;z-index:70;display:flex;align-items:center;gap:9px;" +
-        "padding:8px 12px 8px 8px;border-radius:99px;background:rgba(24,20,17,.86);border:1px solid #3a312b;" +
-        "box-shadow:0 10px 30px rgba(0,0,0,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);" +
-        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#f3ece4;user-select:none;max-width:calc(100vw - 28px)}" +
-      ".tkr button,.tkr a{font:inherit;border:0;background:none;color:inherit;cursor:pointer;display:grid;place-items:center}" +
-      ".tkr-pp{flex:none;width:38px;height:38px;border-radius:50%;background:#e0472c;color:#fff;font-size:14px;transition:.12s}" +
-      ".tkr-pp:hover{background:#ff6a4d}" +
-      ".tkr[data-state='playing'] .tkr-pp,.tkr[data-state='gap'] .tkr-pp{background:#e6b453;color:#241c10}" +
-      ".tkr-eq{flex:none;display:flex;gap:2px;align-items:flex-end;height:20px;width:20px}" +
-      ".tkr-eq i{width:3px;background:#6b5a4c;border-radius:2px;height:5px;transition:height .1s ease,background .1s ease}" +
-      ".tkr[data-state='playing'] .tkr-eq i{background:#ff6a4d}" +
-      ".tkr-meta{min-width:0;display:flex;flex-direction:column;line-height:1.15;margin-right:2px}" +
-      ".tkr-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px}" +
-      ".tkr-sub{font-size:10px;color:#a8998c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}" +
-      ".tkr-ico{flex:none;width:30px;height:30px;border-radius:50%;font-size:15px;color:#d8c8ba}" +
-      ".tkr-ico:hover{background:rgba(255,255,255,.08);color:#fff}" +
-      ".tkr-vol{flex:none;width:74px;height:4px;-webkit-appearance:none;appearance:none;background:#4a3f37;border-radius:4px;cursor:pointer}" +
-      ".tkr-vol::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#e6b453;cursor:pointer}" +
-      ".tkr-vol::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:#e6b453;cursor:pointer}" +
-      ".tkr-make{flex:none;width:30px;height:30px;border-radius:50%;font-size:16px;color:#e6b453;text-decoration:none}" +
-      ".tkr-make:hover{background:rgba(230,180,83,.16)}" +
-      ".tkr-toggle{flex:none;width:30px;height:30px;border-radius:50%;font-size:16px;color:#a8998c}" +
-      ".tkr-toggle:hover{background:rgba(255,255,255,.08);color:#fff}" +
-      ".tkr.collapsed{padding:8px}" +
-      ".tkr.collapsed .tkr-eq,.tkr.collapsed .tkr-meta,.tkr.collapsed .tkr-next,.tkr.collapsed .tkr-mute,.tkr.collapsed .tkr-vol,.tkr.collapsed .tkr-make{display:none}" +
-      "@media (max-width:640px){.tkr-vol{display:none}.tkr-name{max-width:130px}.tkr-sub{max-width:100px}}";
+      ".ggr{position:relative;flex:none;display:flex;align-items:center}" +
+      ".ggr-btn{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid #39404f;background:rgba(255,255,255,.03);" +
+        "color:#c7cbd9;cursor:pointer;display:grid;place-items:center;padding:0;transition:color .15s,border-color .15s,background .15s}" +
+      ".ggr-btn:hover{color:#e0a23a;border-color:#e0a23a}" +
+      ".ggr[data-state='playing'] .ggr-btn,.ggr[data-state='gap'] .ggr-btn{color:#e0a23a;border-color:#e0a23a}" +
+      ".ggr-eq{display:flex;gap:2.5px;align-items:flex-end;height:14px}" +
+      ".ggr-eq i{width:2.5px;background:currentColor;border-radius:2px;height:4px;transition:height .1s ease}" +
+      ".ggr-panel{position:absolute;top:calc(100% + 10px);right:0;z-index:950;width:min(272px,calc(100vw - 24px));" +
+        "background:#14161d;border:1px solid #2a2d38;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.5);" +
+        "padding:16px;display:none;font-family:\"Zen Maru Gothic\",\"Potta One\",system-ui,sans-serif;color:#e9eaf0}" +
+      ".ggr-panel.open{display:block}" +
+      ".ggr-panel__head{margin-bottom:14px}" +
+      ".ggr-name{display:block;font-weight:700;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+      ".ggr-sub{display:block;font-size:.76rem;color:#878da0;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+      ".ggr-controls{display:flex;align-items:center;gap:8px}" +
+      ".ggr-controls button{font:inherit;border:0;cursor:pointer}" +
+      ".ggr-pp{flex:none;width:38px;height:38px;border-radius:50%;background:#e0a23a;color:#141620;font-size:13px;display:grid;place-items:center;transition:filter .12s}" +
+      ".ggr-pp:hover{filter:brightness(1.08)}" +
+      ".ggr-ico{flex:none;width:32px;height:32px;border-radius:50%;background:none;color:#c3c8d4;display:grid;place-items:center}" +
+      ".ggr-ico:hover{background:rgba(255,255,255,.08);color:#e9eaf0}" +
+      ".ggr-vol{flex:1 1 auto;min-width:0;height:4px;-webkit-appearance:none;appearance:none;background:#2a2d38;border-radius:4px;cursor:pointer}" +
+      ".ggr-vol::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:#e0a23a;cursor:pointer}" +
+      ".ggr-vol::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:#e0a23a;cursor:pointer}" +
+      ".ggr-make{display:block;margin-top:14px;font-size:.78rem;color:#878da0;text-decoration:none}" +
+      ".ggr-make:hover{color:#e0a23a}" +
+      "@media (max-width:430px){.ggr-btn{width:34px;height:34px}}";
     document.head.appendChild(css);
 
-    bar = document.createElement("div");
-    bar.className = "tkr"; bar.setAttribute("role","group"); bar.setAttribute("aria-label","Taiko radio");
-    bar.innerHTML =
-      '<button class="tkr-pp" title="Play / stop radio" aria-label="Play or stop">▶</button>' +
-      '<div class="tkr-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>' +
-      '<div class="tkr-meta"><span class="tkr-name">Taiko Radio</span><span class="tkr-sub">starting…</span></div>' +
-      '<button class="tkr-ico tkr-next" title="Next song" aria-label="Next song">⏭</button>' +
-      '<button class="tkr-ico tkr-mute" title="Mute" aria-label="Mute">'+VOL_SVG+'</button>' +
-      '<input class="tkr-vol" type="range" min="0" max="100" title="Volume" aria-label="Volume">' +
-      '<a class="tkr-make" href="taiko.html" title="Create a loop in the constructor" aria-label="Create a loop">＋</a>' +
-      '<button class="tkr-toggle" title="Collapse player" aria-label="Collapse player" aria-expanded="true">‹</button>';
-    document.body.appendChild(bar);
+    wrap = document.createElement("div");
+    wrap.className = "ggr"; wrap.id = "ggRadio";
+    wrap.innerHTML =
+      '<button type="button" class="ggr-btn" id="ggrBtn" aria-haspopup="true" aria-expanded="false" title="Taiko Radio" aria-label="Taiko Radio">' +
+        '<span class="ggr-eq" aria-hidden="true"><i></i><i></i><i></i></span>' +
+      '</button>' +
+      '<div class="ggr-panel" id="ggrPanel" role="dialog" aria-label="Taiko Radio">' +
+        '<div class="ggr-panel__head"><span class="ggr-name">Taiko Radio</span><span class="ggr-sub">starting…</span></div>' +
+        '<div class="ggr-controls">' +
+          '<button type="button" class="ggr-pp" title="Play / stop radio" aria-label="Play or stop">▶</button>' +
+          '<button type="button" class="ggr-ico ggr-next" title="Next song" aria-label="Next song">⏭</button>' +
+          '<button type="button" class="ggr-ico ggr-mute" title="Mute" aria-label="Mute">'+VOL_SVG+'</button>' +
+          '<input class="ggr-vol" type="range" min="0" max="100" title="Volume" aria-label="Volume">' +
+        '</div>' +
+        '<a class="ggr-make" href="taiko.html">Create your own loop →</a>' +
+      '</div>';
 
-    nameEl = bar.querySelector(".tkr-name"); subEl = bar.querySelector(".tkr-sub");
-    ppBtn = bar.querySelector(".tkr-pp"); muteBtn = bar.querySelector(".tkr-mute");
-    eqEl = bar.querySelector(".tkr-eq"); volInput = bar.querySelector(".tkr-vol");
+    // Mount into the shared nav's account cluster, just left of the account
+    // button — falling back to a body-level append if the nav isn't there
+    // (defensive only; on every real page gg-nav.js runs synchronously
+    // near the top of <body>, well before this deferred script fires).
+    var right = document.querySelector("#gg-nav .ggn-right");
+    var acct = right && right.querySelector(".ggn-acct");
+    if (right) { if (acct) right.insertBefore(wrap, acct); else right.insertBefore(wrap, right.firstChild); }
+    else document.body.appendChild(wrap);
+
+    btn = wrap.querySelector("#ggrBtn"); panel = wrap.querySelector("#ggrPanel");
+    nameEl = wrap.querySelector(".ggr-name"); subEl = wrap.querySelector(".ggr-sub");
+    ppBtn = wrap.querySelector(".ggr-pp"); muteBtn = wrap.querySelector(".ggr-mute");
+    eqEl = wrap.querySelector(".ggr-eq"); volInput = wrap.querySelector(".ggr-vol");
     volInput.value = Math.round(prefs.vol*100); reflectMute();
 
+    btn.addEventListener("click", function (e) { e.stopPropagation(); setPanelOpen(!panelOpen); });
+    document.addEventListener("click", function (e) { if (panelOpen && !e.target.closest("#ggRadio")) setPanelOpen(false); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && panelOpen) setPanelOpen(false); });
+
     ppBtn.addEventListener("click", toggle);
-    bar.querySelector(".tkr-next").addEventListener("click", next);
+    wrap.querySelector(".ggr-next").addEventListener("click", next);
     muteBtn.addEventListener("click", function () { prefs.muted=!prefs.muted; savePrefs(); applyGain(); reflectMute(); });
     volInput.addEventListener("input", function () { prefs.vol=(+volInput.value)/100; if (prefs.vol>0 && prefs.muted){ prefs.muted=false; reflectMute(); } savePrefs(); applyGain(); });
-
-    // Collapse control: on thin/mobile widths the full bar covers page content,
-    // so it auto-collapses to a compact play + chevron puck. The chevron toggles
-    // it manually; once the user taps it, we stop auto-managing on resize.
-    var toggleBtn = bar.querySelector(".tkr-toggle");
-    var userToggledTkr = false;
-    function setTkrCollapsed(v){
-      bar.classList.toggle("collapsed", v);
-      toggleBtn.textContent = v ? "\u203a" : "\u2039";   // › expand  /  ‹ collapse
-      toggleBtn.title = v ? "Expand player" : "Collapse player";
-      toggleBtn.setAttribute("aria-label", v ? "Expand player" : "Collapse player");
-      toggleBtn.setAttribute("aria-expanded", v ? "false" : "true");
-    }
-    function autoTkrCollapse(){ if (!userToggledTkr) setTkrCollapsed(window.innerWidth <= 560); }
-    toggleBtn.addEventListener("click", function () { userToggledTkr = true; setTkrCollapsed(!bar.classList.contains("collapsed")); });
-    window.addEventListener("resize", autoTkrCollapse);
-    autoTkrCollapse();
 
     tickInt = setInterval(tickNow, 400);
   }
