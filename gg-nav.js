@@ -39,8 +39,8 @@
       }).join("") +
       '</div>' +
       '<div class="ggn-right">' +
-        '<div class="ggn-acct"></div>' +
         '<button type="button" class="ggn-help" id="ggnHelp" aria-label="Help & feedback" title="Help & feedback">?</button>' +
+        '<div class="ggn-acct"></div>' +
       '</div>' +
       '</div>';
     document.body.insertBefore(nav, document.body.firstChild);

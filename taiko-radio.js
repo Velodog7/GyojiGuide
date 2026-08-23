@@ -437,13 +437,13 @@
         '<a class="ggr-make" href="taiko.html">Create your own loop →</a>' +
       '</div>';
 
-    // Mount into the shared nav's account cluster, just left of the account
-    // button — falling back to a body-level append if the nav isn't there
-    // (defensive only; on every real page gg-nav.js runs synchronously
-    // near the top of <body>, well before this deferred script fires).
+    // Mount into the shared nav's account cluster, as the leftmost item —
+    // adjacent to the help ("?") button — falling back to a body-level
+    // append if the nav isn't there (defensive only; on every real page
+    // gg-nav.js runs synchronously near the top of <body>, well before
+    // this deferred script fires).
     var right = document.querySelector("#gg-nav .ggn-right");
-    var acct = right && right.querySelector(".ggn-acct");
-    if (right) { if (acct) right.insertBefore(wrap, acct); else right.insertBefore(wrap, right.firstChild); }
+    if (right) right.insertBefore(wrap, right.firstChild);
     else document.body.appendChild(wrap);
 
     btn = wrap.querySelector("#ggrBtn"); panel = wrap.querySelector("#ggrPanel");
