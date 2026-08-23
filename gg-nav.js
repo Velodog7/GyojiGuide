@@ -168,6 +168,20 @@
     '.ggh-status{min-height:18px;font-size:.83rem;margin-top:10px;color:#878da0}' +
     '.ggh-status.err{color:#f0655a}.ggh-status.ok{color:#43c08a}' +
     '.ggh-note{font-size:.78rem;color:#878da0;margin:-4px 0 12px}' +
+    /* welcome tour (first-visit "how to use" modal) — reuses .ggh-ov/.ggh-modal/.ggh-x/.ggh-title/.ggh-send */
+    '.ggw-dots{display:flex;gap:6px;margin-bottom:14px}' +
+    '.ggw-dot{width:7px;height:7px;border-radius:50%;background:#2a2d38}' +
+    '.ggw-dot.on{background:#e0a23a}' +
+    '.ggw-body{color:#b6bccb;font-size:.95rem;line-height:1.6;margin:0 0 22px}' +
+    '.ggw-nav{display:flex;align-items:center;justify-content:space-between;gap:10px}' +
+    '.ggw-back{background:none;border:1px solid #2a2d38;color:#c3c8d4;font:inherit;font-size:.85rem;padding:11px 16px;border-radius:9px;cursor:pointer}' +
+    '.ggw-back:hover{border-color:#e0a23a;color:#e0a23a}' +
+    '.ggw-next,.ggw-finish{width:auto;padding:11px 22px}' +
+    '.ggw-skip{display:block;margin:14px auto 0;background:none;border:0;color:#5c6272;font:inherit;font-size:.78rem;cursor:pointer;text-decoration:underline}' +
+    '.ggw-skip:hover{color:#878da0}' +
+    '.ggw-replay{width:100%;background:none;border:1px solid #2a2d38;color:#c3c8d4;font:inherit;font-size:.85rem;' +
+      'padding:11px;border-radius:9px;cursor:pointer;margin-bottom:16px}' +
+    '.ggw-replay:hover{border-color:#e0a23a;color:#e0a23a}' +
     /* shared loading spinner — site-wide (see spinner.html). Block form fills any
        positioned container (position:relative + height); inline form (.gg-spin)
        sits next to status text. */
@@ -195,14 +209,17 @@
 
   /* ============ Help & feedback modal ============ */
   var FAQ = [
-    { q: "What is Sumo Slapdown?", a: "A fantasy sumo playground: draft a stable of wrestlers, run tournament simulations, and dig into per-rikishi analysis for each basho." },
-    { q: "What do Welcome, Analysis, Simulation and Fantasy do?", a: "Welcome shows the full banzuke as an Edo crowd. Analysis is the per-rikishi guide and stats. Simulation is the Elo-based tournament forecast. Fantasy is where you draft a team and run leagues." },
-    { q: "How do I draft a team?", a: "Open Fantasy, sign in, then pick one wrestler for each roster bracket. Your picks save to your account automatically." },
-    { q: "Do I stay signed in across the site?", a: "Yes \u2014 sign in once from the account button at the top-right and your account and team follow you on every page." },
+    { q: "What is Sumo Slap Down?", a: "A fantasy sumo hub built for sumo-obsessed friends and family: analyze every rikishi, simulate the tournament, and run private fantasy leagues \u2014 all built around the real, current banzuke." },
+    { q: "What's on each page?", a: "About has the Welcome banzuke crowd, a Learn tab that teaches the sport (with a quiz), and Resources for sumo creators and shows worth following. Analysis is the deep dive: browse and compare rikishi, a health watch, a practice mock draft, sortable analytics, and tier lists. Simulation lets you build a team and run a day-by-day Elo tournament forecast, saved right in your browser \u2014 no sign-in needed. Fantasy is where you sign in, join the public league or start a private one, and draft a real team against other people." },
+    { q: "What's the difference between the Analysis mock draft and a Fantasy draft?", a: "The Mock Draft tab on Analysis is a private practice run \u2014 no sign-in, saved locally, just for trying out picks. A Fantasy draft is the real thing: you sign in, join a league, and draft against actual people (Keepers leagues even get their own practice mock draft before the live one)." },
+    { q: "How do fantasy leagues work?", a: "Sign in on Fantasy to join the public Sumo Slap Down League or start a private one. Classic leagues let everyone build their roster by hand; Keepers leagues run one live snake draft with persistent rosters, trades, and waivers between bashos. Every league gets its own message board for members." },
+    { q: "Do I stay signed in across the site?", a: "Yes \u2014 sign in once from the account button at the top-right and your account, team, and leagues follow you on every page. From there you can also customize your mawashi avatar and send other players a direct message." },
     { q: "Is the data live?", a: "Rankings and records refresh from the current banzuke via sumo-api when it's reachable; otherwise the site shows the last bundled data." }
   ];
   var HTABS = [
     { id: "faq",        label: "FAQ" },
+    { id: "resources",  label: "Resources" },
+    { id: "community",  label: "Community" },
     { id: "suggestion", label: "Suggestion" },
     { id: "bug",        label: "Report a bug" },
     { id: "abuse",      label: "Report a user" },
@@ -264,10 +281,23 @@
           return '<div class="ggh-q" data-q="'+i+'"><button type="button"><span>'+hesc(f.q)+'</span><span class="ico">+</span></button>'+
                  '<div class="ggh-a"><div>'+hesc(f.a)+'</div></div></div>';
         }).join("") + '</div>' +
+        '<button type="button" class="ggw-replay">Replay the welcome tour</button>'+
         '<span class="ggh-lab">Ask a new question</span>'+
         '<textarea class="ggh-ta" id="fqMsg" placeholder="What would you like to know?"></textarea>'+
         '<button type="button" class="ggh-send" data-kind="faq">Send question</button>'+
         '<div class="ggh-status"></div>';
+    } else if (htab === "resources"){
+      body =
+        '<p class="ggh-note">Sumo Slapdown runs on live rankings, records, and banzuke data pulled straight from <strong>sumo-api</strong> — a free, open API for sumo data. This site simply wouldn’t exist without it. A special thank you to the people building and maintaining it.</p>'+
+        '<span class="ggh-lab">Check it out</span>'+
+        '<a href="https://www.sumo-api.com/" target="_blank" rel="noopener" '+
+          'style="display:inline-flex;align-items:center;justify-content:center;padding:12px 18px;border-radius:9px;background:var(--sun,#d8b25a);color:#141620;font-weight:700;text-decoration:none;margin-top:6px;font-size:.95rem">'+
+          'Visit sumo-api.com</a>';
+    } else if (htab === "community"){
+      body =
+        '<p class="ggh-note">Sumo Slapdown is meant to be fun for everyone — fair play and good sportsmanship apply here just like they do in the ring.</p>'+
+        '<p class="ggh-note">Any inappropriate behavior will be met with a swift warning from the Slap Down Association, followed by the resignation of your user data for repeat offenders.</p>'+
+        '<p class="ggh-note">Have a concern about another user? Use the <strong>Report a user</strong> tab, or reach us directly on <strong>Contact</strong>.</p>';
     } else if (htab === "suggestion"){
       body =
         '<span class="ggh-lab">Subject (optional)</span><input class="ggh-in" id="sgSub" maxlength="160" placeholder="A short summary">'+
@@ -298,12 +328,14 @@
     hmodal.innerHTML =
       '<button class="ggh-x" aria-label="Close">\u2715</button>'+
       '<h2 class="ggh-title">Help &amp; feedback</h2>'+
-      '<p class="ggh-sub">Browse the FAQ, ask a question, suggest an idea, report a bug, flag a user, or email us directly.</p>'+
+      '<p class="ggh-sub">Browse the FAQ, see who makes this possible, check the community guidelines, suggest an idea, report a bug, flag a user, or email us directly.</p>'+
       '<div class="ggh-tabs">'+HTABS.map(function(t){ return '<button type="button" class="ggh-tab'+(t.id===htab?" on":"")+'" data-tab="'+t.id+'">'+t.label+'</button>'; }).join("")+'</div>'+
       '<div id="gghBody">'+body+'</div>';
 
     hmodal.querySelector(".ggh-x").onclick = closeHelp;
     hmodal.querySelectorAll(".ggh-tab").forEach(function(b){ b.onclick = function(){ htab = b.dataset.tab; renderHelp(); }; });
+    var replay = hmodal.querySelector(".ggw-replay");
+    if (replay) replay.onclick = function(){ closeHelp(); openTour(true); };
     // FAQ accordions
     hmodal.querySelectorAll(".ggh-q>button").forEach(function(b){
       b.onclick = function(){
@@ -331,6 +363,52 @@
   function openHelp(){ ensureHelp(); if (!htab) htab = "faq"; renderHelp(); hov.classList.add("open"); document.body.style.overflow = "hidden"; }
   window.GGHelp = { open: openHelp, close: closeHelp };
 
+  /* ============ Welcome tour (first-visit "how to use" modal) ============ */
+  var TOUR = [
+    { title: "Welcome to Sumo Slap Down",
+      body: "A fantasy sumo hub built on real rankings and live tournament data — draft rikishi, simulate the basho, and go head-to-head with friends. Here’s a quick look at what’s on each page — you can replay this anytime from the FAQ tab in the ❓ menu." },
+    { title: "About",
+      body: "See the current banzuke laid out as a full Edo-style crowd, learn the sport from scratch in the Learn tab (rules, ranks, and a quiz), and check Resources for sumo creators and shows worth following." },
+    { title: "Analysis",
+      body: "Browse and compare every rikishi’s stats and health status, try a private practice mock draft, sort the full analytics table, and build your own tier lists." },
+    { title: "Simulation",
+      body: "Build a team and run a day-by-day Elo-based forecast of the whole tournament — saved right in your browser, no sign-in needed." },
+    { title: "Fantasy",
+      body: "Sign in to join the public league or start a private one. Classic lets everyone build their own roster; Keepers runs a live snake draft with trades and waivers between bashos. Every league gets its own message board, and your team follows you across the site." },
+    { title: "You’re ready",
+      body: "That’s the whole site. Questions, ideas, or something to report? The ❓ button in the corner has FAQs and ways to reach us." }
+  ];
+  var wov = null, wmodal = null, tstep = 0;
+  function ensureTour(){
+    if (wov) return;
+    wov = document.createElement("div"); wov.className = "ggh-ov"; wov.id = "ggTourOverlay";
+    wmodal = document.createElement("div"); wmodal.className = "ggh-modal";
+    wov.appendChild(wmodal); document.body.appendChild(wov);
+    wov.addEventListener("click", function(e){ if (e.target === wov) closeTour(); });
+    document.addEventListener("keydown", function(e){ if (e.key === "Escape" && wov.classList.contains("open")) closeTour(); });
+  }
+  function closeTour(){ if (wov){ wov.classList.remove("open"); document.body.style.overflow = ""; } }
+  function renderTour(){
+    var s = TOUR[tstep], first = tstep === 0, last = tstep === TOUR.length - 1;
+    wmodal.innerHTML =
+      '<button class="ggh-x" aria-label="Close">✕</button>'+
+      '<div class="ggw-dots">'+TOUR.map(function(_, i){ return '<span class="ggw-dot'+(i === tstep ? " on" : "")+'"></span>'; }).join("")+'</div>'+
+      '<h2 class="ggh-title">'+hesc(s.title)+'</h2>'+
+      '<p class="ggw-body">'+hesc(s.body)+'</p>'+
+      '<div class="ggw-nav">'+
+        (first ? '<span></span>' : '<button type="button" class="ggw-back">Back</button>')+
+        (last ? '<button type="button" class="ggh-send ggw-finish">Let’s go</button>' : '<button type="button" class="ggh-send ggw-next">Next</button>')+
+      '</div>'+
+      (last ? '' : '<button type="button" class="ggw-skip">Skip tour</button>');
+    wmodal.querySelector(".ggh-x").onclick = closeTour;
+    var back = wmodal.querySelector(".ggw-back"); if (back) back.onclick = function(){ tstep = Math.max(0, tstep - 1); renderTour(); };
+    var next = wmodal.querySelector(".ggw-next"); if (next) next.onclick = function(){ tstep = Math.min(TOUR.length - 1, tstep + 1); renderTour(); };
+    var fin = wmodal.querySelector(".ggw-finish"); if (fin) fin.onclick = closeTour;
+    var skip = wmodal.querySelector(".ggw-skip"); if (skip) skip.onclick = closeTour;
+  }
+  function openTour(reset){ ensureTour(); if (reset) tstep = 0; renderTour(); wov.classList.add("open"); document.body.style.overflow = "hidden"; }
+  window.GGTour = { open: function(){ openTour(true); }, close: closeTour };
+
   /* fire-and-forget pageview beacon for the admin dashboard's analytics tab.
      One anonymous id per browser (localStorage), never tied to an account.
      Also reports the browser's own IANA timezone (no permission prompt,
@@ -351,6 +429,18 @@
     } catch (e) {}
   }
 
+  /* show the welcome tour once per browser, the first time they land on
+     the site — never again after that, even on other pages, unless they
+     replay it themselves from the FAQ tab. */
+  function maybeAutoTour() {
+    var KEY = "gg.seenTour";
+    try {
+      if (localStorage.getItem(KEY)) return;
+      localStorage.setItem(KEY, "1");
+    } catch (e) { return; }   // storage unavailable — skip rather than risk showing every visit
+    setTimeout(function(){ openTour(true); }, 500);
+  }
+
   function mount() {
     ensureFont();
     var st = document.createElement("style");
@@ -359,6 +449,7 @@
     document.head.appendChild(st);
     build();
     trackPageview();
+    maybeAutoTour();
   }
   // Mount as soon as <body> exists rather than waiting for DOMContentLoaded.
   // The gg-nav script sits at the top of <body>, so building now inserts the
