@@ -80,6 +80,19 @@ main{ max-width:var(--maxw); margin:0 auto; padding:24px 20px 80px }
 .stat-card .v{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.7rem; margin-top:4px }
 .stat-card .v.small{ font-size:1.1rem }
 
+/* ---------- weekly trend chart ---------- */
+.wk-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; margin-bottom:18px }
+.wk-card-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px }
+.wk-card-head h3{ font-family:"Zen Maru Gothic",sans-serif; font-size:1rem; margin:0 }
+.wk-chart{ display:flex; align-items:flex-end; gap:10px; height:130px }
+.wk-bar{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:6px }
+.wk-bar .track{ width:100%; max-width:34px; flex:1; display:flex; align-items:flex-end; background:var(--surface-2); border-radius:6px 6px 2px 2px; overflow:hidden }
+.wk-bar .fill{ width:100%; background:var(--sun); border-radius:6px 6px 0 0; min-height:2px; transition:height .3s ease }
+.wk-bar.zero .fill{ background:var(--line-2) }
+.wk-bar .val{ font-family:"WDXL Lubrifont TC",monospace; font-size:.72rem; color:var(--dim) }
+.wk-bar .lab{ font-size:.68rem; color:var(--muted); white-space:nowrap }
+.wk-bar.this-week .val{ color:var(--sun) }
+
 .badge{ display:inline-flex; align-items:center; gap:6px; font-family:"WDXL Lubrifont TC",monospace; font-size:0.85rem; font-weight:600; padding:4px 10px; border-radius:999px }
 .badge .dot{ width:7px; height:7px; border-radius:50% }
 .badge.up{ color:var(--up); background:rgba(67,192,138,.14) }
@@ -243,11 +256,27 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
         <div class="stat-card"><div class="k">Pageviews · last 7 days</div><div class="v" id="pv7Total">—</div></div>
         <div class="stat-card"><div class="k">Unique · last 7 days</div><div class="v" id="pv7Unique">—</div></div>
       </div>
+
+      <div class="wk-card">
+        <div class="wk-card-head">
+          <h3>Weekly pageviews</h3>
+          <span class="v-sub" style="margin:0">Last 8 weeks, Monday-start</span>
+        </div>
+        <div class="wk-chart" id="wkChart"></div>
+      </div>
+
       <div class="tbl-wrap">
         <table>
           <thead><tr><th>Page</th><th class="num">Total views</th><th class="num">Unique visitors</th></tr></thead>
           <tbody id="pvTable"><tr class="load-row"><td colspan="3"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr></tbody>
         </table>
+      </div>
+
+      <div class="card" style="max-width:480px">
+        <h3>Reset analytics</h3>
+        <p class="v-sub" style="margin:0 0 12px">Permanently deletes every recorded pageview — total, unique, and weekly counts all go back to 0. Can&#8217;t be undone.</p>
+        <button class="btn danger" id="resetAnalyticsBtn">Reset all analytics to 0</button>
+        <div id="resetAnalyticsMsg" style="margin-top:10px;font-size:.9rem"></div>
       </div>
     </section>
 
@@ -478,6 +507,25 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
   };
 
   /* ---------- analytics ---------- */
+  function wkLabel(iso){
+    var t = Date.parse(iso + "T00:00:00Z");
+    if (isNaN(t)) return iso;
+    return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  }
+  function renderWeeklyChart(weeks){
+    var el = $("wkChart");
+    if (!weeks || !weeks.length){ el.innerHTML = ""; return; }
+    var max = Math.max(1, Math.max.apply(null, weeks.map(function(w){ return w.total; })));
+    var lastIdx = weeks.length - 1;
+    el.innerHTML = weeks.map(function(w, i){
+      var pct = Math.round((w.total / max) * 100);
+      return '<div class="wk-bar' + (w.total === 0 ? ' zero' : '') + (i === lastIdx ? ' this-week' : '') + '">'
+        + '<div class="val">' + w.total + '</div>'
+        + '<div class="track"><div class="fill" style="height:' + Math.max(pct, w.total ? 4 : 0) + '%"></div></div>'
+        + '<div class="lab">' + esc(wkLabel(w.weekStart)) + (i === lastIdx ? ' (this wk)' : '') + '</div>'
+        + '</div>';
+    }).join("");
+  }
   function loadAnalytics(res){
     var pv = res && res.pageviews;
     if (!pv) return;
@@ -485,11 +533,28 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     $("pvUnique").textContent = pv.unique;
     $("pv7Total").textContent = pv.last7Total;
     $("pv7Unique").textContent = pv.last7Unique;
+    renderWeeklyChart(pv.byWeek || []);
     var rows = (pv.byPage || []).map(function(p){
       return "<tr><td>" + esc(p.page) + "</td><td class=\"num\">" + p.total + "</td><td class=\"num\">" + p.unique + "</td></tr>";
     }).join("");
     $("pvTable").innerHTML = rows || '<tr class="empty-row"><td colspan="3">No pageviews recorded yet.</td></tr>';
   }
+  $("resetAnalyticsBtn").onclick = async function(){
+    var btn = $("resetAnalyticsBtn"), msg = $("resetAnalyticsMsg");
+    if (!confirm("Reset ALL site analytics to 0?\n\nThis permanently deletes every recorded pageview — total, unique, and weekly counts. It can’t be undone.")) return;
+    btn.disabled = true; msg.style.color = ""; msg.textContent = "Clearing…";
+    var res = await aPost("adminResetAnalytics");
+    btn.disabled = false;
+    if (res && res.ok){
+      msg.style.color = "#5fd08a";
+      msg.textContent = "Done — cleared " + (res.clearedRows || 0) + " recorded pageview" + (res.clearedRows === 1 ? "" : "s") + ". Back to 0.";
+      var fresh = await aPost("adminStats");
+      if (fresh && fresh.ok) loadAnalytics(fresh);
+    } else {
+      msg.style.color = "#e0736a";
+      msg.textContent = (res && res.error) || "Couldn’t reset analytics — is the backend deployed?";
+    }
+  };
 
   /* ---------- users ---------- */
   function statusBadge(status){
