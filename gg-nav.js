@@ -429,18 +429,6 @@
     } catch (e) {}
   }
 
-  /* show the welcome tour once per browser, the first time they land on
-     the site — never again after that, even on other pages, unless they
-     replay it themselves from the FAQ tab. */
-  function maybeAutoTour() {
-    var KEY = "gg.seenTour";
-    try {
-      if (localStorage.getItem(KEY)) return;
-      localStorage.setItem(KEY, "1");
-    } catch (e) { return; }   // storage unavailable — skip rather than risk showing every visit
-    setTimeout(function(){ openTour(true); }, 500);
-  }
-
   function mount() {
     ensureFont();
     var st = document.createElement("style");
@@ -449,7 +437,6 @@
     document.head.appendChild(st);
     build();
     trackPageview();
-    maybeAutoTour();
   }
   // Mount as soon as <body> exists rather than waiting for DOMContentLoaded.
   // The gg-nav script sits at the top of <body>, so building now inserts the
