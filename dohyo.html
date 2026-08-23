@@ -894,6 +894,8 @@
   .menu select:hover{ border-color:var(--line2) }
   .ghost:disabled{ opacity:.35; cursor:not-allowed }
   .ghost .ico{ font-style:normal; font-weight:700 }
+  .ghost.is-active{ color:var(--sun) }
+  #speed .ico{ font-size:12px; letter-spacing:.02em; min-width:24px; display:inline-block; text-align:center }
   .ghost .lbl{ margin-left:.4em }
 
   /* compact — the strapline goes, the actions keep just their glyphs */
@@ -1540,6 +1542,7 @@
         <button class="ghost" id="play" title="Play"><i class="ico">▶</i><span class="lbl">Play</span></button>
         <button class="ghost" id="nextBout" title="Next bout"><i class="ico">⏭</i></button>
         <button class="ghost" id="replayBout" title="Replay this bout"><i class="ico">↺</i></button>
+        <button class="ghost" id="speed" title="Playback speed — click to cycle"><i class="ico" id="speedIco">1×</i></button>
       </div>
       <ol class="menu__steps" id="setupSteps" aria-label="Setup progress"></ol>
       <button class="menu__go" id="setupGo" disabled>Enter the dohyō</button>
@@ -1717,6 +1720,7 @@ let division = "makuuchi";     // the one on screen — and the one Play runs
 let current  = null;           // {div, i}
 let suspense = false;          // during playback: matchup up, result held back
 let playing  = false;
+let simSpeed = 1;              // pace multiplier: 1 = normal, 2 = 0.5x (slower), 0.5 = 2x (faster)
 // which day/division pairs have been played through (so their results stay
 // visible on return). A day not in here starts blank and reveals bout-by-bout.
 const revealedDivs = new Set();
@@ -2015,7 +2019,7 @@ const endKachi = () => { clearTimeout(kachiT); kachi.classList.remove("on"); };
 const BOW_WAIT = 520, BOW_MS = 1600, EXIT_MS = 500, AWARD_MS = 1000;   // must match the CSS
 let bowT = null, rites = [];
 const clearRites = () => { rites.forEach(clearTimeout); rites = []; };
-const then = (ms, fn) => rites.push(setTimeout(fn, ms));
+const then = (ms, fn) => rites.push(setTimeout(fn, Math.round(ms * simSpeed)));
 
 function bowOff(winner){
   for (const side of ["east", "west"]) {
@@ -2095,6 +2099,7 @@ const replayBtn = document.getElementById("replayBout");
 let paused = false;
 const liveWaits = new Set();
 function wait(ms){
+  ms = Math.round(ms * simSpeed);
   return new Promise(resolve => {
     const w = { remaining: ms, resolve, timer: null, start: 0, done: false };
     w.tick = () => {
@@ -2393,6 +2398,17 @@ playBtn.onclick = () => togglePlay();
 prevBtn.onclick = () => prevBout();
 nextBtn.onclick = () => nextBout();
 replayBtn.onclick = () => replayBout();
+const SPEEDS = [ { lbl:"1×", f:1 }, { lbl:"2×", f:0.5 }, { lbl:"0.5×", f:2 } ];
+let speedIdx = 0;
+const speedBtn = document.getElementById("speed");
+if (speedBtn) speedBtn.onclick = () => {
+  speedIdx = (speedIdx + 1) % SPEEDS.length;
+  simSpeed = SPEEDS[speedIdx].f;
+  const ico = document.getElementById("speedIco");
+  if (ico) ico.textContent = SPEEDS[speedIdx].lbl;
+  speedBtn.classList.toggle("is-active", simSpeed !== 1);
+  speedBtn.title = "Playback speed: " + SPEEDS[speedIdx].lbl + " — click to cycle";
+};
 
 /* the yobidashi has the ring first: he calls east, then turns and calls west.
    Both names stay up for the bout — they only come down once it's decided. */
@@ -3672,7 +3688,7 @@ setupGo.onclick = () => enter();
 const ceremony = document.getElementById("ceremony");
 const cerCap   = document.getElementById("cerCap");
 let ceremonyOn = false;
-const cSleep = ms => new Promise(r => setTimeout(r, ms));
+const cSleep = ms => new Promise(r => setTimeout(r, Math.round(ms * simSpeed)));
 
 /* the full ring — wrestlers stand all the way around the dohyō at once, as a
    side does in the real dohyō-iri. Front rank nearest and largest, the back
