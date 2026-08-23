@@ -46,6 +46,7 @@ var SHEET_MEMBERS  = 'LeagueMembers';
 var SHEET_MESSAGES = 'Messages';
 var SHEET_LGTEAMS  = 'LeagueTeams';
 var SHEET_HISTORY   = 'TeamHistory';
+var SHEET_RANKINGS  = 'Rankings';
 var SHEET_ROSTERS  = 'KeeperRosters';
 var SHEET_PICKS    = 'DraftPicks';
 var SHEET_TRADES   = 'Trades';
@@ -112,7 +113,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-08-12-pin-reset-fix';
+var BACKEND_VERSION = '2026-08-23-region-redraft';
 
 /* ---------- one-time: build the tabs ---------- */
 function setup() {
@@ -129,11 +130,14 @@ function setup() {
   ensureSheet(ss, SHEET_MESSAGES, ['id', 'leagueId', 'handle', 'name', 'body', 'parentId', 'created']);
   ensureSheet(ss, SHEET_LGTEAMS, ['leagueId', 'handle', 'team', 'updated']);
   ensureSheet(ss, SHEET_HISTORY, ['handle', 'basho', 'team', 'score', 'wins', 'rows', 'savedAt']);
-  ensureSheet(ss, SHEET_ROSTERS, ['leagueId', 'handle', 'rikishi', 'division', 'acquiredVia', 'acquiredAt']);
+  ensureSheet(ss, SHEET_RANKINGS, ['handle', 'rankIdx', 'bashoCount', 'topStreak', 'lastBasho']);
+  var rosters = ensureSheet(ss, SHEET_ROSTERS, ['leagueId', 'handle', 'rikishi', 'division', 'acquiredVia', 'acquiredAt', 'slot']);
+  migrateRostersSlot(rosters);
   ensureSheet(ss, SHEET_PICKS, ['leagueId', 'pickIndex', 'round', 'phase', 'handle', 'rikishi', 'pickedAt']);
   ensureSheet(ss, SHEET_TRADES, ['id', 'leagueId', 'fromHandle', 'toHandle', 'offer', 'request', 'status', 'createdAt', 'resolvedAt']);
   ensureSheet(ss, SHEET_FEEDBACK, ['createdAt', 'kind', 'handle', 'subject', 'message', 'targetUser', 'page', 'status']);
-  ensureSheet(ss, SHEET_PAGEVIEWS, ['ts', 'page', 'visitorId']);
+  var pageviews = ensureSheet(ss, SHEET_PAGEVIEWS, ['ts', 'page', 'visitorId', 'tz']);
+  migratePageViewsV1(pageviews);  // upgrades a pre-regionality sheet (no tz column) in place
   ensureSheet(ss, SHEET_BOARD, ['id', 'handle', 'name', 'body', 'parentId', 'created', 'updated', 'editedByAdmin']);
   ensureSheet(ss, SHEET_BOARD_VOTES, ['msgId', 'handle', 'value', 'votedAt']);
   ensureSheet(ss, SHEET_DMS, ['id', 'fromHandle', 'fromName', 'toHandle', 'body', 'created', 'readByRecipient']);
@@ -201,6 +205,18 @@ function migrateLeaguesV2(sh) {
   }
 }
 
+// pre-regionality PageViews sheets had only [ts,page,visitorId]. Append the
+// 'tz' column (visitor's IANA timezone, e.g. "America/Los_Angeles") if
+// missing; existing rows just get a blank cell, which the admin dashboard's
+// region/time-of-day breakdowns read as "Unknown" / UTC.
+function migratePageViewsV1(sh) {
+  var lastCol = Math.max(3, sh.getLastColumn());
+  var head = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  if (String(head[3] || '').toLowerCase() !== 'tz') {
+    sh.getRange(1, 4).setValue('tz');
+  }
+}
+
 /* ---------- GET: hand back leaderboard data ---------- */
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'data';
@@ -256,6 +272,10 @@ function doPost(e) {
     if (body.action === 'makePick')      return json(makePick(body));
     if (body.action === 'proposeTrade')  return json(proposeTrade(body));
     if (body.action === 'respondTrade')  return json(respondTrade(body));
+    if (body.action === 'setActive')     return json(setActive(body));
+    if (body.action === 'openRedraft')   return json(openSupplementalDraft(body));
+    if (body.action === 'redraftState')  return json(redraftState(body.id));
+    if (body.action === 'redraftPick')   return json(redraftPick(body));
     if (body.action === 'addDrop')       return json(addDrop(body));
     if (body.action === 'deleteMessage')return json(deleteMessage(body));
     if (body.action === 'saveLeagueTeam') return json(saveLeagueTeam(body));
@@ -267,6 +287,7 @@ function doPost(e) {
     // Admin READS — moved here from doGet so the key rides in the POST body,
     // not the URL. adminGated() runs the gate and only calls the reader on pass.
     if (body.action === 'adminStats')     return json(adminGated(body.adminKey, adminStats));
+    if (body.action === 'adminResetAnalytics') return json(adminGated(body.adminKey, adminResetAnalytics));
     if (body.action === 'adminUsers')     return json(adminGated(body.adminKey, adminUsers));
     if (body.action === 'adminMessages')  return json(adminGated(body.adminKey, adminMessages));
     if (body.action === 'adminFeedback')  return json(adminGated(body.adminKey, adminFeedback));
@@ -281,6 +302,7 @@ function doPost(e) {
     if (body.action === 'adminDeleteUser')    return json(adminDeleteUser(body));
     if (body.action === 'requestPinReset')    return json(requestPinReset(body));
     if (body.action === 'adminPinResets')     return json(adminPinResets(body.adminKey));
+    if (body.action === 'adminApplyRanking')  return json(adminApplyRanking(body));
     if (body.action === 'adminResetPin')      return json(adminResetPin(body));
     if (body.action === 'adminDeleteMessage') return json(adminDeleteMessageFn(body));
     if (body.action === 'adminSetFeedbackStatus') return json(adminSetFeedbackStatus(body));
@@ -514,11 +536,13 @@ function readUsers() {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
   var v = sh.getDataRange().getValues();
   var out = [];
+  var ranks = rankBadgeMap_();
   for (var r = 1; r < v.length; r++) {
     if (!String(v[r][0]).trim()) continue;
     var team = {};
     try { team = JSON.parse(v[r][3] || '{}'); } catch (e) {}
-    out.push({ handle: String(v[r][0]), name: String(v[r][1] || v[r][0]), team: team, updated: String(v[r][4] || ''), avatar: String(v[r][5] || '') });
+    var rk = ranks[String(v[r][0]).toLowerCase()] || { idx:0, label:RANK_LADDER[0].label, div:RANK_LADDER[0].div };
+    out.push({ handle: String(v[r][0]), name: String(v[r][1] || v[r][0]), team: team, updated: String(v[r][4] || ''), avatar: String(v[r][5] || ''), rank: rk });
   }
   return out;
 }
@@ -1258,7 +1282,8 @@ function makePick(body){
     var nextIdx = L.draftPickIdx + 1;
     var nextTurn = draftTurn(L.draftOrder, L.rosterSize, nextIdx);
     var status = nextTurn.phase === 'done' ? 'complete' : 'active';
-    sh_(SHEET_LEAGUES).getRange(L.row, 8, 1, 3).setValues([[status, nextIdx, nextTurn.phase]]);
+    sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue(status);                                 // draftStatus (col 8)
+    sh_(SHEET_LEAGUES).getRange(L.row, 10, 1, 2).setValues([[nextIdx, nextTurn.phase]]);     // draftPickIdx (10) + draftPhase (11); leave draftOrder (col 9) intact
     return { ok:true, nextTurn:nextTurn, draftStatus:status };
   } finally { lock.releaseLock(); }
 }
@@ -1269,11 +1294,44 @@ function keeperRostersOf(id){
     if (String(v[r][0]) !== String(id)) continue;
     var h = String(v[r][1]||''); if (!h) continue;
     var key = h.toLowerCase();
-    if (!out[key]) out[key] = { makuuchi:[], juryo:[] };
+    if (!out[key]) out[key] = { makuuchi:[], juryo:[], active:[] };
     var div = String(v[r][3]||'').toLowerCase() === 'juryo' ? 'juryo' : 'makuuchi';
-    out[key][div].push(String(v[r][2]));
+    var name = String(v[r][2]);
+    out[key][div].push(name);
+    var slot = String(v[r][6]||'').toLowerCase();
+    if (slot === 'active' || (slot === '' && div === 'makuuchi')) out[key].active.push(name);   // default: Makuuchi starts active
   }
   return out;
+}
+/* migration for older KeeperRosters sheets (no 'slot' column) */
+function migrateRostersSlot(sh){
+  var lastCol = Math.max(6, sh.getLastColumn());
+  var head = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  if (String(head[6] || '').toLowerCase() !== 'slot') sh.getRange(1, 7).setValue('slot');
+}
+/* Set a team's active lineup (which owned wrestlers score). Capped at the
+   league's rosterSize; locked once a tournament starts. Anything owned that
+   isn't listed active is benched. */
+function setActive(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.mode !== 'keepers' || L.draftStatus !== 'complete') return { ok:false, error:'Set your lineup once the keeper draft is complete.' };
+  if (tournamentActive()) return { ok:false, error:'Lineups are locked once the tournament starts.' };
+  var cap = Number(L.rosterSize) || 6;
+  var wanted = {}; (Array.isArray(body.active) ? body.active : []).forEach(function(n){ wanted[String(n).toLowerCase()] = 1; });
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = sh_(SHEET_ROSTERS), v = sh.getDataRange().getValues(), key = u.handle.toLowerCase();
+    var mine = [];
+    for (var r=1;r<v.length;r++){
+      if (String(v[r][0])!==String(L.id) || String(v[r][1]||'').toLowerCase()!==key) continue;
+      mine.push({ row:r+1, active: !!wanted[String(v[r][2]||'').toLowerCase()] });
+    }
+    var nActive = mine.filter(function(m){ return m.active; }).length;
+    if (nActive > cap) return { ok:false, error:'You can only start ' + cap + ' active wrestlers.' };
+    mine.forEach(function(m){ sh.getRange(m.row, 7).setValue(m.active ? 'active' : 'bench'); });
+    return { ok:true, active:nActive, cap:cap };
+  } finally { lock.releaseLock(); }
 }
 function whoOwns(id, rikishi){
   var v = sh_(SHEET_ROSTERS).getDataRange().getValues(), key = rikishi.toLowerCase();
@@ -1580,8 +1638,14 @@ function adminGated(key, reader) {
 function logPageview(body) {
   var page = String(body.page || '').trim().slice(0, 80);
   var vid = String(body.visitorId || '').trim().slice(0, 60);
+  // Visitor's browser-reported IANA zone (e.g. "America/Los_Angeles"), used
+  // only for the admin dashboard's region/time-of-day breakdowns — charset-
+  // limited to what a real zone name can contain, not verified against the
+  // actual IANA list (that's handled at read time, see localHour_).
+  var tz = String(body.tz || '').trim().slice(0, 40);
+  if (!/^[A-Za-z0-9_+\-\/]*$/.test(tz)) tz = '';
   if (!page || !vid) return { ok: false };
-  try { sh_(SHEET_PAGEVIEWS).appendRow([new Date().toISOString(), page, vid]); }
+  try { sh_(SHEET_PAGEVIEWS).appendRow([new Date().toISOString(), page, vid, tz]); }
   catch (e) { return { ok: false }; }
   return { ok: true };
 }
@@ -1600,21 +1664,118 @@ function checkSumoApi() {
   }
 }
 
+/* Monday-aligned (UTC) week key for a Date, as a 'YYYY-MM-DD' string —
+   used to bucket pageviews into calendar weeks for the admin trend chart. */
+function weekStart_(d) {
+  var day = d.getUTCDay(); // 0=Sun..6=Sat
+  var diff = (day === 0 ? -6 : 1 - day); // days back to Monday
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + diff));
+}
+function isoDate_(d) { return d.toISOString().slice(0, 10); }
+
+/* Local hour-of-day (0-23, as a number) for a timestamp+IANA-zone pair.
+   Falls back to UTC when tz is blank/unrecognized — Utilities.formatDate
+   throws on a bad zone name, and client-supplied tz is only charset-
+   validated, not verified against the real IANA list. */
+function localHour_(d, tz) {
+  if (tz) {
+    try { return parseInt(Utilities.formatDate(d, tz, 'H'), 10); } catch (e) {}
+  }
+  return d.getUTCHours();
+}
+
 function adminStats() {
   var v = sh_(SHEET_PAGEVIEWS).getDataRange().getValues();
   var total = 0, uniques = {}, byPage = {}, since7 = Date.now() - 7 * 24 * 3600 * 1000, total7 = 0, uniq7 = {};
+  var byWeek = {};   // 'YYYY-MM-DD' (Monday) -> { total, uniques:{} }
+  var byDay = {};    // 'YYYY-MM-DD' (UTC calendar day) -> { total, uniques:{} }
+  var byHour = {};   // 0-23 (visitor-local hour where known, else UTC) -> total
+  var byRegion = {}; // IANA tz string, or 'Unknown' -> { total, uniques:{} }
+  // Read column D directly rather than gating on the header label saying
+  // 'tz' — the header only gets renamed when setup() is manually re-run
+  // after a redeploy, but logPageview() has been writing real tz values
+  // into column D since the moment the new backend went live either way.
+  // Gating on the header meant real per-row data sat in the sheet unread
+  // until someone remembered to re-run setup(). hasRegionData now reflects
+  // whether any row actually carries a timezone, which is the true signal.
+  var anyTz = false;
   for (var r = 1; r < v.length; r++) {
     var vid = String(v[r][2] || ''); if (!vid) continue;
     var page = String(v[r][1] || '(unknown)');
+    var tz = String(v[r][3] || '').trim();
+    if (tz) anyTz = true;
     total++; uniques[vid] = 1;
     if (!byPage[page]) byPage[page] = { total: 0, uniques: {} };
     byPage[page].total++; byPage[page].uniques[vid] = 1;
     var t = Date.parse(String(v[r][0] || ''));
-    if (!isNaN(t) && t >= since7) { total7++; uniq7[vid] = 1; }
+    if (isNaN(t)) continue;
+    if (t >= since7) { total7++; uniq7[vid] = 1; }
+    var d = new Date(t);
+    var wk = isoDate_(weekStart_(d));
+    if (!byWeek[wk]) byWeek[wk] = { total: 0, uniques: {} };
+    byWeek[wk].total++; byWeek[wk].uniques[vid] = 1;
+
+    var day = isoDate_(d);
+    if (!byDay[day]) byDay[day] = { total: 0, uniques: {} };
+    byDay[day].total++; byDay[day].uniques[vid] = 1;
+
+    var hr = localHour_(d, tz);
+    byHour[hr] = (byHour[hr] || 0) + 1;
+
+    var region = tz || 'Unknown';
+    if (!byRegion[region]) byRegion[region] = { total: 0, uniques: {} };
+    byRegion[region].total++; byRegion[region].uniques[vid] = 1;
   }
   var pages = [];
   for (var p in byPage) pages.push({ page: p, total: byPage[p].total, unique: Object.keys(byPage[p].uniques).length });
   pages.sort(function (a, b) { return b.total - a.total; });
+
+  // Last 8 calendar weeks (Mon-start, UTC), oldest first, zero-filled so a
+  // quiet week still shows as a bar rather than a gap.
+  var weeks = [];
+  var thisWeek = weekStart_(new Date());
+  for (var i = 7; i >= 0; i--) {
+    var wkDate = new Date(thisWeek.getTime() - i * 7 * 24 * 3600 * 1000);
+    var key = isoDate_(wkDate);
+    var bucket = byWeek[key];
+    weeks.push({
+      weekStart: key,
+      total: bucket ? bucket.total : 0,
+      unique: bucket ? Object.keys(bucket.uniques).length : 0
+    });
+  }
+
+  // Last 14 calendar days (UTC), oldest first, zero-filled.
+  var days = [];
+  var todayUTC = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()));
+  for (var j = 13; j >= 0; j--) {
+    var dDate = new Date(todayUTC.getTime() - j * 24 * 3600 * 1000);
+    var dKey = isoDate_(dDate);
+    var dBucket = byDay[dKey];
+    days.push({
+      date: dKey,
+      total: dBucket ? dBucket.total : 0,
+      unique: dBucket ? Object.keys(dBucket.uniques).length : 0
+    });
+  }
+
+  // 24 hourly buckets, visitor-local time where we know it (falls back to
+  // UTC for older rows recorded before we captured a timezone).
+  var hours = [];
+  for (var h = 0; h < 24; h++) hours.push({ hour: h, total: byHour[h] || 0 });
+
+  // Top 15 regions by pageviews; anything smaller folds into "Other" so a
+  // long tail of one-off timezones doesn't swamp the list.
+  var regionList = [];
+  for (var rg in byRegion) regionList.push({ tz: rg, total: byRegion[rg].total, unique: Object.keys(byRegion[rg].uniques).length });
+  regionList.sort(function (a, b) { return b.total - a.total; });
+  var regions = regionList.slice(0, 15);
+  if (regionList.length > 15) {
+    var rest = regionList.slice(15);
+    var otherTotal = 0, otherUnique = 0;
+    for (var ri = 0; ri < rest.length; ri++) { otherTotal += rest[ri].total; otherUnique += rest[ri].unique; }
+    regions.push({ tz: 'Other', total: otherTotal, unique: otherUnique });
+  }
 
   var userRows = Math.max(0, sh_(SHEET_USERS).getDataRange().getValues().length - 1);
   var leagueRows = Math.max(0, sh_(SHEET_LEAGUES).getDataRange().getValues().length - 1);
@@ -1622,10 +1783,26 @@ function adminStats() {
 
   return {
     ok: true,
-    pageviews: { total: total, unique: Object.keys(uniques).length, last7Total: total7, last7Unique: Object.keys(uniq7).length, byPage: pages },
+    pageviews: {
+      total: total, unique: Object.keys(uniques).length,
+      last7Total: total7, last7Unique: Object.keys(uniq7).length,
+      byPage: pages, byWeek: weeks, byDay: days, byHour: hours, byRegion: regions,
+      hasRegionData: anyTz
+    },
     counts: { users: userRows, leagues: leagueRows, messages: msgRows },
     api: checkSumoApi()
   };
+}
+
+/* Wipes all recorded pageviews (keeps the sheet + header row) so the
+   analytics dashboard goes back to 0. Gated behind the admin key like every
+   other adminX action — this is destructive and not undoable. */
+function adminResetAnalytics() {
+  var sh = sh_(SHEET_PAGEVIEWS);
+  var last = sh.getLastRow();
+  var cleared = Math.max(0, last - 1);
+  if (cleared > 0) sh.deleteRows(2, cleared);
+  return { ok: true, clearedRows: cleared };
 }
 
 function adminUsers() {
@@ -1776,6 +1953,250 @@ function adminDeleteFeedback(body) {
   sh_(SHEET_FEEDBACK).deleteRow(row);
   return { ok: true };
 }
+
+/* ================= supplemental re-draft (new banzuke) =================
+   Runs between tournaments when the commissioner opens it. Reads the live
+   top-two-division banzuke from sumo-api, auto-releases anyone who fell out
+   of the top two divisions, pools the unclaimed + newly-promoted rikishi, and
+   fills rosters in worst-first (reverse-standings) order. All transient state
+   lives in a Meta key ('redraft:<id>') so we only touch the unambiguous
+   draftStatus column on the league row. */
+function fetchBanzukeNames(bashoId){
+  bashoId = bashoId || BASHO_ID;
+  var out = { makuuchi:[], juryo:[] }, divs = [['Makuuchi','makuuchi'],['Juryo','juryo']];
+  for (var d=0; d<divs.length; d++){
+    try {
+      var resp = UrlFetchApp.fetch('https://sumo-api.com/api/basho/' + bashoId + '/banzuke/' + divs[d][0], { muteHttpExceptions:true });
+      if (resp.getResponseCode() !== 200) continue;
+      var data = JSON.parse(resp.getContentText());
+      var rows = [].concat(data.east||[], data.west||[]);
+      for (var i=0;i<rows.length;i++){
+        var name = rows[i].shikonaEn || rows[i].shikona || rows[i].Rikishi || '';
+        if (name) out[divs[d][1]].push(String(name));
+      }
+    } catch(e){}
+  }
+  return out;
+}
+function keeperStandings(id){          // member handles, worst-first, by last-basho active-lineup wins
+  var wins = {}; readResults().forEach(function(b){ var w=String(b.winner||'').toLowerCase(); if(w) wins[w]=(wins[w]||0)+1; });
+  var rosters = keeperRostersOf(id);
+  return membersOf(id).map(function(h){
+    var r = rosters[h.toLowerCase()] || { active:[] };
+    var score = (r.active||[]).reduce(function(s,n){ return s + (wins[String(n).toLowerCase()]||0); }, 0);
+    return { h:h, score:score };
+  }).sort(function(a,b){ return a.score - b.score; }).map(function(x){ return x.h; });
+}
+function getRedraft_(id){ try { return JSON.parse(readMeta()['redraft:'+id] || 'null'); } catch(e){ return null; } }
+function setRedraft_(id, obj){ setMeta_('redraft:'+id, obj ? JSON.stringify(obj) : ''); }
+function redraftPool_(id, rd){
+  rd = rd || getRedraft_(id); if (!rd || !rd.banzuke) return [];
+  var owned = {}, rosters = keeperRostersOf(id);
+  Object.keys(rosters).forEach(function(k){ rosters[k].makuuchi.concat(rosters[k].juryo).forEach(function(n){ owned[String(n).toLowerCase()]=1; }); });
+  var pool = [];
+  (rd.banzuke.makuuchi||[]).forEach(function(n){ if(!owned[n.toLowerCase()]) pool.push({ name:n, division:'makuuchi' }); });
+  (rd.banzuke.juryo||[]).forEach(function(n){ if(!owned[n.toLowerCase()]) pool.push({ name:n, division:'juryo' }); });
+  return pool;
+}
+function redraftTurn_(id, L, rd, rosters){
+  rd = rd || getRedraft_(id); if (!rd) return { phase:'done' };
+  rosters = rosters || keeperRostersOf(id);
+  var order = rd.order||[], n = order.length, size = L.rosterSize;
+  if (!n) return { phase:'done' };
+  function open(h){ var r=rosters[h.toLowerCase()]||{makuuchi:[],juryo:[]}; return { mk:Math.max(0,size-r.makuuchi.length), jr:Math.max(0,size-r.juryo.length) }; }
+  var cursor = Number(rd.cursor)||0;
+  for (var i=0;i<n;i++){
+    var idx=(cursor+i)%n, o=open(order[idx]);
+    if (o.mk>0 || o.jr>0) return { phase:'redraft', handle:order[idx], cursor:idx, open:o };
+  }
+  return { phase:'done' };
+}
+function openSupplementalDraft(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can open the re-draft.' };
+  if (L.mode !== 'keepers' || L.draftStatus !== 'complete') return { ok:false, error:'The keeper draft must be complete first.' };
+  if (tournamentActive()) return { ok:false, error:'Wait until the tournament is over to re-draft.' };
+  var banzuke = fetchBanzukeNames(BASHO_ID);
+  if (!banzuke.makuuchi.length && !banzuke.juryo.length) return { ok:false, error:'Could not read the current banzuke from sumo-api. Try again shortly.' };
+  var inB = {}; banzuke.makuuchi.forEach(function(n){ inB[n.toLowerCase()]='makuuchi'; }); banzuke.juryo.forEach(function(n){ inB[n.toLowerCase()]='juryo'; });
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try {
+    var sh = sh_(SHEET_ROSTERS), v = sh.getDataRange().getValues(), released=[], del=[];
+    for (var r=1;r<v.length;r++){
+      if (String(v[r][0]) !== String(L.id)) continue;
+      var name = String(v[r][2]||''), div = inB[name.toLowerCase()];
+      if (!div){ del.push(r+1); released.push(name); }
+      else if (String(v[r][3]||'').toLowerCase() !== div) sh.getRange(r+1,4).setValue(div);   // moved between the two divisions
+    }
+    del.sort(function(a,b){return b-a;}).forEach(function(row){ sh.deleteRow(row); });
+    var order = keeperStandings(L.id);                       // worst first
+    setRedraft_(L.id, { order:order, cursor:0, banzuke:banzuke });
+    sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue('redraft');
+    return { ok:true, released:released, order:order, pool: redraftPool_(L.id).length };
+  } finally { lock.releaseLock(); }
+}
+function redraftState(id){
+  var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.draftStatus !== 'redraft') return { ok:true, redraft:false, draftStatus:L.draftStatus };
+  var rd = getRedraft_(L.id), rosters = keeperRostersOf(L.id);
+  return { ok:true, redraft:true, rosterSize:L.rosterSize, order:(rd&&rd.order)||[],
+    turn: redraftTurn_(L.id, L, rd, rosters), pool: redraftPool_(L.id, rd) };
+}
+function redraftPick(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.draftStatus !== 'redraft') return { ok:false, error:'The re-draft isn\u2019t running.' };
+  var rikishi = String(body.rikishi||'').trim(); if (!rikishi) return { ok:false, error:'No wrestler given.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    L = leagueRow(body.id);
+    var rd = getRedraft_(L.id); if (!rd) return { ok:false, error:'Re-draft state missing.' };
+    var rosters = keeperRostersOf(L.id);
+    var turn = redraftTurn_(L.id, L, rd, rosters);
+    if (turn.phase === 'done') return { ok:false, error:'The re-draft is complete.' };
+    if (turn.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'It\u2019s not your turn.' };
+    var pool = redraftPool_(L.id, rd), pick=null;
+    for (var i=0;i<pool.length;i++){ if (pool[i].name.toLowerCase()===rikishi.toLowerCase()){ pick=pool[i]; break; } }
+    if (!pick) return { ok:false, error: rikishi + ' isn\u2019t available.' };
+    var mine = rosters[u.handle.toLowerCase()] || { makuuchi:[], juryo:[] };
+    var openInDiv = L.rosterSize - (pick.division==='juryo' ? mine.juryo.length : mine.makuuchi.length);
+    if (openInDiv <= 0) return { ok:false, error:'You have no open ' + pick.division + ' slot.' };
+    var now = new Date().toISOString();
+    sh_(SHEET_PICKS).appendRow([L.id, 0, 0, 'redraft', u.handle, pick.name, now]);
+    sh_(SHEET_ROSTERS).appendRow([L.id, u.handle, pick.name, pick.division, 'redraft', now, '']);
+    rd.cursor = (turn.cursor + 1) % (rd.order.length || 1);
+    var fresh = keeperRostersOf(L.id);
+    var next = redraftTurn_(L.id, L, rd, fresh);
+    if (next.phase === 'done'){ sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue('complete'); setRedraft_(L.id, ''); }
+    else { rd.cursor = next.cursor; setRedraft_(L.id, rd); }
+    return { ok:true, nextTurn:next, draftStatus: next.phase==='done' ? 'complete' : 'redraft' };
+  } finally { lock.releaseLock(); }
+}
+
+/* ============================================================
+   LONG-TERM RANKING (JSA-style banzuke). Mirrors gg-ranking.js (the
+   simulation-tuned canonical version) so promotions are computed once,
+   server-side, from every player basho win rate = wins / (teamSize*15).
+   ============================================================ */
+var RANK_LADDER = [
+  { key:'jonokuchi',  label:'Jonokuchi',  div:'jonokuchi' },
+  { key:'jonidan',    label:'Jonidan',    div:'jonidan'   },
+  { key:'sandanme',   label:'Sandanme',   div:'sandanme'  },
+  { key:'makushita',  label:'Makushita',  div:'makushita' },
+  { key:'juryo',      label:'J\u016bry\u014d', div:'juryo' },
+  { key:'maegashira', label:'Maegashira', div:'makuuchi'  },
+  { key:'komusubi',   label:'Komusubi',   div:'makuuchi'  },
+  { key:'sekiwake',   label:'Sekiwake',   div:'makuuchi'  },
+  { key:'ozeki',      label:'\u014czeki', div:'makuuchi'  },
+  { key:'yokozuna',   label:'Yokozuna',   div:'makuuchi'  }
+];
+var RANK_CFG = [
+  { up:0.50, down:-1,    jump:2 }, { up:0.50, down:0.15, jump:2 }, { up:0.52, down:0.18, jump:2 },
+  { up:0.56, down:0.22,  jump:1 }, { up:0.66, down:0.30, jump:1 }, { up:0.85, down:0.35, jump:1 },
+  { up:0.90, down:0.60,  jump:1 }, { up:0.94, down:0.72, jump:1 }, { up:0.98, down:0.86, jump:1 },
+  { up:2,    down:0.90,  jump:0 }
+];
+var RANK_YOK_MIN_BASHO = 6, RANK_TOP_PCTL = 0.985, RANK_MAX_FALL = 3;
+function rankClampIdx(i){ i = i|0; return i<0?0:(i>9?9:i); }
+function rankApplyBasho(users){
+  var active = users.filter(function(u){ return typeof u.score === 'number'; });
+  var N = active.length; if (!N) return users;
+  active.forEach(function(u){
+    var below=0, eq=0, i;
+    for (i=0;i<N;i++){ if (active[i].score < u.score) below++; else if (active[i].score === u.score) eq++; }
+    u._p = N>1 ? (below + 0.5*(eq-1))/(N-1) : 1;
+  });
+  active.forEach(function(u){
+    var idx = rankClampIdx(u.rankIdx||0), cfg = RANK_CFG[idx], p = u._p;
+    var bashoCount = (u.bashoCount||0) + 1;
+    u.topStreak = (p >= RANK_TOP_PCTL) ? (u.topStreak||0)+1 : 0;
+    var next = idx;
+    if (idx === 9){ if (p < cfg.down) next = 8; }
+    else if (idx === 8){
+      if (p >= cfg.up && u.topStreak >= 2 && bashoCount >= RANK_YOK_MIN_BASHO) next = 9;
+      else if (p < cfg.down) next = 7;
+    } else if (p >= cfg.up){
+      var steps = 1;
+      if (cfg.jump > 1){ var over=(p-cfg.up)/(1-cfg.up+1e-9); steps = Math.min(cfg.jump, 1 + Math.floor(over*cfg.jump)); }
+      next = idx + steps;
+      if (next >= 9 && !(bashoCount >= RANK_YOK_MIN_BASHO && u.topStreak >= 2)) next = 8;
+    } else if (p < cfg.down){
+      var depth = (cfg.down - p)/(cfg.down + 1e-9);
+      next = idx - (1 + Math.floor(depth * RANK_MAX_FALL));
+    }
+    u.rankIdx = rankClampIdx(next);
+    u.bashoCount = bashoCount;
+    delete u._p;
+  });
+  return users;
+}
+function rankTeamSize_(t){
+  if (!t) return 0;
+  if (Object.prototype.toString.call(t) === '[object Array]'){ var n=0,i; for (i=0;i<t.length;i++) if (t[i]) n++; return n; }
+  if (typeof t === 'object'){ var c=0,k; for (k in t){ if (t.hasOwnProperty(k) && t[k]) c++; } return c; }
+  return 0;
+}
+function rankStateMap_(){
+  var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_RANKINGS, ['handle','rankIdx','bashoCount','topStreak','lastBasho']);
+  var v = sh.getDataRange().getValues(), map = {}, r;
+  for (r=1;r<v.length;r++){
+    var h = String(v[r][0]||'').toLowerCase(); if (!h) continue;
+    map[h] = { rankIdx:Number(v[r][1]||0), bashoCount:Number(v[r][2]||0), topStreak:Number(v[r][3]||0), lastBasho:String(v[r][4]||'') };
+  }
+  return map;
+}
+function rankBadgeMap_(){
+  var state = rankStateMap_(), out = {}, h;
+  for (h in state){ if (!state.hasOwnProperty(h)) continue; var idx = rankClampIdx(state[h].rankIdx||0), R = RANK_LADDER[idx]; out[h] = { idx:idx, label:R.label, div:R.div }; }
+  return out;
+}
+function writeRankings_(arr, basho){
+  var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_RANKINGS, ['handle','rankIdx','bashoCount','topStreak','lastBasho']);
+  var v = sh.getDataRange().getValues(), rowByHandle = {}, r;
+  for (r=1;r<v.length;r++){ rowByHandle[String(v[r][0]||'').toLowerCase()] = r+1; }
+  arr.forEach(function(u){
+    var key = u.handle.toLowerCase(), row = rowByHandle[key];
+    var vals = [u.handle, u.rankIdx||0, u.bashoCount||0, u.topStreak||0, basho];
+    if (row) sh.getRange(row,1,1,5).setValues([vals]); else sh.appendRow(vals);
+  });
+}
+function setMeta_(key, value){
+  var sh = sh_(SHEET_META); if (!sh) return;
+  var v = sh.getDataRange().getValues(), r;
+  for (r=1;r<v.length;r++){ if (String(v[r][0])===key){ sh.getRange(r+1,2).setValue(value); return; } }
+  sh.appendRow([key, value]);
+}
+/* Compute promotions for a completed basho from everyone archived win rate.
+   Idempotent per basho (guarded by Meta.rankedBasho). New handles start at
+   Jonokuchi; returning handles carry rankIdx/bashoCount/topStreak forward. */
+function applyBashoRanking(basho){
+  basho = String(basho || readMeta().basho || '').trim();
+  if (!basho) return { ok:false, error:'no basho' };
+  if (String(readMeta().rankedBasho||'') === basho) return { ok:true, already:true, basho:basho };
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try {
+    if (String(readMeta().rankedBasho||'') === basho) return { ok:true, already:true, basho:basho };
+    var hv = sh_(SHEET_HISTORY).getDataRange().getValues(), arr = [], r;
+    for (r=1;r<hv.length;r++){
+      if (String(hv[r][1]) !== basho) continue;
+      var handle = String(hv[r][0]||''); if (!handle) continue;
+      var wins = Number(hv[r][4]||0), team = {};
+      try { team = JSON.parse(hv[r][2] || '{}'); } catch(e){}
+      var size = rankTeamSize_(team), possible = (size>0?size:1)*15;
+      arr.push({ handle:handle, score: possible>0 ? wins/possible : 0 });
+    }
+    if (!arr.length) return { ok:false, error:'no archived results for '+basho };
+    var state = rankStateMap_();
+    arr.forEach(function(u){ var st = state[u.handle.toLowerCase()] || {}; u.rankIdx=st.rankIdx||0; u.bashoCount=st.bashoCount||0; u.topStreak=st.topStreak||0; });
+    rankApplyBasho(arr);
+    writeRankings_(arr, basho);
+    setMeta_('rankedBasho', basho);
+    return { ok:true, ranked:arr.length, basho:basho };
+  } finally { lock.releaseLock(); }
+}
+function adminApplyRanking(body){ var bad = adminGate(body.adminKey); if (bad) return bad; return applyBashoRanking(body && body.basho); }
+
 
 /* ---------- JSON helper ----------
    POSTs from the page use Content-Type text/plain (a CORS-safelisted

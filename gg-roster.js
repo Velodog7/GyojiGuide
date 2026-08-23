@@ -205,8 +205,65 @@
     return null;
   }
 
+  /* ---- BULK BIO/CAREER ENRICHMENT from /api/rikishis ----------------------
+   * One paginated call fetches every rikishi's bio (heya, shusshin, height,
+   * weight, birthDate, debut, shikonaJp) + rankHistory. parseBio() maps each to
+   * the analysis card's fields. Pass { names:[...] } to keep only your roster and
+   * stop early. Returns { ok, count, byName:{ shikonaEn: {stable,from,pref,
+   * country,ht,wt,dob,age,debut,kanji,high,chg} } }. Editorial fields (form,
+   * inj, lv, grade, elo, sig) are never touched — those stay curated. */
+  function ageFrom(d){ var t=new Date(),a=t.getFullYear()-d.getFullYear(),m=t.getMonth()-d.getMonth(); if(m<0||(m===0&&t.getDate()<d.getDate()))a--; return a; }
+  var JPREF=/(hokkaido|aomori|iwate|miyagi|akita|yamagata|fukushima|ibaraki|tochigi|gunma|saitama|chiba|tokyo|kanagawa|niigata|toyama|ishikawa|fukui|yamanashi|nagano|gifu|shizuoka|aichi|mie|shiga|kyoto|osaka|hyogo|nara|wakayama|tottori|shimane|okayama|hiroshima|yamaguchi|tokushima|kagawa|ehime|kochi|fukuoka|saga|nagasaki|kumamoto|oita|miyazaki|kagoshima|okinawa)/i;
+  function parseShusshin(s){
+    s=String(s||"").trim(); if(!s) return {from:"",country:"",pref:""};
+    var isJP=/-ken|-fu|-to\b|-d[o\u014d]\b/i.test(s)||JPREF.test(s);
+    if(isJP){ var pref=s.split(",")[0].replace(/-(ken|fu|to|d[o\u014d])$/i,"").trim(); pref=pref.charAt(0).toUpperCase()+pref.slice(1); return {from:pref+", Japan",country:"Japan",pref:pref}; }
+    var parts=s.split(",").map(function(x){return x.trim();}).filter(Boolean);
+    return { from:s, country:parts[parts.length-1]||s, pref:"" };
+  }
+  function highCode(r){ var d=deriveFromRank(r); return d.tier+(d.num?d.num:""); }
+  function parseBio(e){
+    var b={};
+    if(e.heya) b.stable=e.heya;
+    if(typeof e.height==="number"&&e.height) b.ht=e.height;
+    if(typeof e.weight==="number"&&e.weight) b.wt=e.weight;
+    if(e.shikonaJp) b.kanji=String(e.shikonaJp).split(/[\s\u3000]/)[0];
+    if(e.debut&&/^\d{6}$/.test(String(e.debut))){ var dv=String(e.debut); b.debut=dv.slice(0,4)+"-"+dv.slice(4,6); }
+    if(e.birthDate){ var bd=new Date(e.birthDate); if(!isNaN(bd.getTime())){ b.dob=String(e.birthDate).slice(0,10); b.age=ageFrom(bd); } }
+    if(e.shusshin){ var o=parseShusshin(e.shusshin); b.from=o.from; b.country=o.country; b.pref=o.pref; }
+    if(Array.isArray(e.rankHistory)&&e.rankHistory.length){
+      var hist=e.rankHistory.slice().filter(function(r){return r&&r.rank;});
+      var hi=null; hist.forEach(function(r){ if(typeof r.rankValue==="number"&&(hi===null||r.rankValue<hi.rankValue)) hi=r; });
+      if(hi) b.high=highCode(hi.rank);
+      hist.sort(function(a,c){ return String(c.bashoId).localeCompare(String(a.bashoId)); });
+      if(hist.length>=2){ var cur=hist[0],prev=hist[1]; var d=(cur.rankValue<prev.rankValue)?"up":(cur.rankValue>prev.rankValue?"down":"same"); b.chg={d:d,t:deriveFromRank(prev.rank).rk+"\u2192"+deriveFromRank(cur.rank).rk}; }
+    }
+    return b;
+  }
+  function bios(opts){
+    opts=opts||{};
+    var want=null; if(opts.names&&opts.names.length){ want={}; opts.names.forEach(function(n){ want[String(n).toLowerCase()]=1; }); }
+    var byName={}, found=0, maxPages=opts.maxPages||6, limit=1000;
+    function page(skip,p){
+      if(p>maxPages) return finish();
+      var url=API_BASE+"/rikishis?limit="+limit+"&skip="+skip+"&measurements=true&ranks=true&shikonas=true";
+      return fetch(url,{headers:{"Accept":"application/json"}})
+        .then(function(res){ if(!res.ok) throw new Error("rikishis "+res.status); return res.json(); })
+        .then(function(data){
+          var recs=data.records||[];
+          recs.forEach(function(e){ var name=e.shikonaEn; if(!name) return; if(want&&!want[name.toLowerCase()]) return; if(!byName[name]){ byName[name]=parseBio(e); found++; } });
+          var total=data.total||0;
+          if(want&&found>=Object.keys(want).length) return finish();
+          if(recs.length<limit||(skip+limit)>=total) return finish();
+          return page(skip+limit,p+1);
+        });
+    }
+    function finish(){ return { ok:true, count:Object.keys(byName).length, byName:byName }; }
+    return Promise.resolve().then(function(){ return page(0,1); }).catch(function(e){ return { ok:false, error:String(e) }; });
+  }
+
   window.GGRoster = {
-    load: load, applyTo: applyTo, headToHead: headToHead,
+    load: load, bios: bios, applyTo: applyTo, headToHead: headToHead,
     bashoCandidates: bashoCandidates, deriveFromRank: deriveFromRank, label: label,
     _fetchBanzuke: fetchBanzuke
   };

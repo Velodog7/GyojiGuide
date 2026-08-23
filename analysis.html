@@ -884,6 +884,29 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
     });
     try { renderPills(); renderCards(); if (typeof renderTiers === "function") renderTiers(); } catch(e){}
     show("live", "Up to date with the <b>" + res.label + "</b> banzuke \u2014 ranks and records live from sumo-api.");
+
+    /* Enrich each card's biographical + career fields from sumo-api's rikishi
+       records (one bulk call). Editorial fields \u2014 form, inj, lv, grade, elo,
+       eloPk, sig, note \u2014 are deliberately left as curated. */
+    GGRoster.bios({ names: R.map(function(r){ return r.n; }) }).then(function(bio){
+      if (!bio || !bio.ok) return;
+      R.forEach(function(r){
+        var b = bio.byName[r.n]; if (!b) return;
+        if (b.stable) r.stable = b.stable;
+        if (b.from) r.from = b.from;
+        if (b.country) r.country = b.country;
+        if (typeof b.pref === "string") r.pref = b.pref;
+        if (b.ht) r.ht = b.ht;
+        if (b.wt) r.wt = b.wt;
+        if (b.dob) r.dob = b.dob;
+        if (typeof b.age === "number") r.age = b.age;
+        if (b.debut) r.debut = b.debut;
+        if (b.kanji) r.kanji = b.kanji;
+        if (b.high) r.high = b.high;
+        if (b.chg) r.chg = b.chg;
+      });
+      try { renderCards(); if (typeof renderTiers === "function") renderTiers(); } catch(e){}
+    });
   });
 })();</script>
 <div class="edohyo" id="edohyo" role="dialog" aria-modal="true" aria-label="Enter the Dohyo">
