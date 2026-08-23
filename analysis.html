@@ -896,6 +896,11 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
         if (b.from) r.from = b.from;
         if (b.country) r.country = b.country;
         if (typeof b.pref === "string") r.pref = b.pref;
+        /* Some sumo-api bio records return just a bare hometown/city with no
+           country suffix (seen for Mongolian rikishi) while others already
+           include it (e.g. "Chiba, Japan"). Normalize so "From" always reads
+           "City, Country" instead of a bare city. */
+        if (r.from && r.country && r.from.indexOf(r.country) === -1) r.from = r.from + ", " + r.country;
         if (b.ht) r.ht = b.ht;
         if (b.wt) r.wt = b.wt;
         if (b.dob) r.dob = b.dob;
