@@ -332,7 +332,10 @@
   window.GGHelp = { open: openHelp, close: closeHelp };
 
   /* fire-and-forget pageview beacon for the admin dashboard's analytics tab.
-     One anonymous id per browser (localStorage), never tied to an account. */
+     One anonymous id per browser (localStorage), never tied to an account.
+     Also reports the browser's own IANA timezone (no permission prompt,
+     no IP/geolocation lookup) so the dashboard can show a rough region +
+     time-of-day breakdown. */
   function trackPageview() {
     try {
       var GG = window.GyojiGuide;
@@ -342,7 +345,9 @@
         vid = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("v" + Date.now() + Math.random().toString(16).slice(2));
         try { localStorage.setItem(KEY, vid); } catch (e) {}
       }
-      GG.apiPost({ action: "logPageview", page: here, visitorId: vid });
+      var tz = "";
+      try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
+      GG.apiPost({ action: "logPageview", page: here, visitorId: vid, tz: tz });
     } catch (e) {}
   }
 

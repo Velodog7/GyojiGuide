@@ -80,18 +80,23 @@ main{ max-width:var(--maxw); margin:0 auto; padding:24px 20px 80px }
 .stat-card .v{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.7rem; margin-top:4px }
 .stat-card .v.small{ font-size:1.1rem }
 
-/* ---------- weekly trend chart ---------- */
-.wk-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; margin-bottom:18px }
-.wk-card-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px }
-.wk-card-head h3{ font-family:"Zen Maru Gothic",sans-serif; font-size:1rem; margin:0 }
-.wk-chart{ display:flex; align-items:flex-end; gap:10px; height:130px }
-.wk-bar{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:6px }
-.wk-bar .track{ width:100%; max-width:34px; flex:1; display:flex; align-items:flex-end; background:var(--surface-2); border-radius:6px 6px 2px 2px; overflow:hidden }
-.wk-bar .fill{ width:100%; background:var(--sun); border-radius:6px 6px 0 0; min-height:2px; transition:height .3s ease }
-.wk-bar.zero .fill{ background:var(--line-2) }
-.wk-bar .val{ font-family:"WDXL Lubrifont TC",monospace; font-size:.72rem; color:var(--dim) }
-.wk-bar .lab{ font-size:.68rem; color:var(--muted); white-space:nowrap }
-.wk-bar.this-week .val{ color:var(--sun) }
+/* ---------- trend bar charts (weekly / daily / hourly) ---------- */
+.bar-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; margin-bottom:18px }
+.bar-card-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:16px }
+.bar-card-head h3{ font-family:"Zen Maru Gothic",sans-serif; font-size:1rem; margin:0 }
+.bar-chart{ display:flex; align-items:flex-end; gap:10px; height:130px; overflow-x:auto; overflow-y:hidden; padding-bottom:2px }
+.bar-item{ flex:1; min-width:22px; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:6px }
+.bar-item .track{ width:100%; max-width:34px; flex:1; display:flex; align-items:flex-end; background:var(--surface-2); border-radius:6px 6px 2px 2px; overflow:hidden }
+.bar-item .fill{ width:100%; background:var(--sun); border-radius:6px 6px 0 0; min-height:2px; transition:height .3s ease }
+.bar-item.zero .fill{ background:var(--line-2) }
+.bar-item .val{ font-family:"WDXL Lubrifont TC",monospace; font-size:.72rem; color:var(--dim) }
+.bar-item .lab{ font-size:.68rem; color:var(--muted); white-space:nowrap }
+.bar-item.current .val{ color:var(--sun) }
+.bar-chart.dense{ gap:5px }
+.bar-chart.dense .bar-item{ min-width:16px }
+.bar-chart.dense .bar-item .val{ font-size:.62rem }
+.bar-chart.dense .bar-item .lab{ font-size:.6rem }
+.region-note{ font-size:.8rem; color:var(--muted); margin:10px 0 0 }
 
 .badge{ display:inline-flex; align-items:center; gap:6px; font-family:"WDXL Lubrifont TC",monospace; font-size:0.85rem; font-weight:600; padding:4px 10px; border-radius:999px }
 .badge .dot{ width:7px; height:7px; border-radius:50% }
@@ -257,12 +262,37 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
         <div class="stat-card"><div class="k">Unique · last 7 days</div><div class="v" id="pv7Unique">—</div></div>
       </div>
 
-      <div class="wk-card">
-        <div class="wk-card-head">
+      <div class="bar-card">
+        <div class="bar-card-head">
+          <h3>Daily unique visitors</h3>
+          <span class="v-sub" style="margin:0">Last 14 days, UTC calendar day</span>
+        </div>
+        <div class="bar-chart dense" id="dayChart"></div>
+      </div>
+
+      <div class="bar-card">
+        <div class="bar-card-head">
           <h3>Weekly pageviews</h3>
           <span class="v-sub" style="margin:0">Last 8 weeks, Monday-start</span>
         </div>
-        <div class="wk-chart" id="wkChart"></div>
+        <div class="bar-chart" id="wkChart"></div>
+      </div>
+
+      <div class="bar-card">
+        <div class="bar-card-head">
+          <h3>Time of day</h3>
+          <span class="v-sub" style="margin:0">All pageviews, visitor-local hour where known</span>
+        </div>
+        <div class="bar-chart dense" id="hourChart"></div>
+        <p class="region-note" id="hourNote"></p>
+      </div>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Region (browser timezone)</th><th class="num">Total views</th><th class="num">Unique visitors</th></tr></thead>
+          <tbody id="regionTable"><tr class="load-row"><td colspan="3"><span class="ld-row"><span class="ld-ring"></span>Loading…</span></td></tr></tbody>
+        </table>
+        <p class="region-note" id="regionNote"></p>
       </div>
 
       <div class="tbl-wrap">
@@ -274,7 +304,7 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
 
       <div class="card" style="max-width:480px">
         <h3>Reset analytics</h3>
-        <p class="v-sub" style="margin:0 0 12px">Permanently deletes every recorded pageview — total, unique, and weekly counts all go back to 0. Can&#8217;t be undone.</p>
+        <p class="v-sub" style="margin:0 0 12px">Permanently deletes every recorded pageview — total, unique, weekly, daily, region, and time-of-day counts all go back to 0. Can&#8217;t be undone.</p>
         <button class="btn danger" id="resetAnalyticsBtn">Reset all analytics to 0</button>
         <div id="resetAnalyticsMsg" style="margin-top:10px;font-size:.9rem"></div>
       </div>
@@ -512,19 +542,43 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     if (isNaN(t)) return iso;
     return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
   }
-  function renderWeeklyChart(weeks){
-    var el = $("wkChart");
-    if (!weeks || !weeks.length){ el.innerHTML = ""; return; }
-    var max = Math.max(1, Math.max.apply(null, weeks.map(function(w){ return w.total; })));
-    var lastIdx = weeks.length - 1;
-    el.innerHTML = weeks.map(function(w, i){
-      var pct = Math.round((w.total / max) * 100);
-      return '<div class="wk-bar' + (w.total === 0 ? ' zero' : '') + (i === lastIdx ? ' this-week' : '') + '">'
-        + '<div class="val">' + w.total + '</div>'
-        + '<div class="track"><div class="fill" style="height:' + Math.max(pct, w.total ? 4 : 0) + '%"></div></div>'
-        + '<div class="lab">' + esc(wkLabel(w.weekStart)) + (i === lastIdx ? ' (this wk)' : '') + '</div>'
+  function dayLabel(iso){
+    var t = Date.parse(iso + "T00:00:00Z");
+    if (isNaN(t)) return iso;
+    return new Date(t).toLocaleDateString(undefined, { weekday: "short", day: "numeric", timeZone: "UTC" });
+  }
+  function hourLabel(h){
+    var h12 = h % 12 === 0 ? 12 : h % 12;
+    return h12 + (h < 12 ? "a" : "p");
+  }
+  // Shared renderer for the weekly/daily/hourly bar charts — items just need
+  // {total, lab, key} (unique is carried for a title tooltip when present).
+  function renderBarChart(elId, items, opts){
+    var el = $(elId);
+    if (!items || !items.length){ el.innerHTML = ""; return; }
+    opts = opts || {};
+    var max = Math.max(1, Math.max.apply(null, items.map(function(it){ return it.total; })));
+    var lastIdx = items.length - 1;
+    el.innerHTML = items.map(function(it, i){
+      var pct = Math.round((it.total / max) * 100);
+      var isCurrent = opts.markLast && i === lastIdx;
+      var title = it.unique != null ? (it.total + " views · " + it.unique + " unique") : (it.total + " views");
+      return '<div class="bar-item' + (it.total === 0 ? ' zero' : '') + (isCurrent ? ' current' : '') + '" title="' + esc(title) + '">'
+        + '<div class="val">' + it.total + '</div>'
+        + '<div class="track"><div class="fill" style="height:' + Math.max(pct, it.total ? 4 : 0) + '%"></div></div>'
+        + '<div class="lab">' + esc(it.lab) + (isCurrent ? (opts.currentSuffix || '') : '') + '</div>'
         + '</div>';
     }).join("");
+  }
+  function renderRegionTable(regions, hasRegionData){
+    var rows = (regions || []).map(function(r){
+      var lab = r.tz === "Unknown" ? "Unknown" : (r.tz === "Other" ? "Other (long tail)" : r.tz);
+      return "<tr><td>" + esc(lab) + "</td><td class=\"num\">" + r.total + "</td><td class=\"num\">" + r.unique + "</td></tr>";
+    }).join("");
+    $("regionTable").innerHTML = rows || '<tr class="empty-row"><td colspan="3">No pageviews recorded yet.</td></tr>';
+    $("regionNote").textContent = hasRegionData
+      ? "Region is the visitor's browser timezone, not their exact location. “Unknown” is pageviews recorded before regionality tracking, or with timezone detection blocked."
+      : "Region tracking just went live — redeploy the backend if you haven’t, then this fills in as new visits come in.";
   }
   function loadAnalytics(res){
     var pv = res && res.pageviews;
@@ -533,7 +587,24 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     $("pvUnique").textContent = pv.unique;
     $("pv7Total").textContent = pv.last7Total;
     $("pv7Unique").textContent = pv.last7Unique;
-    renderWeeklyChart(pv.byWeek || []);
+
+    renderBarChart("wkChart", (pv.byWeek || []).map(function(w){
+      return { total: w.total, unique: w.unique, lab: wkLabel(w.weekStart) };
+    }), { markLast: true, currentSuffix: " (this wk)" });
+
+    renderBarChart("dayChart", (pv.byDay || []).map(function(d){
+      return { total: d.unique, unique: null, lab: dayLabel(d.date) };
+    }), { markLast: true, currentSuffix: " (today)" });
+
+    renderBarChart("hourChart", (pv.byHour || []).map(function(h){
+      return { total: h.total, unique: null, lab: hourLabel(h.hour) };
+    }), {});
+    $("hourNote").textContent = pv.hasRegionData
+      ? "Local hour where the visitor’s timezone is known; UTC otherwise."
+      : "Time-of-day tracking just went live — shown in UTC until timezone data comes in.";
+
+    renderRegionTable(pv.byRegion, pv.hasRegionData);
+
     var rows = (pv.byPage || []).map(function(p){
       return "<tr><td>" + esc(p.page) + "</td><td class=\"num\">" + p.total + "</td><td class=\"num\">" + p.unique + "</td></tr>";
     }).join("");
