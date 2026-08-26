@@ -384,30 +384,48 @@
        live  + no hover -> the drum being played, struck in time with the beat
        idle  + hover    -> play
        live  + hover    -> pause
-     The drum is drawn once and shared by the first two; only the bachi and
-     the head-pulse differ, and both are driven by CSS custom properties the
-     scheduler sets on every beat (see tickEq), so the sticks land with the
-     music rather than looping on a guessed tempo. */
+     The drum is a flat three-quarter taiko — barrel angled away, head facing
+     up-left, tacked rim — drawn once and shared by the first two states. Only
+     the bachi and the head-pulse differ, and both ride CSS custom properties
+     the scheduler sets on every beat (see tickEq), so the sticks land with the
+     music instead of looping at a guessed tempo. */
+  var C_BODY = "#c65f3b", C_BODY_D = "#ab4d2e", C_SKIN = "#ece7db",
+      C_RIM = "#dbd5c5", C_TACK = "#1c1a19", C_BACHI = "#c8825f";
+  /* Drawn axis-aligned — head at the left, barrel running right — then the
+     whole group is tipped, which is far easier to reason about than laying
+     out a rotated barrel by hand. */
   var DRUM_BODY =
-    '<g class="ggr-drum">' +
-      '<path d="M7.6 17.4 6.0 20.9M16.4 17.4 18.0 20.9"/>' +                     /* stand legs */
-      '<circle class="ggr-head" cx="12" cy="12.2" r="6.3"/>' +                   /* body + rim */
-      '<circle class="ggr-skin" cx="12" cy="12.2" r="3.9" stroke-width="1.1"/>' +  /* the head */
+    '<g class="ggr-drum" transform="rotate(-17 12 12) translate(.7 .3)">' +
+      /* far rim — a tacked cream band, as on the reference */
+      '<ellipse cx="17.5" cy="12" rx="2.5" ry="5.2" fill="' + C_RIM + '"/>' +
+      '<g fill="' + C_TACK + '">' +
+        '<circle cx="18.5" cy="8.6" r=".6"/><circle cx="19.0" cy="12" r=".6"/>' +
+        '<circle cx="18.5" cy="15.4" r=".6"/>' +
+      '</g>' +
+      '<path d="M6.6 6 Q12 4.6 17.5 6.9 L17.5 17.1 Q12 19.4 6.6 18 Z" fill="' + C_BODY + '"/>' +
+      '<path d="M6.6 18 Q12 19.4 17.5 17.1 L17.5 15.6 Q12 17.9 6.6 16.6 Z" fill="' + C_BODY_D + '"/>' +
+      '<g class="ggr-skin">' +
+        '<ellipse cx="6.6" cy="12" rx="2.9" ry="6" fill="' + C_RIM + '"/>' +
+        '<ellipse cx="6.4" cy="12" rx="1.9" ry="4.8" fill="' + C_SKIN + '"/>' +
+        '<g fill="' + C_TACK + '">' +
+          '<circle cx="7.6" cy="6.4" r=".68"/><circle cx="9.0" cy="8.6" r=".68"/>' +
+          '<circle cx="9.5" cy="12.0" r=".68"/><circle cx="9.0" cy="15.4" r=".68"/>' +
+          '<circle cx="7.6" cy="17.6" r=".68"/>' +
+        '</g>' +
+      '</g>' +
     '</g>';
   function drumSvg(inner){
-    return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" ' +
-      'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-      (inner || '') + DRUM_BODY + '</svg>';
+    return '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">' +
+      DRUM_BODY + (inner || '') + '</svg>';
   }
   var DRUM_SVG = drumSvg();
-  /* bachi held above the head, pivoting at the hand end */
-  /* Bachi above the head. They strike by dropping along their own axis rather
-     than swinging — pivoting them makes the pair converge and cross at this
-     size, a translation never does. */
+  /* Bachi crossing in from the lower left, as in the reference. They strike by
+     dropping along their own axis — pivoting them makes the pair converge and
+     cross at this size, a translation never does. */
   var LIVE_SVG = drumSvg(
-    '<g stroke-width="1.7">' +
-      '<path class="ggr-bachi ggr-bachi-l" d="M6.7 4.4 9.7 7.5"/>' +
-      '<path class="ggr-bachi ggr-bachi-r" d="M17.3 4.4 14.3 7.5"/>' +
+    '<g stroke="' + C_BACHI + '" stroke-width="1.9" stroke-linecap="round">' +
+      '<path class="ggr-bachi ggr-bachi-l" d="M1.4 9.6 7.6 6.2"/>' +
+      '<path class="ggr-bachi ggr-bachi-r" d="M1.9 15.6 8.1 12.2"/>' +
     '</g>');
   var PLAY_SVG  = '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true">' +
     '<path d="M8.5 5.6a.9.9 0 0 1 1.37-.77l8.1 5.4a.92.92 0 0 1 0 1.54l-8.1 5.4A.9.9 0 0 1 8.5 16.4z"/></svg>';
@@ -446,7 +464,10 @@
       ".ggr-btn{position:relative}" +
       ".ggr-ic{position:absolute;inset:0;display:grid;place-items:center;opacity:0;transition:opacity .13s ease}" +
       ".ggr-ic svg{display:block;overflow:visible}" +
-      ".ggr-ic-drum{opacity:1}" +
+      /* the drum carries its own colour now, so idle is dimmed to keep reading
+         as "off" and full colour is reserved for actually playing */
+      ".ggr-ic-drum{opacity:1;filter:saturate(.3) brightness(.82)}" +
+      ".ggr-btn:is(:hover,:focus-visible) .ggr-ic-drum{filter:saturate(.75) brightness(.95)}" +
       /* hovering (or keyboard-focused) offers the transport icon instead */
       ".ggr-btn:is(:hover,:focus-visible) .ggr-ic-drum{opacity:0}" +
       ".ggr-btn:is(:hover,:focus-visible) .ggr-ic-play{opacity:1}" +
