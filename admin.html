@@ -148,9 +148,15 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
 .empty-row td{ text-align:center; color:var(--muted); padding:24px }
 .load-row td{ text-align:center; color:var(--muted); padding:24px; font-family:"WDXL Lubrifont TC",monospace; font-size:0.944rem }
 .ld-row{ display:inline-flex; align-items:center; justify-content:center; gap:10px }
-.ld-ring{ width:16px; height:16px; border-radius:50%; flex:none; border:2px solid rgba(216,178,90,.18); border-top-color:var(--sun); animation:ld-spin .8s linear infinite }
-@keyframes ld-spin{ to{ transform:rotate(360deg) } }
-@media (prefers-reduced-motion:reduce){ .ld-ring{ animation-duration:2s } }
+/* the little gunbai, turning red face to black — matches the site-wide loader in gg-nav.js */
+.ld-ring{ position:relative; width:12px; height:16px; flex:none; transform-style:preserve-3d;
+  animation:ld-spin 2.9s ease-in-out infinite }
+.ld-ring::before,.ld-ring::after{ content:""; position:absolute; inset:0; border:1.5px solid #d9a94e;
+  border-radius:44% 44% 48% 48%/38% 38% 58% 58%; -webkit-backface-visibility:hidden; backface-visibility:hidden }
+.ld-ring::before{ background:#b3352a }
+.ld-ring::after{ background:#32312e; transform:rotateY(180deg) }
+@keyframes ld-spin{ 0%,10%{ transform:rotateY(0deg) } 40%,60%{ transform:rotateY(180deg) } 90%,100%{ transform:rotateY(360deg) } }
+@media (prefers-reduced-motion:reduce){ .ld-ring{ animation-duration:7s } }
 .dm-modal{ position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:24px;
   background:rgba(0,0,0,.6); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px) }
 .dm-modal[hidden]{ display:none }
