@@ -279,6 +279,7 @@
   }
   .call__days i.w{ background:var(--win); box-shadow:0 0 .5cqw rgba(var(--win-rgb),.5) }
   .call__days i.l{ background:var(--loss); box-shadow:0 0 .5cqw rgba(var(--loss-rgb),.45) }
+  .call__days i.f{ background:transparent; border:.35cqw solid var(--loss); opacity:.7 }  /* fusenpai — left off the card */
   .call__days i.now{ box-shadow:inset 0 0 0 .1cqw rgba(255,255,255,.75) }
   .call__days i.now.w{ box-shadow:0 0 .7cqw rgba(var(--win-rgb),.8) }
   .call__days i.now.l{ box-shadow:0 0 .7cqw rgba(var(--loss-rgb),.7) }
@@ -2497,6 +2498,18 @@ function rebuildResults(){
         (RESULTS[los] ||= {})[d] = "l";
       }
     }
+    /* Anyone in either division who appears nowhere on a day that has been
+       fought was left off the card: mark it "f" so the record counts it as a
+       loss and the dot can render differently from one he actually lost. */
+    const fought = new Set();
+    let anyResult = false;
+    for (const div of ["makuuchi", "juryo"])
+      for (const b of day[div]) { if (b[2]) { anyResult = true; fought.add(b[1]); fought.add(b[5]); } }
+    if (anyResult)
+      for (const n of Object.keys(ROSTER)){
+        const dv = ROSTER[n].d;
+        if ((dv === "makuuchi" || dv === "juryo") && !fought.has(n)) (RESULTS[n] ||= {})[d] = "f";
+      }
   }
 }
 rebuildResults();
@@ -2519,7 +2532,7 @@ function recordThrough(name, upto){
   let w = 0, l = 0;
   for (let d = 1; d <= upto; d++) {
     if (r[d] === "w") w++;
-    else if (r[d] === "l") l++;
+    else if (r[d] === "l" || r[d] === "f") l++;      // f = fusenpai, a default loss
   }
   return { w, l };
 }
@@ -2916,44 +2929,203 @@ function seedMet(){
   return met;
 }
 
-function matchDay(divName, st, met, rng, cond){
-  const pool = ROSTER_BY_DIV[divName].slice()
-    .sort((a,b) => (st[b].w - st[a].w) || (elo(b) - elo(a)));   // by record, then rank
-  const legal = (x,y) => x !== y && !met.has(pairKey(x,y)) && ROSTER[x].stable !== ROSTER[y].stable;
-  const used = new Set(), pairs = [];
-  const find = (i, allowRe, allowStable) => {
-    const a = pool[i];
-    for (let j = i+1; j < pool.length; j++){
-      const b = pool[j]; if (used.has(b)) continue;
-      if (!allowRe && met.has(pairKey(a,b))) continue;
-      if (!allowStable && ROSTER[a].stable === ROSTER[b].stable) continue;
-      return j;
-    }
-    return -1;
-  };
-  for (let i = 0; i < pool.length; i++){
-    const a = pool[i]; if (used.has(a)) continue;
-    let j = find(i,false,false); if (j<0) j = find(i,false,true); if (j<0) j = find(i,true,true);
-    if (j<0) continue;
-    const b = pool[j]; used.add(a); used.add(b); pairs.push([a,b]);
-  }
-  // 2-opt repair: swap partners between bouts to clear any rematch / same-stable pairing
-  for (let pass = 0; pass < 4; pass++){
-    let fixed = 0;
-    for (let i = 0; i < pairs.length; i++){
-      if (legal(pairs[i][0], pairs[i][1])) continue;
-      for (let j = 0; j < pairs.length; j++){
-        if (j === i) continue;
-        const [a,b] = pairs[i], [c,d] = pairs[j];
-        if (legal(a,c) && legal(b,d)) { pairs[i]=[a,c]; pairs[j]=[b,d]; fixed++; break; }
-        if (legal(a,d) && legal(b,c)) { pairs[i]=[a,d]; pairs[j]=[b,c]; fixed++; break; }
+/* ── torikumi: how the shinpan-bu actually build a card ────────────────────
+   Real matchmaking is rank-driven early and record-driven late:
+
+   • Days 1–~9    Everyone fights inside their own rank neighbourhood. The
+                  sanyaku work through the joi (the top maegashira); the
+                  rank-and-file meet men ranked near them. Two sanyaku are
+                  essentially never paired this early.
+   • Days ~10–15  The card turns into a leaderboard. Equal records are matched,
+                  a maegashira on a tear gets pulled up into the sanyaku, and
+                  the marquee bouts are spent one per day.
+   • Senshuraku   The biggest pairing the banzuke can offer — Yokozuna vs
+                  Yokozuna where there are two — is held back for the last day
+                  as the musubi no ichiban.
+
+   Everything below keys off banzuke position and win count. Nothing keys off
+   who a wrestler is.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Ordered banzuke position within a division. 0 = Yokozuna east. */
+const _rankPos = {};
+function rankPosMap(divName){
+  if (_rankPos[divName]) return _rankPos[divName];
+  const m = {};
+  ROSTER_BY_DIV[divName].slice().sort(rankSort).forEach((n, i) => { m[n] = i; });
+  return (_rankPos[divName] = m);
+}
+const tierOf = n => RANK_ORDER[rankOf(n).tier] ?? 9;      // Y0 O1 S2 K3 M4 J5
+
+/* The earliest day the schedulers would put two sanyaku together. The marquee
+   pairings are spent from the back of the basho forwards, so the biggest bout
+   on the banzuke lands on the final day and nothing above komusubi meets in
+   the first week. Expressed against the basho length, not hard-coded days. */
+function sanyakuGate(a, b, days){
+  const ta = tierOf(a), tb = tierOf(b);
+  if (ta > 3 || tb > 3) return 1;                          // a maegashira: no gate
+  const hi = Math.min(ta, tb), lo = Math.max(ta, tb);
+  if (hi === 0 && lo === 0) return days;                   // Y v Y     → senshuraku
+  if (lo <= 1)              return days - 4;               // Y/Ō v Y/Ō → day 11+
+  /* S/K bouts are NOT marquee — a yokozuna's fifteen opponents are roughly the
+     eight other sanyaku plus seven joi maegashira, so these have to start in
+     week one. Gate them any later and the top of the banzuke runs out of legal
+     opponents and starts reaching down to M14, which never happens for real. */
+  if (hi <= 1)              return Math.max(1, days - 10); // Y/Ō v S/K → day 5+
+  return Math.max(1, days - 11);                           // S/K v S/K → day 4+
+}
+
+/* The gate only says a pairing *may* happen. The shinpan-bu also don't wait
+   for the leaderboard to throw the big ones together — they hold them back and
+   spend them one a day over the closing stretch, most senior last. Without this
+   two Yokozuna can simply never be sorted next to each other and the basho ends
+   without its musubi no ichiban. */
+function reserveBout(divName, met, D, days){
+  if (D < days - 4) return null;                           // last five days only
+  const san = ROSTER_BY_DIV[divName].filter(n => tierOf(n) <= 3);
+  let best = null;
+  for (let i = 0; i < san.length; i++){
+    for (let j = i + 1; j < san.length; j++){
+      const a = san[i], b = san[j];
+      if (met.has(pairKey(a, b))) continue;
+      if (ROSTER[a].stable === ROSTER[b].stable) continue;
+      const gate = sanyakuGate(a, b, days);
+      if (D < gate) continue;
+      const seniority = tierOf(a) + tierOf(b);             // lower = bigger bout
+      if (!best || seniority < best.seniority
+               || (seniority === best.seniority && gate > best.gate)) {
+        best = { a, b, seniority, gate };
       }
     }
-    if (!fixed) break;
   }
-  for (const [a,b] of pairs) met.add(pairKey(a,b));
-  pairs.sort((p,q) => Math.max(elo(p[0]),elo(p[1])) - Math.max(elo(q[0]),elo(q[1])));  // top bout last
-  return pairs.map(([x,y]) => {
+  return best;
+}
+
+function matchDay(divName, st, met, rng, cond, D){
+  const days = BASHO_DAYS;
+  const pos  = rankPosMap(divName);
+  const pool = ROSTER_BY_DIV[divName].slice();
+  const N    = pool.length;
+
+  /* The sort key slides from rank to record across the fifteen days. A win is
+     worth almost nothing on day 1 and several rank slots by senshuraku, which
+     is what turns the card from a banzuke into a leaderboard — and what pulls
+     a hot low-ranker up the sheet without ever naming him. */
+  const t    = (D - 1) / Math.max(1, days - 1);
+  const perW = 1.2 + 7.0 * t * t;                          // rank slots per net win
+  const key  = n => pos[n] - perW * (st[n].w - st[n].l) / 2;
+  pool.sort((a, b) => key(a) - key(b) || pos[a] - pos[b]);
+
+  /* Fold pairing inside a block, which is how a Swiss draw works and how a
+     rank block actually gets matched: split the block in half and play the top
+     half against the bottom half. Nobody faces the man immediately beside them
+     on the banzuke — that alone is what keeps the two Yokozuna apart on day 1
+     — and the offset rotates by day so a block never reproduces its own card. */
+  const BLOCK = Math.max(4, Math.min(16, N));
+  function foldTarget(i){
+    const s   = Math.floor(i / BLOCK) * BLOCK;
+    const blk = Math.min(BLOCK, N - s);
+    if (blk < 2) return i;
+    const h = Math.max(1, blk >> 1), k = i - s, r = (D - 1);
+    const j = k < h ? h + ((k + r) % Math.max(1, blk - h))
+                    : (((k - h) - r) % h + h) % h;
+    return s + j;
+  }
+
+  const gateOK   = (x, y) => D >= sanyakuGate(x, y, days);
+  const stableOK = (x, y) => ROSTER[x].stable !== ROSTER[y].stable;
+  const freshOK  = (x, y) => !met.has(pairKey(x, y));
+  /* A big jump up the banzuke has to be earned. The schedulers pull a
+     maegashira up because he is winning, never because the card ran out of
+     neighbours — so a wide gap needs a winning record from the man below. */
+  const gapOK = (x, y) => {
+    const g = Math.abs(pos[x] - pos[y]);
+    if (g <= 14) return true;
+    const low = pos[x] > pos[y] ? x : y;
+    return (st[low].w - st[low].l) >= Math.max(2, Math.round((D - 1) * 0.34));
+  };
+  const hardOK = (x, y) => x !== y && freshOK(x, y) && stableOK(x, y) && gateOK(x, y);
+  const legal  = (x, y) => hardOK(x, y) && gapOK(x, y);
+
+  const used = new Set(), pairs = [];
+
+  /* Today's reserved marquee bout goes on the card before anything else. */
+  const rsv = reserveBout(divName, met, D, days);
+  if (rsv){ used.add(rsv.a); used.add(rsv.b); pairs.push([rsv.a, rsv.b]); }
+
+  /* Closest legal partner to the fold target, so a blocked pairing slides a
+     rank or two rather than falling back to whoever is left over. */
+  function nearest(i, allowGap, allowRe, allowGate, allowStable){
+    const a = pool[i], want = foldTarget(i);
+    let best = -1, bestD = Infinity;
+    for (let j = 0; j < N; j++){
+      if (j === i) continue;
+      const b = pool[j]; if (used.has(b)) continue;
+      if (!allowGap    && !gapOK(a, b))    continue;
+      if (!allowRe     && !freshOK(a, b))  continue;
+      if (!allowStable && !stableOK(a, b)) continue;
+      if (!allowGate   && !gateOK(a, b))   continue;
+      const d = Math.abs(j - want);
+      if (d < bestD){ bestD = d; best = j; }
+    }
+    return best;
+  }
+  for (let i = 0; i < N; i++){
+    const a = pool[i]; if (used.has(a)) continue;
+    /* Give way in the order the schedulers would: an unearned pull-up first,
+       then a rematch, then an early marquee bout, and only ever a stablemate
+       pairing if the card is otherwise impossible. */
+    let j = nearest(i, false, false, false, false);
+    if (j < 0) j = nearest(i, true,  false, false, false);
+    if (j < 0) j = nearest(i, true,  true,  false, false);
+    if (j < 0) j = nearest(i, true,  true,  true,  false);
+    if (j < 0) j = nearest(i, true,  true,  true,  true);
+    if (j < 0) continue;
+    used.add(a); used.add(pool[j]); pairs.push([a, pool[j]]);
+  }
+
+  /* 2-opt repair: swap partners between two bouts to clear a rematch, a
+     stablemate pairing, or a marquee bout that has come up too early. */
+  const locked = rsv ? 1 : 0;              // pairs[0] is the reserved bout — leave it alone
+
+  /* 2-opt repair, run twice with different bars. A rematch or a stablemate
+     pairing simply never happens in a real basho, so the first pass clears
+     those and will accept a wider rank gap to do it. The second pass then
+     tidies the gaps, refusing any swap that would reintroduce the first. */
+  function repair(bad, bars){
+    for (let pass = 0; pass < 8; pass++){
+      let fixed = 0;
+      for (let i = locked; i < pairs.length; i++){
+        if (!bad(pairs[i][0], pairs[i][1])) continue;
+        let done = false;
+        for (const ok of bars){                 // tightest bar first, then give ground
+          for (let j = locked; j < pairs.length; j++){
+            if (j === i) continue;
+            const [a, b] = pairs[i], [c, d] = pairs[j];
+            if (ok(a, c) && ok(b, d)) { pairs[i] = [a, c]; pairs[j] = [b, d]; done = true; break; }
+            if (ok(a, d) && ok(b, c)) { pairs[i] = [a, d]; pairs[j] = [b, c]; done = true; break; }
+          }
+          if (done) break;
+        }
+        if (done) fixed++;
+      }
+      if (!fixed) break;
+    }
+  }
+  /* Rematches and stablemate bouts never happen in a real basho, so clear those
+     first — preferring a swap that also keeps the rank gap sensible, and only
+     widening the gap if that is the sole way out. Then tidy the gaps. */
+  repair((x, y) => !hardOK(x, y), [legal, hardOK]);
+  repair((x, y) => !legal(x, y),  [legal]);
+
+  for (const [a, b] of pairs) met.add(pairKey(a, b));
+
+  /* Card order: lowest ranks open the day, the most senior pairing closes it
+     as the musubi no ichiban. */
+  const prestige = p => Math.min(pos[p[0]], pos[p[1]]);
+  pairs.sort((p, q) => prestige(q) - prestige(p));
+
+  return pairs.map(([x, y]) => {
     let e = x, w = y;                                          // east/west placement
     const sx = ROSTER[x].code.slice(-1), sy = ROSTER[y].code.slice(-1);
     if (sx === sy) { if (elo(y) > elo(x)) { e = y; w = x; } }
@@ -2968,6 +3140,7 @@ function matchDay(divName, st, met, rng, cond){
 
 function realDay(D, st, rng, cond){                                  // real announced card → project every bout
   const src = REAL_SNAP[String(D)], out = {};
+  const fought = new Set();
   for (const div of ["makuuchi","juryo"]) {
     out[div] = src[div].map(b => {
       const t = b.slice();
@@ -2978,9 +3151,18 @@ function realDay(D, st, rng, cond){                                  // real ann
       t[3] = pickKimarite(rng, ROSTER[eastWins ? e : w].sig);
       if (st[e]) (eastWins ? st[e] : st[w]).w++;
       if (st[w]) (eastWins ? st[w] : st[e]).l++;
+      fought.add(e); fought.add(w);
       return t;
     });
   }
+  /* Fusenpai. An announced card is 21 Makuuchi bouts drawn from 41 Makuuchi men
+     plus a Jūryō visitor, so somebody is always left off it — and in sumo a man
+     who doesn't appear takes a default loss. Without this he finishes the basho
+     on fewer than fifteen decided bouts, which makes his record incomparable
+     with everyone else's and quietly puts the yūshō out of his reach. */
+  for (const div of ["makuuchi","juryo"])
+    for (const n of ROSTER_BY_DIV[div])
+      if (!fought.has(n) && st[n]) st[n].l++;
   return out;
 }
 
@@ -3000,7 +3182,7 @@ function runSeason(rng, fill){
   for (let D = 1; D <= BASHO_DAYS; D++){                        // the whole tournament, Day 1 → 15
     const day = REAL_SNAP[String(D)]                            // real announced opening cards where known
       ? realDay(D, st, rng, cond)
-      : { makuuchi: matchDay("makuuchi", st, met, rng, cond), juryo: matchDay("juryo", st, met, rng, cond) };
+      : { makuuchi: matchDay("makuuchi", st, met, rng, cond, D), juryo: matchDay("juryo", st, met, rng, cond, D) };
     if (fill) days[String(D)] = { label:`Day ${D}`, sub:`Day ${D} · Simulation`,
                                   makuuchi:day.makuuchi, juryo:day.juryo };
   }
@@ -3074,7 +3256,7 @@ function banzukeRows(divName){
 function recordStr(name, upto){
   const r = RESULTS[name] || {};
   let win = 0, loss = 0;
-  for (let d = 1; d <= upto; d++) { if (r[d] === "w") win++; else if (r[d] === "l") loss++; }
+  for (let d = 1; d <= upto; d++) { if (r[d] === "w") win++; else if (r[d] === "l" || r[d] === "f") loss++; }
   return `${win}–${loss}`;
 }
 function bzCell(name, side, upto){
