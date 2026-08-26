@@ -158,6 +158,64 @@
   .results .rc{font-size:.78rem;padding:4px 9px;border-radius:7px;background:var(--surface-2);border:1px solid var(--line)}
   .results .rc .e{font-family:"IBM Plex Mono",monospace;font-size:.66rem;color:var(--sun);margin-left:6px}
 
+
+  /* ===== confirm modal ===== */
+  .cfm-back{position:fixed;inset:0;background:rgba(6,7,10,.72);backdrop-filter:blur(3px);z-index:80;
+    display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .13s}
+  .cfm-back.show{opacity:1;pointer-events:auto}
+  .cfm{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--radius);width:min(420px,100%);
+    box-shadow:0 26px 70px rgba(0,0,0,.62);transform:translateY(10px) scale(.98);transition:transform .13s;overflow:hidden}
+  .cfm-back.show .cfm{transform:none}
+  .cfm-hd{padding:16px 20px 4px;text-align:center}
+  .cfm-hd h3{margin:0;font-size:1.02rem;letter-spacing:.01em}
+  .cfm-hd .sub{color:var(--dim);font-size:.8rem;margin-top:3px}
+  .cfm-body{display:flex;gap:16px;align-items:center;padding:14px 20px 6px}
+  .cfm-shot{width:104px;flex:0 0 104px;aspect-ratio:5/7;border-radius:var(--radius-sm);overflow:hidden;
+    border:1px solid var(--line);background:var(--surface-2);position:relative}
+  .cfm-shot img{width:100%;height:100%;object-fit:contain;object-position:bottom}
+  .cfm-meta{min-width:0}
+  .cfm-kanji{font-size:1.15rem;color:var(--ink-2);line-height:1.2}
+  .cfm-name{font-size:1.3rem;font-weight:700;letter-spacing:.01em;margin:1px 0 6px;word-break:break-word}
+  .cfm-row{font-size:.82rem;color:var(--dim);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .cfm-row b{color:var(--ink-2);font-weight:600}
+  .cfm-warn{margin:10px 20px 0;padding:8px 11px;border-radius:8px;background:var(--sun-soft);
+    border:1px solid rgba(var(--sun-rgb),.34);color:var(--ink-2);font-size:.78rem}
+  .cfm-ft{display:flex;gap:9px;padding:16px 20px 18px;justify-content:flex-end}
+  .cfm-ft .btn{padding:9px 16px;font-size:.86rem}
+  .pcard.pending{outline:2px solid var(--sun);outline-offset:2px;box-shadow:0 0 0 6px var(--sun-soft)}
+
+  /* ===== my board (custom ranking) ===== */
+  .bd{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+  .bd-hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:9px}
+  .bd-hd h4{margin:0;font-size:.9rem}
+  .bd-hd .cnt{color:var(--dim);font-size:.78rem;font-weight:400}
+  .bd-hd .sp{flex:1}
+  .bd-note{color:var(--dim);font-size:.78rem;margin:0 0 9px}
+  .bd-list{max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius-sm);
+    background:var(--surface-2);padding:4px}
+  .bd-row{display:flex;gap:9px;align-items:center;padding:5px 7px;border-radius:7px;font-size:.83rem;
+    background:transparent;cursor:grab;border:1px solid transparent}
+  .bd-row+.bd-row{margin-top:2px}
+  .bd-row:hover{background:var(--surface-3);border-color:var(--line)}
+  .bd-row.drag{opacity:.4}
+  .bd-row.over{border-color:var(--sun);background:var(--sun-soft)}
+  .bd-row.gone{opacity:.38}
+  .bd-row.gone .bd-nm{text-decoration:line-through}
+  .bd-row.next{background:var(--sun-soft);border-color:rgba(var(--sun-rgb),.4)}
+  .bd-n{width:22px;text-align:right;color:var(--faint);font-variant-numeric:tabular-nums;flex:0 0 22px}
+  .bd-th{width:22px;height:30px;flex:0 0 22px;border-radius:4px;overflow:hidden;background:var(--surface-3)}
+  .bd-th img{width:100%;height:100%;object-fit:contain;object-position:bottom}
+  .bd-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bd-rk{color:var(--dim);font-size:.74rem;flex:0 0 auto}
+  .bd-acts{display:flex;gap:3px;flex:0 0 auto}
+  .bd-acts button{background:var(--surface-3);border:1px solid var(--line);color:var(--ink-2);border-radius:5px;
+    width:23px;height:23px;font:inherit;font-size:.72rem;line-height:1;cursor:pointer;padding:0}
+  .bd-acts button:hover{border-color:var(--line-2);color:var(--ink)}
+  .bd-grip{color:var(--faint);flex:0 0 auto;cursor:grab;user-select:none}
+  .adr{display:flex;gap:7px;align-items:center;background:var(--surface-2);border:1px solid var(--line);
+    border-radius:8px;padding:5px 10px;font-size:.78rem;color:var(--ink-2);cursor:pointer;user-select:none}
+  .adr input{accent-color:var(--sun);margin:0}
+  .adr.on{border-color:rgba(var(--sun-rgb),.5);background:var(--sun-soft);color:var(--ink)}
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;
     background:var(--surface-3);border:1px solid var(--line-2);color:var(--ink);border-radius:10px;padding:11px 18px;
     font-size:.86rem;box-shadow:0 12px 34px rgba(0,0,0,.5);transition:opacity .2s,transform .2s;z-index:80;max-width:90vw}
@@ -304,7 +362,7 @@
           <option value="28800">8 hours (slowest)</option>
           <option value="10" data-demo="1">10 seconds — demo speed</option>
         </select>
-        <span class="hint">Same for every player. If someone misses their window, the top wrestler by ELO is drafted for them automatically.</span>
+        <span class="hint">Same for every player. If someone misses their window, the top available wrestler on their own board is drafted for them automatically.</span>
       </label>
       <label class="fld"><span class="lab">Draft starts</span>
         <input type="datetime-local" id="startAt">
@@ -360,6 +418,20 @@
       </div>
       <div class="pool" id="pool"></div>
 
+      <!-- ===== MY BOARD: custom ranking that drives auto-draft ===== -->
+      <div class="bd" id="boardWrap">
+        <div class="bd-hd">
+          <h4>My board <span class="cnt" id="bdCnt"></span></h4>
+          <span class="sp"></span>
+          <label class="adr" id="autoWrap" title="Draft for me from the top of my board the moment I'm on the clock">
+            <input type="checkbox" id="autoDraft"><span>Auto-draft me</span>
+          </label>
+          <button class="btn ghost sm" id="bdReset">Reset to banzuke order</button>
+        </div>
+        <p class="bd-note" id="bdNote"></p>
+        <div class="bd-list" id="bdList"></div>
+      </div>
+
       <div class="mine" id="mineWrap">
         <div class="mhead"><h4>My team</h4><span class="cnt" id="mineCnt"></span></div>
         <div class="mgroup"><div class="glab">Makuuchi — active roster</div><div class="mgrid" id="mineMak"></div></div>
@@ -391,6 +463,27 @@
       <button class="btn ghost" id="againBtn">Run another preview draft</button>
     </div>
   </section>
+</div>
+<div class="cfm-back" id="cfmBack" role="dialog" aria-modal="true" aria-labelledby="cfmTitle">
+  <div class="cfm">
+    <div class="cfm-hd">
+      <h3 id="cfmTitle">Draft this wrestler?</h3>
+      <div class="sub" id="cfmSub"></div>
+    </div>
+    <div class="cfm-body">
+      <div class="cfm-shot" id="cfmShot"></div>
+      <div class="cfm-meta">
+        <div class="cfm-kanji" id="cfmKanji"></div>
+        <div class="cfm-name" id="cfmName"></div>
+        <div class="cfm-row" id="cfmRow"></div>
+      </div>
+    </div>
+    <div class="cfm-warn">Once confirmed, only the commissioner can rescind this pick.</div>
+    <div class="cfm-ft">
+      <button class="btn ghost" id="cfmNo">Cancel</button>
+      <button class="btn" id="cfmYes">Draft him</button>
+    </div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -528,6 +621,7 @@ async function initRoster(){
     const live = await loadLive();
     if (S) return; // a draft started while we were fetching — don't disturb it
     applyRoster(live.wrestlers);
+    loadBoard();   // re-seed the ranking against the roster that actually loaded
     const withPhoto = RK.filter(r=>r.src).length;
     setRosterStatus('Live roster — <b>'+bashoLabel(live.bashoId)+'</b> banzuke · '+MAK.length+' Makuuchi + '+JUR.length+' Jūryō'
       + (withPhoto<RK.length ? ' · <span class="muted">'+(RK.length-withPhoto)+' new rikishi shown without a photo</span>' : ''), "ok");
@@ -599,6 +693,147 @@ let members = buildRoom();
    handle "you"; launched from a league it's your league handle. buildRoom()
    always puts you first, so read it from there rather than hard-coding "you"
    — that assumption is what used to lock you out of your own picks. */
+
+/* =====================================================================
+   MY BOARD — a personal ranking of every draftable wrestler, per
+   division, seeded in banzuke order (MAK/JUR are already sorted that way:
+   each wrestler's ELO is derived from their live banzuke rank, so highest
+   ELO == highest rank). Auto-draft always takes the top wrestler on this
+   list who is still available, so an idle manager still drafts sensibly.
+   Persisted per league so your board survives a reload.
+   ===================================================================== */
+let BOARD = { makuuchi: [], juryo: [] };
+let AUTODRAFT = false;
+let autoTimer = null;
+
+function boardKey(){ return "GG_MOCK_BOARD:" + ((CTX && CTX.league) || "__standalone__"); }
+function poolFor(div){ return div === "juryo" ? JUR : MAK; }
+function defaultBoard(div){ return poolFor(div).map(r => r.name); }
+
+/* Keep the saved order but reconcile it against the roster actually loaded:
+   drop anyone who is gone, append newcomers in banzuke order. */
+function reconcile(saved, div){
+  const live = defaultBoard(div), set = new Set(live);
+  const kept = (saved || []).filter(n => set.has(n));
+  const have = new Set(kept);
+  return kept.concat(live.filter(n => !have.has(n)));
+}
+function loadBoard(){
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(boardKey()) || "null"); } catch(e){}
+  BOARD.makuuchi = reconcile(saved && saved.makuuchi, "makuuchi");
+  BOARD.juryo    = reconcile(saved && saved.juryo,    "juryo");
+  if (saved && typeof saved.auto === "boolean") AUTODRAFT = saved.auto;
+}
+function saveBoard(){
+  try { localStorage.setItem(boardKey(), JSON.stringify({ makuuchi:BOARD.makuuchi, juryo:BOARD.juryo, auto:AUTODRAFT })); } catch(e){}
+}
+function resetBoard(){
+  BOARD.makuuchi = defaultBoard("makuuchi");
+  BOARD.juryo    = defaultBoard("juryo");
+  saveBoard(); renderMyBoard();
+  toast("Board reset to banzuke order.");
+}
+
+/* The next name on my board that nobody has taken. Falls back to best
+   available so auto-draft can never stall on an exhausted list. */
+function boardPick(div){
+  const list = BOARD[div] || [];
+  for (const n of list){ if (!S.owned.has(n) && byName[n]) return byName[n]; }
+  return bestAvailable(div);
+}
+/* Bots draft best-available; only the human has a board. */
+function autoPickFor(handle, div){ return isMe(handle) ? boardPick(div) : bestAvailable(div); }
+
+function moveInBoard(div, name, to){
+  const list = BOARD[div], from = list.indexOf(name);
+  if (from < 0) return;
+  to = Math.max(0, Math.min(list.length - 1, to));
+  if (to === from) return;
+  list.splice(from, 1); list.splice(to, 0, name);
+  saveBoard(); renderMyBoard();
+}
+
+function renderMyBoard(){
+  if (!S) return;
+  const div = S.activeDiv, list = BOARD[div] || [];
+  const nextUp = boardPick(div);
+  const avail = list.filter(n => !S.owned.has(n)).length;
+  $("bdCnt").textContent = "— " + (div === "juryo" ? "Jūryō" : "Makuuchi") + " · " + avail + " still available";
+  $("bdNote").innerHTML = AUTODRAFT
+    ? 'Auto-draft is <b>on</b> — you’ll be drafted the top available name here the moment you’re on the clock.'
+    : 'Drag to reorder. If your clock runs out, you get the top available name here instead of a random pick.';
+  $("bdList").innerHTML = list.map((n, i) => {
+    const r = byName[n] || {}, taken = S.owned.has(n);
+    return '<div class="bd-row' + (taken ? " gone" : "") + (!taken && nextUp && nextUp.name === n ? " next" : "") + '"'
+      + ' draggable="' + (taken ? "false" : "true") + '" data-n="' + esc(n) + '">'
+      + '<span class="bd-n">' + (i + 1) + '</span>'
+      + '<span class="bd-th">' + (r.src ? '<img src="' + r.src + '" alt="">' : "") + '</span>'
+      + '<span class="bd-nm">' + esc(n) + '</span>'
+      + '<span class="bd-rk">' + esc(rankLabel(n)) + '</span>'
+      + '<span class="bd-acts"><button data-a="top" title="Move to top">⇈</button>'
+      + '<button data-a="up" title="Up">↑</button>'
+      + '<button data-a="down" title="Down">↓</button></span>'
+      + '<span class="bd-grip" aria-hidden="true">∷</span></div>';
+  }).join("") || '<p class="hint" style="padding:8px">No wrestlers in this division.</p>';
+
+  let dragging = null;
+  $("bdList").querySelectorAll(".bd-row").forEach(row => {
+    const name = row.dataset.n;
+    row.querySelectorAll("[data-a]").forEach(btn => {
+      btn.onclick = e => {
+        e.stopPropagation();
+        const at = BOARD[div].indexOf(name), a = btn.dataset.a;
+        moveInBoard(div, name, a === "top" ? 0 : a === "up" ? at - 1 : at + 1);
+      };
+    });
+    row.ondragstart = e => { dragging = name; row.classList.add("drag"); e.dataTransfer.effectAllowed = "move"; };
+    row.ondragend   = () => { dragging = null; row.classList.remove("drag");
+                              $("bdList").querySelectorAll(".over").forEach(x => x.classList.remove("over")); };
+    row.ondragover  = e => { if (dragging && dragging !== name){ e.preventDefault(); row.classList.add("over"); } };
+    row.ondragleave = () => row.classList.remove("over");
+    row.ondrop      = e => { e.preventDefault(); row.classList.remove("over");
+                             if (dragging) moveInBoard(div, dragging, BOARD[div].indexOf(name)); };
+  });
+}
+
+/* =====================================================================
+   CONFIRM MODAL — a pick is irreversible for everyone but the
+   commissioner, so a stray click must never draft anybody.
+   ===================================================================== */
+let PENDING = null;
+function cfmOpen(name){
+  const r = byName[name] || {}, t = snakeTurn(S.order, S.rosterSize, S.pickIdx);
+  PENDING = name;
+  $("cfmShot").innerHTML = r.src ? '<img src="' + r.src + '" alt="' + esc(name) + '">' : "";
+  $("cfmKanji").textContent = r.kanji || "";
+  $("cfmName").textContent = name;
+  $("cfmRow").innerHTML = '<b>' + esc(rankLabel(name)) + '</b><span>·</span><span>ELO ' + (r.elo || "—") + '</span>'
+    + (r.from ? '<span>·</span><span>' + esc(r.from) + '</span>' : "");
+  $("cfmSub").textContent = (t.phase === "juryo" ? "Jūryō · farm team" : "Makuuchi · active roster")
+    + " · round " + t.round + " · pick " + (S.pickIdx + 1) + " of " + t.total;
+  $("cfmBack").classList.add("show");
+  const card = $("pool").querySelector('[data-n="' + (window.CSS && CSS.escape ? CSS.escape(name) : name) + '"]');
+  if (card) card.classList.add("pending");
+  $("cfmYes").focus();
+}
+function cfmClose(){
+  PENDING = null;
+  $("cfmBack").classList.remove("show");
+  $("pool").querySelectorAll(".pending").forEach(c => c.classList.remove("pending"));
+}
+function cfmConfirm(){
+  const name = PENDING;
+  if (!name) return;
+  cfmClose();
+  if (!S || S.paused) return;
+  const t = snakeTurn(S.order, S.rosterSize, S.pickIdx);
+  if (!isMe(t.who)){ toast("Too late — the pick moved on."); return; }
+  if (S.owned.has(name)){ toast(name + " was just drafted."); return; }
+  clearInterval(tick);
+  commitPick(meHandle(), name, false);
+}
+
 function meHandle(){ return (members[0] && members[0].handle) || "you"; }
 function isMe(h){ return h === meHandle(); }
 function nameOf(m){ return String((m && m.name) || "").replace(" (commissioner)","").replace(" (you)",""); }
@@ -665,6 +900,9 @@ function startDraft(){
   $("roomCard").classList.add("hide");
   $("resultsCard").classList.add("hide");
   $("draftCard").classList.remove("hide");
+  loadBoard();
+  $("autoDraft").checked = AUTODRAFT;
+  $("autoWrap").classList.toggle("on", AUTODRAFT);
   $("phaseSub").textContent = "Draft in progress — pick when you're on the clock.";
   $("draftMeta").textContent = "— "+(rs)+" per division · "+fmtClock(S.pickClock)+" per pick";
   renderOrderStrip();
@@ -700,11 +938,26 @@ function beginTurn(){
   updateClock();
   clearInterval(tick);
   tick = setInterval(clockLoop, 250);
-  // bots think for a beat, then pick
-  if(!you && !S.paused) scheduleBot(t);
+  renderMyBoard();
+  if(!S.paused){
+    if(you){ if(AUTODRAFT) scheduleAuto(t); }   // my turn: only fire if I asked to be auto-drafted
+    else scheduleBot(t);
+  }
 }
 
 let botTimer=null;
+/* Auto-draft mode: I'm on the clock but I've asked to be picked for.
+   Short beat so the pick is visible rather than instantaneous. */
+function scheduleAuto(t){
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(()=>{
+    if(!S || S.paused || !AUTODRAFT) return;
+    const cur = snakeTurn(S.order,S.rosterSize,S.pickIdx);
+    if(!isMe(cur.who) || cur.phase!==t.phase) return;   // state moved on
+    const pick = boardPick(cur.phase);
+    if(pick){ clearInterval(tick); cfmClose(); commitPick(cur.who, pick.name, "auto"); }
+  }, 900);
+}
 function scheduleBot(t){
   clearTimeout(botTimer);
   const thinkMs = Math.min(S.pickClock*1000*0.5, 1200 + Math.random()*1800);
@@ -728,8 +981,8 @@ function clockLoop(){
   if(Date.now()>=S.deadline){
     clearInterval(tick);
     const t = snakeTurn(S.order,S.rosterSize,S.pickIdx);
-    const pick = bestAvailable(t.phase);
-    if(pick) commitPick(t.who, pick.name, true); // auto pick
+    const pick = autoPickFor(t.who, t.phase);   // mine comes off my board, bots take best available
+    if(pick){ cfmClose(); commitPick(t.who, pick.name, "timeout"); } // clock ran out
   }
 }
 function updateClock(){
@@ -750,15 +1003,18 @@ function commitPick(handle, rikishi, auto){
   if(t.phase==="done") return;
   if(S.owned.has(rikishi)) return;
   S.owned.add(rikishi);
-  S.picks.push({idx:S.pickIdx, round:t.round, phase:t.phase, handle, rikishi, auto:!!auto});
+  S.picks.push({idx:S.pickIdx, round:t.round, phase:t.phase, handle, rikishi, auto:auto||false});
   S.pickIdx++;
   const m = members.find(x=>x.handle===handle);
   const nm = nameOf(m);
-  toast(auto ? `Time expired — ${rikishi} auto-drafted for ${nm}` : `${nm} drafted ${rikishi}`);
+  toast(auto === "auto"    ? `Auto-draft — ${rikishi} taken for ${nm}`
+      : auto === "timeout" ? `Time expired — ${rikishi} auto-drafted for ${nm}`
+      : auto               ? `${rikishi} auto-drafted for ${nm}`
+      :                      `${nm} drafted ${rikishi}`);
   refreshRescind();
   const nt = snakeTurn(S.order,S.rosterSize,S.pickIdx);
   if(nt.phase==="done"){
-    renderMine(); renderBoard();   // the final pick lands after the last beginTurn(), so paint it here
+    renderMine(); renderBoard(); renderMyBoard();   // final pick lands after the last beginTurn(), so paint it here
     return finishDraft();
   }
   beginTurn();
@@ -769,8 +1025,7 @@ function youPick(name){
   if(!isMe(t.who)){ toast("It's not your turn."); return; }
   if(S.paused){ toast("The draft is paused."); return; }
   if(S.owned.has(name)){ toast(name+" is already drafted."); return; }
-  clearInterval(tick);
-  commitPick(meHandle(), name, false);
+  cfmOpen(name);   // never draft straight off a click — confirm first
 }
 
 function renderPool(){
@@ -815,7 +1070,7 @@ function renderBoard(){
     const nm = nameOf(m);
     return `<div class="brow ${isMe(p.handle)?"me":""}">
       <span class="pn">${p.round}.${String(p.idx%S.order.length+1)}</span>
-      <span class="ri">${esc(p.rikishi)}${p.auto?`<span class="auto">auto</span>`:""}</span>
+      <span class="ri">${esc(p.rikishi)}${p.auto?`<span class="auto">${p.auto==="timeout"?"timed out":"auto"}</span>`:""}</span>
       <span class="to">${esc(nm)}</span></div>`;
   }).join("") || `<p class="hint">No picks yet.</p>`;
 }
@@ -826,7 +1081,7 @@ function togglePause(){
   $("pausedNote").classList.toggle("hide", !S.paused);
   $("pauseBtn").textContent = S.paused ? "Resume draft" : "Pause draft";
   if(S.paused){
-    clearInterval(tick); clearTimeout(botTimer);
+    clearInterval(tick); clearTimeout(botTimer); clearTimeout(autoTimer); cfmClose();
     S._remain = S.deadline - Date.now();
     toast("Draft paused.");
   } else {
@@ -834,7 +1089,7 @@ function togglePause(){
     updateClock();
     tick = setInterval(clockLoop, 250);
     const t = snakeTurn(S.order,S.rosterSize,S.pickIdx);
-    if(!isMe(t.who)) scheduleBot(t);
+    if(!isMe(t.who)) scheduleBot(t); else if(AUTODRAFT) scheduleAuto(t);
     toast("Draft resumed.");
   }
   renderPool();
@@ -842,9 +1097,9 @@ function togglePause(){
 function forcePick(){
   if(S.paused){ toast("Resume first to force a pick."); return; }
   const t = snakeTurn(S.order,S.rosterSize,S.pickIdx);
-  const pick = bestAvailable(t.phase);
-  clearInterval(tick); clearTimeout(botTimer);
-  if(pick) commitPick(t.who, pick.name, true);
+  const pick = autoPickFor(t.who, t.phase);
+  clearInterval(tick); clearTimeout(botTimer); clearTimeout(autoTimer);
+  if(pick){ cfmClose(); commitPick(t.who, pick.name, "timeout"); }
 }
 function refreshRescind(){
   const sel = $("rescindSel");
@@ -875,7 +1130,7 @@ function rescind(){
 
 // ---------- results ----------
 function finishDraft(){
-  clearInterval(tick); clearTimeout(botTimer);
+  clearInterval(tick); clearTimeout(botTimer); clearTimeout(autoTimer); cfmClose();
   $("draftCard").classList.add("hide");
   $("resultsCard").classList.remove("hide");
   $("phaseSub").textContent = "Draft complete. Here's how every roster shook out.";
@@ -904,7 +1159,7 @@ function finishDraft(){
 
 // ---------- wiring ----------
 function resetAll(){
-  clearInterval(tick); clearTimeout(botTimer);
+  clearInterval(tick); clearTimeout(botTimer); clearTimeout(autoTimer); cfmClose();
   S=null;
   members = buildRoom();
   $("setupCard").classList.remove("hide");
@@ -930,6 +1185,27 @@ $("poolSearch").oninput = ()=>{ if(S) renderPool(); };
 $("pauseBtn").onclick = togglePause;
 $("skipBtn").onclick = forcePick;
 $("rescindBtn").onclick = rescind;
+
+$("bdReset").onclick = resetBoard;
+$("autoDraft").onchange = e => {
+  AUTODRAFT = e.target.checked;
+  $("autoWrap").classList.toggle("on", AUTODRAFT);
+  saveBoard(); renderMyBoard();
+  if(!S) return;
+  const t = snakeTurn(S.order,S.rosterSize,S.pickIdx);
+  if(AUTODRAFT && isMe(t.who) && !S.paused){ cfmClose(); scheduleAuto(t); }   // already on the clock — go now
+  else clearTimeout(autoTimer);
+  toast(AUTODRAFT ? "Auto-draft on — picks come off the top of your board." : "Auto-draft off — you pick for yourself.");
+};
+
+$("cfmNo").onclick  = cfmClose;
+$("cfmYes").onclick = cfmConfirm;
+$("cfmBack").onclick = e => { if(e.target === $("cfmBack")) cfmClose(); };
+document.addEventListener("keydown", e => {
+  if(!PENDING) return;
+  if(e.key === "Escape"){ e.preventDefault(); cfmClose(); }
+  if(e.key === "Enter"){ e.preventDefault(); cfmConfirm(); }
+});
 
 $("startAt").value = defaultStartAt();
 applyCtx();
