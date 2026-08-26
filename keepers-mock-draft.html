@@ -551,8 +551,19 @@ function applyCtx(){
   if(!CTX) return;
   var h=document.getElementById("dtTitle");
   if(h) h.innerHTML = esc(CTX.league||"Your league")+' <span class="badge">Mock Draft</span>';
-  if(CTX.rosterSize) $("rosterSize").value = CTX.rosterSize;
-  if(CTX.pickClock) $("pickClock").value = String(CTX.pickClock);
+  if(CTX.rosterSize) $("rosterSize").value = Math.max(5, Math.min(10, +CTX.rosterSize || 6));
+  if(CTX.pickClock){
+    /* Snap to the nearest option we actually offer. Assigning a value the
+       <select> doesn't have leaves it with nothing selected, and +"" is 0 —
+       which would make every pick expire instantly and auto-draft. */
+    var sel = $("pickClock"), want = +CTX.pickClock || 0;
+    var opts = [].filter.call(sel.options, function(o){ return !o.dataset.demo; })
+                 .map(function(o){ return +o.value; });   // never snap a league onto the 10s demo clock
+    if(want > 0){
+      var best = opts.reduce(function(a,b){ return Math.abs(b-want) < Math.abs(a-want) ? b : a; });
+      sel.value = String(best);
+    }
+  }
   var np=$("numPlayers"); if(np){ var fld=np.closest(".fld"); if(fld) fld.style.display="none"; }
   members = buildRoom();
   var ph=$("phaseSub"); if(ph) ph.textContent = "Practice run \u2014 draft against bot versions of your league. Nothing here affects the real draft.";
@@ -570,7 +581,7 @@ function defaultStartAt(){
 function buildRoom(){
   if (CTX && Array.isArray(CTX.members) && CTX.members.length){
     const meKey = String((CTX.you&&(CTX.you.handle||CTX.you.name))||"").toLowerCase();
-    const you = { handle:(CTX.you&&CTX.you.handle)||"you", name:((CTX.you&&CTX.you.name)||"You")+" (you)", commish:true, rsvp:true };
+    const you = { handle:String((CTX.you&&(CTX.you.handle||CTX.you.name))||"you").toLowerCase(), name:((CTX.you&&CTX.you.name)||"You")+" (you)", commish:true, rsvp:true };
     const bots = CTX.members
       .filter(m => String(m.handle||m.name||"").toLowerCase() !== meKey)
       .map(m => ({ handle:String(m.handle||m.name||"bot").toLowerCase(), name:(m.name||m.handle||"Bot"), commish:false, rsvp:true, bot:true }));
@@ -583,6 +594,14 @@ function buildRoom(){
 }
 
 let members = buildRoom();
+
+/* Who is the human in this room? In the standalone demo that's the literal
+   handle "you"; launched from a league it's your league handle. buildRoom()
+   always puts you first, so read it from there rather than hard-coding "you"
+   — that assumption is what used to lock you out of your own picks. */
+function meHandle(){ return (members[0] && members[0].handle) || "you"; }
+function isMe(h){ return h === meHandle(); }
+function nameOf(m){ return String((m && m.name) || "").replace(" (commissioner)","").replace(" (you)",""); }
 
 function renderRoom(){
   $("roomCount").textContent = "— "+members.length+" managers";
@@ -638,7 +657,7 @@ function startDraft(){
   const order = members.map(m=>m.handle);
   for(let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
   S = {
-    order, rosterSize:rs, pickClock:+$("pickClock").value,
+    order, rosterSize:rs, pickClock:(+$("pickClock").value || 120),
     pickIdx:0, picks:[], owned:new Set(), paused:false,
     deadline:0, activeDiv:"makuuchi"
   };
@@ -658,7 +677,7 @@ function renderOrderStrip(){
   $("orderStrip").innerHTML = S.order.map((h,i)=>{
     const m = members.find(x=>x.handle===h);
     const now = t.who===h;
-    return `<span class="ochip ${now?"now":""}"><span class="num">${i+1}</span>${esc(m.name.replace(" (commissioner)",""))}</span>`;
+    return `<span class="ochip ${now?"now":""}"><span class="num">${i+1}</span>${esc(nameOf(m))}</span>`;
   }).join("");
 }
 
@@ -671,7 +690,7 @@ function beginTurn(){
   $("tabMak").disabled = t.phase!=="makuuchi";
   $("tabJur").disabled = t.phase!=="juryo";
   const m = members.find(x=>x.handle===t.who);
-  const you = t.who==="you";
+  const you = isMe(t.who);
   $("clockName").innerHTML = you ? `<b>Your pick</b>` : esc(m.name);
   $("clockPhase").textContent = `Round ${t.round} · ${t.phase==="makuuchi"?"Makuuchi (active roster)":"Jūryō (farm team)"} · pick ${S.pickIdx+1} of ${t.total}`;
   renderOrderStrip();
@@ -734,21 +753,24 @@ function commitPick(handle, rikishi, auto){
   S.picks.push({idx:S.pickIdx, round:t.round, phase:t.phase, handle, rikishi, auto:!!auto});
   S.pickIdx++;
   const m = members.find(x=>x.handle===handle);
-  const nm = m.name.replace(" (commissioner)","");
+  const nm = nameOf(m);
   toast(auto ? `Time expired — ${rikishi} auto-drafted for ${nm}` : `${nm} drafted ${rikishi}`);
   refreshRescind();
   const nt = snakeTurn(S.order,S.rosterSize,S.pickIdx);
-  if(nt.phase==="done") return finishDraft();
+  if(nt.phase==="done"){
+    renderMine(); renderBoard();   // the final pick lands after the last beginTurn(), so paint it here
+    return finishDraft();
+  }
   beginTurn();
 }
 
 function youPick(name){
   const t = snakeTurn(S.order,S.rosterSize,S.pickIdx);
-  if(t.who!=="you"){ toast("It's not your turn."); return; }
+  if(!isMe(t.who)){ toast("It's not your turn."); return; }
   if(S.paused){ toast("The draft is paused."); return; }
   if(S.owned.has(name)){ toast(name+" is already drafted."); return; }
   clearInterval(tick);
-  commitPick("you", name, false);
+  commitPick(meHandle(), name, false);
 }
 
 function renderPool(){
@@ -756,7 +778,7 @@ function renderPool(){
   const q = ($("poolSearch").value||"").toLowerCase();
   const list = (div==="makuuchi"?MAK:JUR).filter(r=>!q || r.name.toLowerCase().includes(q));
   const t = snakeTurn(S.order,S.rosterSize,S.pickIdx);
-  const youUp = t.who==="you" && !S.paused;
+  const youUp = isMe(t.who) && !S.paused;
   const band = div==="makuuchi" ? "Makuuchi" : "Juryo";
   $("pool").innerHTML = list.map(r=>{
     const taken = S.owned.has(r.name);
@@ -773,7 +795,7 @@ function renderPool(){
 }
 
 function renderMine(){
-  const mine = S.picks.filter(p=>p.handle==="you");
+  const mine = S.picks.filter(p=>isMe(p.handle));
   const mak = mine.filter(p=>p.phase==="makuuchi");
   const jur = mine.filter(p=>p.phase==="juryo");
   $("mineCnt").textContent = mine.length+" of "+(S.rosterSize*2)+" drafted";
@@ -790,8 +812,8 @@ function renderMine(){
 function renderBoard(){
   $("board").innerHTML = S.picks.slice().reverse().map(p=>{
     const m = members.find(x=>x.handle===p.handle);
-    const nm = m.name.replace(" (commissioner)","");
-    return `<div class="brow ${p.handle==="you"?"me":""}">
+    const nm = nameOf(m);
+    return `<div class="brow ${isMe(p.handle)?"me":""}">
       <span class="pn">${p.round}.${String(p.idx%S.order.length+1)}</span>
       <span class="ri">${esc(p.rikishi)}${p.auto?`<span class="auto">auto</span>`:""}</span>
       <span class="to">${esc(nm)}</span></div>`;
@@ -812,7 +834,7 @@ function togglePause(){
     updateClock();
     tick = setInterval(clockLoop, 250);
     const t = snakeTurn(S.order,S.rosterSize,S.pickIdx);
-    if(t.who!=="you") scheduleBot(t);
+    if(!isMe(t.who)) scheduleBot(t);
     toast("Draft resumed.");
   }
   renderPool();
@@ -829,7 +851,7 @@ function refreshRescind(){
   const recent = S.picks.slice(-12).reverse();
   sel.innerHTML = `<option value="">Rescind a pick…</option>` + recent.map(p=>{
     const m = members.find(x=>x.handle===p.handle);
-    return `<option value="${p.idx}">#${p.idx+1} · ${esc(p.rikishi)} → ${esc(m.name.replace(" (commissioner)",""))}</option>`;
+    return `<option value="${p.idx}">#${p.idx+1} · ${esc(p.rikishi)} → ${esc(nameOf(m))}</option>`;
   }).join("");
 }
 function rescind(){
@@ -867,10 +889,10 @@ function finishDraft(){
   }).sort((a,b)=>b.total-a.total);
   $("resultsMeta").textContent = "— ranked by total roster ELO";
   $("resultsBody").innerHTML = teams.map((t,i)=>{
-    const nm = t.m.name.replace(" (commissioner)","");
+    const nm = nameOf(t.m);
     const chips = list => list.map(r=>`<span class="rc">${esc(r.name)}<span class="e">${r.elo}</span></span>`).join("") || `<span class="hint">—</span>`;
     return `<div class="team ${i===0?"win":""}">
-      <div class="thead"><span class="rank">${i+1}</span><span class="nm">${esc(nm)}${t.m.commish?" · you":""}</span>
+      <div class="thead"><span class="rank">${i+1}</span><span class="nm">${esc(nm)}${isMe(t.m.handle)?" · you":""}</span>
         <span class="tot">${t.total.toLocaleString()} ELO</span></div>
       <div class="roster">
         <div class="rblock"><h5>Makuuchi — active</h5><div class="chips">${chips(t.mak)}</div></div>
