@@ -517,7 +517,7 @@
     { id:"super",  label:"Super fan", sub:"photo only" }
   ];
   var ntr = { mode:"novice", pool:"all", queue:[], i:0, results:[], answered:false, retry:false };
-  var ntrChapter = -1;   // set once CHAPTERS is built
+  var ntrChapter = -1, quizChapter = -1;   // set once CHAPTERS is built
 
   function ntrAll(){ return (window.GGRikishi && GGRikishi.ALL) || {}; }
   function ntrNames(pool){
@@ -794,7 +794,10 @@
 
   function buildLearn(){
     learnBuilt = true;
-    for (var ci = 0; ci < CHAPTERS.length; ci++) if (CHAPTERS[ci].ntr) ntrChapter = ci;
+    for (var ci = 0; ci < CHAPTERS.length; ci++){
+      if (CHAPTERS[ci].ntr)  ntrChapter  = ci;
+      if (CHAPTERS[ci].quiz) quizChapter = ci;
+    }
     $("learnNav").innerHTML = CHAPTERS.map(function(c,i){
       return "<button class='learn-navb' data-i='"+i+"' aria-current='"+(i===0?"true":"false")+"'>"+
         "<span class='lb-i'>"+c.icon+"</span>"+esc(c.title)+"</button>";
@@ -865,7 +868,10 @@
     });
   }
   function renderQuiz(){
-    var step = $("learnPanel").querySelector(".learn-step[data-i='"+(CHAPTERS.length-1)+"']");
+    /* look the chapter up by flag — it stopped being the last one when
+       "Name that rikishi" was added after it. */
+    var step = $("learnPanel").querySelector(".learn-step[data-i='"+quizChapter+"']");
+    if (!step) return;
     if (quizIdx >= QUIZ.length){
       step.innerHTML = "<h3>Nice work!</h3><div class='jp'>\u5b8c \u30fb complete</div>"+
         "<p>You scored <b>"+quizScore+" / "+QUIZ.length+"</b>. You\u2019ve got the basics down \u2014 now go watch some sumo, or jump into the fantasy game and draft a team.</p>"+
