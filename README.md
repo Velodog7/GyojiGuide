@@ -53,9 +53,22 @@ assume it's live.
 | `SumoSlapdown-logoTall.svg` | The centerpiece in the home page's crowd |
 | `SumoSlapdown-logoMedium.svg` | The Fantasy leaderboard header |
 | `samples/` | 60 taiko `.mp3` hits for the radio and the loop constructor |
+| `images/rikishi/` | The 70 rikishi cutouts, transparent WebP, 420px tall, one file per shikona |
+| `images/svg/`, `images/jpg/` | Source art: Illustrator SVGs (each wrapping a full-res PNG) and background-intact JPGs |
 
-Wrestler photos and the favicon are base64-inlined directly into the HTML —
-that's why `dohyo.html` and `fantasy.html` are multi-megabyte files.
+`images/rikishi/` is the set the site actually loads — `dohyo.html`,
+`fantasy.html` and `keepers-mock-draft.html` all reference the same files, so a
+photo is downloaded once and cached across the whole site. **Filenames must
+match the shikona keys** in each page's photo table exactly; that string is the
+lookup. The files were generated from `images/svg/` by extracting the embedded
+PNG, trimming to the alpha bounding box and resizing to 420px tall — the tight
+crop matters, because each rikishi's `ar`/`h`/face-position metadata is
+expressed as fractions of a tightly-cropped frame.
+
+The favicon and the simulator's scenery (dohyo, roof, gyoji, yobidashi, and the
+two `SHIKO` dohyo-iri poses) are still base64-inlined in `dohyo.html`. They're
+page-specific and not duplicated anywhere, so there's little to gain by pulling
+them out.
 
 ## Backend
 

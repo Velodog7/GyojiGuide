@@ -60,6 +60,8 @@ getting it live.
 | `keepers-mock-draft.html` | Snake-draft practice room, opened from Fantasy → My Leagues on a keepers league. Also works standalone (generic bots) for demos. |
 | `spinner.html` | Reference page for the shared loading spinner. Nothing links to it; upload optional. |
 | `robots.txt`, `sitemap.xml` | SEO. `robots.txt` disallows `/admin.html`. |
+| `images/rikishi/` | **Required.** The 70 rikishi photos the pages load by name. |
+| `images/svg/`, `images/jpg/` | Source art only — not loaded at runtime, safe to skip when uploading. |
 
 **Private admin dashboard** (deliberately not linked anywhere — see below)
 
@@ -165,12 +167,11 @@ Hard-refresh (Cmd/Ctrl+Shift+R) after uploading to clear cached old copies.
   `gyojiguide.com` internally — these are code/infra identifiers, not visible
   branding, and were intentionally left as-is. If you move to a new domain,
   that's a separate swap.
-- All wrestler photos and the favicon are inlined as base64 (that's why the
-  HTML files are large) — nothing external to host for those. Note that the
-  same 70 rikishi photos are inlined separately into `dohyo.html`,
-  `fantasy.html` and `keepers-mock-draft.html`, so nothing is cached across
-  pages; extracting them to a shared module is the biggest available win on
-  page weight.
+- Rikishi photos load from `images/rikishi/` — 70 transparent WebP files, one
+  per shikona, shared by `dohyo.html`, `fantasy.html` and
+  `keepers-mock-draft.html`. **Upload that folder with the HTML**, or every
+  wrestler renders blank. The favicon and the simulator's scenery are still
+  base64-inlined in `dohyo.html`; nothing external to host for those.
 - `robots.txt` and `sitemap.xml` both declare `sumoslapdown.com`. If you serve
   this from GitHub Pages on that custom domain, the repo also needs a `CNAME`
   file containing `sumoslapdown.com`.
