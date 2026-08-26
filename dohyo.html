@@ -2404,7 +2404,7 @@ playBtn.onclick = () => togglePlay();
 prevBtn.onclick = () => prevBout();
 nextBtn.onclick = () => nextBout();
 replayBtn.onclick = () => replayBout();
-const SPEEDS = [ { lbl:"1×", f:1 }, { lbl:"2×", f:0.5 }, { lbl:"0.5×", f:2 } ];
+const SPEEDS = [ { lbl:"1×", f:1 }, { lbl:"1.5×", f:2/3 }, { lbl:"0.5×", f:2 } ];
 let speedIdx = 0;
 const speedBtn = document.getElementById("speed");
 if (speedBtn) speedBtn.onclick = () => {
@@ -2415,6 +2415,18 @@ if (speedBtn) speedBtn.onclick = () => {
   speedBtn.classList.toggle("is-active", simSpeed !== 1);
   speedBtn.title = "Playback speed: " + SPEEDS[speedIdx].lbl + " — click to cycle";
 };
+
+/* Keep the wrestlers' animations in lock-step with the scaled JS timers: slow-mo
+   actually slows the motion (no still moment before the finish) and 1.5x speeds
+   the whole thing up together. playbackRate = 1/simSpeed scales every CSS
+   animation AND transition under the stage; at normal speed rate is 1 (no-op). */
+(function keepSimRate(){
+  var rate = 1 / simSpeed;
+  if (stage && stage.getAnimations) {
+    try { stage.getAnimations({ subtree:true }).forEach(function(a){ if (a.playbackRate !== rate) a.playbackRate = rate; }); } catch(e){}
+  }
+  requestAnimationFrame(keepSimRate);
+})();
 
 /* the yobidashi has the ring first: he calls east, then turns and calls west.
    Both names stay up for the bout — they only come down once it's decided. */
