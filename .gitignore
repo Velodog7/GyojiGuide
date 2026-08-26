@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Build/handoff bundles — the repo is the source of truth, don't commit snapshots of it
+*.zip
+sumo-slapdown-site-bundle.zip
+
+# Local servers / scratch
+.cache/
+node_modules/
+*.log

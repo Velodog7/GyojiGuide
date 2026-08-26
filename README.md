@@ -1,66 +1,124 @@
-# Taiko Beat Loop Constructor
+# Sumo Slap Down
 
-A browser drum machine built from 60 taiko samples. Build a loop in `taiko.html`, then embed it on any other page in this repo with `player.html`.
+Fantasy sumo hub — analyze rikishi, mock draft a team, simulate upcoming basho,
+and run private fantasy sumo leagues. Live at **https://sumoslapdown.com**.
 
-## Files
+A static, no-build site: plain HTML + vanilla JS modules, backed by a Google
+Apps Script web app (a Google Sheet is the database). No bundler, no npm, no
+framework. Every path is relative, so all the web files just need to sit in the
+same folder on whatever static host you use.
 
+> Deploying or updating the backend? See **[DEPLOY.md](DEPLOY.md)** — it covers
+> the Apps Script side, the `ADMIN_KEY`, and the smoke test.
+
+---
+
+## Pages
+
+| File | Nav label | What it is |
+|---|---|---|
+| `index.html` | About | Home. Welcome / Learn / Resources tabs, plus the Edo-style banzuke crowd illustration. |
+| `analysis.html` | Analysis | Per-rikishi stats and matchup analysis. |
+| `dohyo.html` | Simulation | Basho simulator. |
+| `fantasy.html` | Fantasy | Drafting, leagues, leaderboard, message board. |
+| `admin.html` | — | Private admin dashboard. Not linked from anywhere; password-gated by `ADMIN_KEY`. See DEPLOY.md. |
+| `banzuke.html` | — | Legacy home page, superseded by `index.html`. Still served so old links resolve; `gg-nav.js` treats it as an alias for About. |
+| `keepers-mock-draft.html` | — | Snake-draft practice room, opened from Fantasy → My Leagues on a keepers league. Works standalone too (generic bots) if opened directly. |
+
+## Shared modules
+
+Loaded by the four main pages, in this order:
+
+| File | Role |
+|---|---|
+| `gg-config.js` | The Apps Script `/exec` URL + `apiGet`/`apiGetQ`/`apiPost` helpers. The one place the endpoint lives. |
+| `gg-account.js` | Accounts, scoring engine, leagues, DM + directory API. |
+| `gg-nav.js` | Shared top nav, the Help/feedback modal, and the site-wide spinner CSS. |
+| `gg-auth.js` | The account control in the nav, the account modal, and Messages. |
+| `gg-mawashi.js` | Mawashi avatar designer (layers, textures, kanji). |
+| `gg-roster.js` | Live banzuke loader — pulls the current ranking from sumo-api. |
+| `gg-banzuke.js` | The home page's banzuke crowd illustration. |
+| `taiko-radio.js` | Background taiko radio player. Reads `samples/`. |
+
+`gg-ranking.js` also lives here — the long-term JSA-style ranking ladder — but
+**no page currently loads it**. The ladder that actually runs is the mirrored
+copy inside `sumo-fantasy.gs`, server-side. Wire it in or delete it; don't
+assume it's live.
+
+## Assets
+
+| File | Used by |
+|---|---|
+| `SumoSlapdown-logowide.svg` | The nav logo, every page |
+| `SumoSlapdown-logoTall.svg` | The centerpiece in the home page's crowd |
+| `SumoSlapdown-logoMedium.svg` | The Fantasy leaderboard header |
+| `samples/` | 60 taiko `.mp3` hits for the radio and the loop constructor |
+
+Wrestler photos and the favicon are base64-inlined directly into the HTML —
+that's why `dohyo.html` and `fantasy.html` are multi-megabyte files.
+
+## Backend
+
+`sumo-fantasy.gs` is the Google Apps Script source (accounts, leagues, drafts,
+the ranking ladder, the feedback inbox). It isn't served as a web file — it's
+kept here as the source of truth and pasted into script.google.com. See
+DEPLOY.md.
+
+---
+
+## Running it locally
+
+The pages fetch `samples/*.mp3` and talk to the backend, and browsers block
+both from a `file://` URL — so don't just double-click the HTML. From this
+folder:
+
+```sh
+python3 -m http.server
 ```
-taiko.html          The beat constructor (open this to make loops)
-player.html         Embeddable looping player — reads a pattern from the URL
-taiko-data.js       Sample list + the pattern encoder/decoder (shared by both pages)
-samples/            The 60 .mp3 samples
-example-embed.html  Shows how to drop a loop into your own page
+
+Then open http://localhost:8000/ .
+
+---
+
+## The taiko beat constructor
+
+A separate little browser drum machine built from the same 60 taiko samples,
+used by the radio's "＋" button. Not part of the main nav.
+
+| File | Role |
+|---|---|
+| `taiko.html` | The constructor — open it to build a loop |
+| `player.html` | Embeddable looping player; reads a pattern from the URL |
+| `taiko-data.js` | Sample list + pattern encoder/decoder, shared by both |
+| `example-embed.html` | Worked example of dropping a loop into a page |
+
+Build a loop in `taiko.html`, hit **Embed…**, and paste the snippet anywhere:
+
+```html
+<iframe src="player.html?p=XXXXXX" width="260" height="104" style="border:0"></iframe>
 ```
 
-## Important: it must be served over http
+The whole pattern is packed into that `p=` code — no database needed. Visitors
+click ▶ to play (browsers block sound that starts on its own).
 
-The pages load audio files from the `samples/` folder, and browsers block that when you
-open the file directly (a `file://` URL). So you can't just double-click `taiko.html`.
-Use one of these:
-
-- **GitHub Pages** (easiest — see below), or
-- **A local server:** from this folder run `python3 -m http.server` and open
-  `http://localhost:8000/taiko.html`.
-
-## Put it on GitHub
-
-1. Create a new repository on github.com (e.g. `taiko-beats`).
-2. Upload everything in this folder — keep `taiko.html`, `player.html`, `taiko-data.js`,
-   and the `samples/` folder together at the repo root.
-   (On github.com: **Add file → Upload files**, drag the whole contents in, commit.)
-3. Turn on GitHub Pages: repo **Settings → Pages → Source: Deploy from a branch →
-   `main` / `root` → Save**.
-4. After a minute your constructor is live at
-   `https://YOUR-USERNAME.github.io/taiko-beats/taiko.html`.
-   (Note: the file is `taiko.html`, not `index.html`, so the repo's root URL won't
-   auto-open it — go straight to `/taiko.html`.)
-
-## Embedding a beat on another page
-
-1. Open the constructor, build a loop, click **Embed…**.
-2. Copy the `<iframe>` snippet it gives you and paste it into any other `.html` page
-   in the same repo. It looks like:
-
-   ```html
-   <iframe src="player.html?p=XXXXXX" width="260" height="104" style="border:0"></iframe>
-   ```
-
-   The whole pattern is packed into that `p=` code — no database needed.
-   If your page lives in a subfolder, adjust the path (e.g. `../player.html?p=...`).
-
-3. Visitors click ▶ to play. (Browsers block sound that starts on its own, so a
-   click is required.)
-
-### Trigger it yourself
-
-The player exposes a tiny API on its iframe window:
+The player exposes a small API on its iframe window:
 
 ```js
 const frame = document.querySelector('iframe');
-frame.contentWindow.TaikoLoop.play();    // start
-frame.contentWindow.TaikoLoop.stop();    // stop
-frame.contentWindow.TaikoLoop.toggle();  // toggle
+frame.contentWindow.TaikoLoop.play();
+frame.contentWindow.TaikoLoop.stop();
+frame.contentWindow.TaikoLoop.toggle();
 ```
 
-Add `&autoplay=1` to the player URL to attempt autoplay (most browsers still wait
-for a first interaction on the page).
+Adding `&autoplay=1` attempts autoplay, though most browsers still wait for a
+first interaction on the page.
+
+---
+
+## Notes
+
+- The JS namespace is `GyojiGuide` and some internals still say `gyojiguide.com`
+  — code identifiers from an earlier name, deliberately left alone. Not visible
+  branding.
+- `spinner.html` is a reference page for the shared loading spinner, kept for
+  copy-paste. Nothing links to it.

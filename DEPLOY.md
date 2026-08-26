@@ -1,23 +1,29 @@
 # Sumo Slapdown — deploy guide
 
-A static, no-build site: plain HTML + JS modules + two SVG logos, backed by a
+A static, no-build site: plain HTML + JS modules + SVG logos, backed by a
 Google Apps Script web app. Everything uses **relative paths**, so all the web
 files just need to sit in the **same folder** on your host (GitHub Pages,
 Netlify Drop, etc.). No bundler, no npm.
+
+For what each file *is*, see [README.md](README.md). This guide is about
+getting it live.
 
 ---
 
 ## 1. Web files — upload these to your host (same directory)
 
 **Pages**
+
 | File | Nav label |
 |---|---|
 | `index.html` | About (home) |
 | `analysis.html` | Analysis |
 | `dohyo.html` | Simulation |
 | `fantasy.html` | Fantasy |
+| `banzuke.html` | — (legacy home page, superseded by `index.html`; kept so old links resolve) |
 
 **Shared modules** (loaded by the pages)
+
 | File | Role |
 |---|---|
 | `gg-config.js` | Holds the Apps Script `/exec` URL (the one place it lives) |
@@ -26,21 +32,37 @@ Netlify Drop, etc.). No bundler, no npm.
 | `gg-auth.js` | The unified account control that sits in the nav on every page |
 | `gg-mawashi.js` | The mawashi avatar designer (layers, textures, kanji) |
 | `gg-roster.js` | Live banzuke loader (pulls the current ranking from sumo-api) |
-| `gg-banzuke.js` | The Welcome page's Edo banzuke-e crowd illustration |
+| `gg-banzuke.js` | The home page's Edo banzuke-e crowd illustration |
 | `taiko-radio.js` | The background taiko radio player |
+| `gg-ranking.js` | Long-term ranking ladder. **Not loaded by any page** — the live ladder is the mirrored copy in `sumo-fantasy.gs`. Ships as reference; harmless to omit. |
 
 **Logo assets** (must sit alongside the HTML)
+
 | File | Used by |
 |---|---|
 | `SumoSlapdown-logowide.svg` | The nav logo (every page) |
-| `SumoSlapdown-logoTall.svg` | The centerpiece in the Welcome crowd |
+| `SumoSlapdown-logoTall.svg` | The centerpiece in the home page crowd |
+| `SumoSlapdown-logoMedium.svg` | The Fantasy leaderboard header |
 
-**Optional standalone tool** (not in the nav; open it directly if you want it)
+**Taiko beat constructor** (not in the nav; the radio's "＋" button links to it)
+
 | File | What it is |
 |---|---|
-| `keepers-draft-preview.html` | A self-contained click-through of the Keepers snake draft (bots draft themselves; nothing is saved). Handy for demos. |
+| `taiko.html` | The loop constructor |
+| `player.html` | Embeddable looping player |
+| `taiko-data.js` | Sample list + pattern encoder/decoder |
+| `example-embed.html` | Worked example of embedding a loop |
+
+**Other**
+
+| File | What it is |
+|---|---|
+| `keepers-mock-draft.html` | Snake-draft practice room, opened from Fantasy → My Leagues on a keepers league. Also works standalone (generic bots) for demos. |
+| `spinner.html` | Reference page for the shared loading spinner. Nothing links to it; upload optional. |
+| `robots.txt`, `sitemap.xml` | SEO. `robots.txt` disallows `/admin.html`. |
 
 **Private admin dashboard** (deliberately not linked anywhere — see below)
+
 | File | What it is |
 |---|---|
 | `admin.html` | Connectivity to sumo-api, pageview analytics, user moderation (warn/ban/delete), and a read-only feed of every message-board post across all leagues. Password-gated by the `ADMIN_KEY` Script Property (with a brute-force lockout on the backend). |
@@ -49,35 +71,31 @@ Netlify Drop, etc.). No bundler, no npm.
 
 ---
 
-## 2. Two things that must already exist on the host
+## 2. The `samples/` folder
 
-These are **not** in this zip and the site expects them on your server:
-
-- **`samples/` folder of `.mp3` drum sounds** — `taiko-radio.js` fetches its
-  taiko hits from `samples/…​.mp3` at runtime. If that folder isn't present the
-  rest of the site works fine; the radio just won't have audio. (These are the
-  same sample files already on your current deployment.)
-- **`taiko.html`** *(optional)* — if the radio's "＋" build-a-loop button links
-  to it. Only needed if you were using that feature; the site works without it.
+`taiko-radio.js` and the loop constructor fetch their taiko hits from
+`samples/*.mp3` at runtime. The folder is in the repo — just make sure it comes
+along with everything else. If it's missing the rest of the site works fine;
+the radio just won't have audio.
 
 ---
 
 ## 3. Backend — `sumo-fantasy.gs` (Google Apps Script)
 
 `sumo-fantasy.gs` is **not** a web file — it's the source for your Apps Script
-web app (accounts, leagues, drafts, and the Help/feedback inbox). It's included
-here as backup/reference. To update the live backend:
+web app (accounts, leagues, drafts, and the Help/feedback inbox). It's kept in
+the repo as the source of truth. To update the live backend:
 
 1. Open your Apps Script project at **script.google.com**.
 2. Paste in the contents of `sumo-fantasy.gs`.
 3. **Set your `ADMIN_KEY` as a Script Property — do it in code, not by hand.**
-   The key is no longer stored in `sumo-fantasy.gs` (the file only *reads* it),
-   so the secret never lives in a file you zip or share. Setting it by typing
-   into **Project Settings → Script Properties** works in theory, but in
-   practice a stray trailing space — or setting it in the wrong one of your
-   several sumo projects — will make the login reject the correct key. The
-   reliable way is to set it programmatically: temporarily paste this into the
-   project, **Run** it once, confirm the log, then delete it:
+   The key is not stored in `sumo-fantasy.gs` (the file only *reads* it), so the
+   secret never lives in a file you commit or share. Setting it by typing into
+   **Project Settings → Script Properties** works in theory, but in practice a
+   stray trailing space — or setting it in the wrong one of your several sumo
+   projects — will make the login reject the correct key. The reliable way is to
+   set it programmatically: temporarily paste this into the project, **Run** it
+   once, confirm the log, then delete it:
    ```js
    function setAdminKeyNow() {
      PropertiesService.getScriptProperties().setProperty('ADMIN_KEY', 'YOUR-KEY-HERE');
@@ -92,20 +110,17 @@ here as backup/reference. To update the live backend:
 4. **Run `setup()` once.** This creates/updates the Sheets, including the
    **Feedback** sheet used by the Help modal (FAQ questions, suggestions, bug
    reports, user reports), the **PageViews** sheet the admin dashboard reads
-   for analytics, two new columns (`status`, `warnMsg`) on the **Users**
-   sheet for the admin dashboard's warn/ban moderation, and the
-   **LeaderboardBoard** / **LeaderboardVotes** sheets behind the Fantasy
-   page's Leaderboard-tab message board. (Editable handles and the account
-   modal's trophy case/history/leagues panel added later reuse these same
-   sheets — no new ones, but still redeploy per the next step so the new
-   backend actions go live.)
+   for analytics, the `status` / `warnMsg` columns on the **Users** sheet for
+   warn/ban moderation, and the **LeaderboardBoard** / **LeaderboardVotes**
+   sheets behind the Fantasy page's Leaderboard-tab message board. It's safe to
+   re-run on existing data.
 5. **Deploy → Manage deployments → click the ✏️ pencil on your existing
    deployment → Version: New version → Deploy.** ⚠️ **Always update the
    existing deployment this way — do _not_ create a *new* deployment.** Editing
    the current one keeps the same `/exec` URL; creating a new one mints a fresh
    URL and forces you to update `gg-config.js`, `fantasy.html`, and `admin.html`
    every time (this is exactly what caused the repeated URL churn). If the URL
-   ever does change, update it in those three files — see §4.
+   ever does change, update it in those three files — see below.
 6. Set access to **Anyone**, or browser calls will be blocked.
 
 ### The `/exec` URL
@@ -117,23 +132,30 @@ https://script.google.com/macros/s/AKfycbyrhng3sZoNNpgDA2JApz2Z0xx01x9N1TwnGhqkM
 ```
 
 This lives in **`gg-config.js`** (`GyojiGuide.API_URL`) — the single source of
-truth every page reads. `fantasy.html` also keeps a matching fallback copy.
-**If you ever create a new deployment (new URL), update it in `gg-config.js`**
-(and the fallback in `fantasy.html`) and re-upload those two files.
+truth every page reads. `fantasy.html` and `admin.html` each keep a matching
+fallback copy. **If you ever create a new deployment (new URL), update all
+three** and re-upload them.
 
 ---
 
 ## 4. After uploading — quick smoke test
 
-1. Open the site. The nav shows **WELCOME · ANALYSIS · SIMULATION · FANTASY**,
+1. Open the site. The nav shows **ABOUT · ANALYSIS · SIMULATION · FANTASY**,
    the logo, a **?** help button, and **Log in / Sign up** at top-right.
 2. Sign up from the nav. Open another page — you're still signed in (state is
    shared across the whole site).
-3. On **Fantasy**, draft a team and save it; sign in from a private window and
+3. Account modal → **Messages** (searchable user picker), **Avatar**, **Log out**.
+4. On **Fantasy**, draft a team and save it; sign in from a private window and
    confirm it comes back.
-4. Click **?** → **Report a bug**, submit → check the Sheet's **Feedback** tab
+5. **Fantasy → My Leagues** on a league you commissioner: the scoring-rules
+   editor and (on keepers leagues) the draft-date scheduler with member
+   agreement.
+6. Click **?** → **Report a bug**, submit → check the Sheet's **Feedback** tab
    for the new row. (If it says it couldn't send, the backend URL/access or the
    `setup()` step needs attention.)
+7. **Admin page** → Feedback tab (Reply) and Users tab (Message).
+
+Hard-refresh (Cmd/Ctrl+Shift+R) after uploading to clear cached old copies.
 
 ---
 
@@ -144,4 +166,11 @@ truth every page reads. `fantasy.html` also keeps a matching fallback copy.
   branding, and were intentionally left as-is. If you move to a new domain,
   that's a separate swap.
 - All wrestler photos and the favicon are inlined as base64 (that's why the
-  HTML files are large) — nothing external to host for those.
+  HTML files are large) — nothing external to host for those. Note that the
+  same 70 rikishi photos are inlined separately into `dohyo.html`,
+  `fantasy.html` and `keepers-mock-draft.html`, so nothing is cached across
+  pages; extracting them to a shared module is the biggest available win on
+  page weight.
+- `robots.txt` and `sitemap.xml` both declare `sumoslapdown.com`. If you serve
+  this from GitHub Pages on that custom domain, the repo also needs a `CNAME`
+  file containing `sumoslapdown.com`.
