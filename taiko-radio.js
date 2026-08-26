@@ -237,7 +237,7 @@
   function scheduleStep(s, time) {
     var beat = false;
     song.voices.forEach(function (v) { if (v.steps[s] && audible.has(v.idx)) { playSample(v.idx, time, v.vol); beat = beat || v.role==="backbone" || v.role==="drum"; } });
-    if (beat) beatKick = 1;
+    if (beat) { beatKick = 1; beatSide ^= 1; }   // alternate hands so the bachi trade blows
   }
   function stepLoop() {
     while (nextT < AC.currentTime + AHEAD) {
@@ -352,13 +352,21 @@
   }
 
   /* ==== visualizer (random, music-like) ==== */
-  var eqTimer=null, beatKick=0, eqBars=null;
-  function startEq() { if (eqTimer || !eqEl) return; eqBars = eqEl.children; eqTimer = setInterval(tickEq, 95); }
-  function stopEq() { clearInterval(eqTimer); eqTimer=null; if (eqEl) for (var i=0;i<eqEl.children.length;i++) eqEl.children[i].style.height="5px"; }
+  var eqTimer=null, beatKick=0, beatSide=0;
+  /* Drives the nav button's drum. --ggr-kick is a 1 -> 0 decay after every
+     beat; --ggr-l / --ggr-r carry it to whichever bachi struck, so the sticks
+     land on the actual beat instead of looping at a guessed tempo. */
+  function setBeatVars(k, side) {
+    if (!eqEl) return;
+    eqEl.style.setProperty("--ggr-kick", k.toFixed(2));
+    eqEl.style.setProperty("--ggr-l", side === 0 ? k.toFixed(2) : "0");
+    eqEl.style.setProperty("--ggr-r", side === 1 ? k.toFixed(2) : "0");
+  }
+  function startEq() { if (eqTimer || !eqEl) return; eqTimer = setInterval(tickEq, 95); }
+  function stopEq() { clearInterval(eqTimer); eqTimer = null; beatKick = 0; setBeatVars(0, -1); }
   function tickEq() {
-    if (!eqBars) return;
     var kick = beatKick; beatKick = Math.max(0, beatKick - 0.34);
-    for (var i=0;i<eqBars.length;i++) { var r=Math.random(); var h=5 + r*r*12 + kick*(5+Math.random()*7); eqBars[i].style.height = Math.max(5,Math.min(20,h)).toFixed(1)+"px"; }
+    setBeatVars(kick, beatSide);
   }
 
   /* ==== UI ====
@@ -370,6 +378,43 @@
      it opens a lightweight popover (matching the site's existing chip →
      panel pattern) with the actual transport controls. */
   var wrap, btn, panel, nameEl, subEl, ppBtn, muteBtn, volInput, eqEl, tickInt=null, panelOpen=false;
+  /* ---- nav button faces -------------------------------------------------
+     Four states, swapped purely in CSS off [data-state] and :hover:
+       idle  + no hover -> the drum itself
+       live  + no hover -> the drum being played, struck in time with the beat
+       idle  + hover    -> play
+       live  + hover    -> pause
+     The drum is drawn once and shared by the first two; only the bachi and
+     the head-pulse differ, and both are driven by CSS custom properties the
+     scheduler sets on every beat (see tickEq), so the sticks land with the
+     music rather than looping on a guessed tempo. */
+  var DRUM_BODY =
+    '<g class="ggr-drum">' +
+      '<path d="M7.6 17.4 6.0 20.9M16.4 17.4 18.0 20.9"/>' +                     /* stand legs */
+      '<circle class="ggr-head" cx="12" cy="12.2" r="6.3"/>' +                   /* body + rim */
+      '<circle class="ggr-skin" cx="12" cy="12.2" r="3.9" stroke-width="1.1"/>' +  /* the head */
+    '</g>';
+  function drumSvg(inner){
+    return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" ' +
+      'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      (inner || '') + DRUM_BODY + '</svg>';
+  }
+  var DRUM_SVG = drumSvg();
+  /* bachi held above the head, pivoting at the hand end */
+  /* Bachi above the head. They strike by dropping along their own axis rather
+     than swinging — pivoting them makes the pair converge and cross at this
+     size, a translation never does. */
+  var LIVE_SVG = drumSvg(
+    '<g stroke-width="1.7">' +
+      '<path class="ggr-bachi ggr-bachi-l" d="M6.7 4.4 9.7 7.5"/>' +
+      '<path class="ggr-bachi ggr-bachi-r" d="M17.3 4.4 14.3 7.5"/>' +
+    '</g>');
+  var PLAY_SVG  = '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true">' +
+    '<path d="M8.5 5.6a.9.9 0 0 1 1.37-.77l8.1 5.4a.92.92 0 0 1 0 1.54l-8.1 5.4A.9.9 0 0 1 8.5 16.4z"/></svg>';
+  var PAUSE_SVG = '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor" aria-hidden="true">' +
+    '<rect x="7.6" y="5.4" width="3.4" height="13.2" rx="1.2"/>' +
+    '<rect x="13" y="5.4" width="3.4" height="13.2" rx="1.2"/></svg>';
+
   var VOL_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3l4.5 3.5v-12L7 9.5H4z" fill="currentColor" stroke="none"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></svg>';
   var MUTE_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3l4.5 3.5v-12L7 9.5H4z" fill="currentColor" stroke="none"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></svg>';
   function setState(s) { if (wrap) wrap.dataset.state=s; if (ppBtn) ppBtn.textContent = (s==="playing"||s==="gap") ? "❚❚" : "▶"; }
@@ -397,8 +442,31 @@
         "color:#c7cbd9;cursor:pointer;display:grid;place-items:center;padding:0;transition:color .15s,border-color .15s,background .15s}" +
       ".ggr-btn:hover{color:#e0a23a;border-color:#e0a23a}" +
       ".ggr[data-state='playing'] .ggr-btn,.ggr[data-state='gap'] .ggr-btn{color:#e0a23a;border-color:#e0a23a}" +
-      ".ggr-eq{display:flex;gap:2.5px;align-items:flex-end;height:14px}" +
-      ".ggr-eq i{width:2.5px;background:currentColor;border-radius:2px;height:4px;transition:height .1s ease}" +
+      /* the four button faces stack on top of each other and cross-fade */
+      ".ggr-btn{position:relative}" +
+      ".ggr-ic{position:absolute;inset:0;display:grid;place-items:center;opacity:0;transition:opacity .13s ease}" +
+      ".ggr-ic svg{display:block;overflow:visible}" +
+      ".ggr-ic-drum{opacity:1}" +
+      /* hovering (or keyboard-focused) offers the transport icon instead */
+      ".ggr-btn:is(:hover,:focus-visible) .ggr-ic-drum{opacity:0}" +
+      ".ggr-btn:is(:hover,:focus-visible) .ggr-ic-play{opacity:1}" +
+      /* playing: the drum plays itself, and hover offers pause */
+      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-ic-drum{opacity:0}" +
+      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-ic-live{opacity:1}" +
+      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:is(:hover,:focus-visible) .ggr-ic-live{opacity:0}" +
+      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:is(:hover,:focus-visible) .ggr-ic-play{opacity:0}" +
+      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:is(:hover,:focus-visible) .ggr-ic-pause{opacity:1}" +
+      /* beat-driven: --ggr-kick decays 1 -> 0 after each beat, --ggr-l / --ggr-r
+         say which hand struck it, so the sticks alternate with the music */
+      ".ggr-ic-live .ggr-skin{transform-box:fill-box;transform-origin:center;" +
+        "transform:scale(calc(1 + var(--ggr-kick,0) * .13));transition:transform .07s ease-out}" +
+      ".ggr-ic-live .ggr-head{transform-box:fill-box;transform-origin:center;" +
+        "transform:scale(calc(1 + var(--ggr-kick,0) * .04));transition:transform .07s ease-out}" +
+      ".ggr-bachi{transition:transform .06s ease-out}" +
+      ".ggr-bachi-l{transform:translate(calc(var(--ggr-l,0) * .7px - .7px),calc(var(--ggr-l,0) * 2.2px - 2.2px))}" +
+      ".ggr-bachi-r{transform:translate(calc(.7px - var(--ggr-r,0) * .7px),calc(var(--ggr-r,0) * 2.2px - 2.2px))}" +
+      "@media (prefers-reduced-motion:reduce){.ggr-ic-live .ggr-skin,.ggr-ic-live .ggr-head," +
+        ".ggr-bachi{transform:none!important;transition:none}}" +
       ".ggr-panel{position:absolute;top:calc(100% + 10px);right:0;z-index:950;width:min(272px,calc(100vw - 24px));" +
         "background:#14161d;border:1px solid #2a2d38;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.5);" +
         "padding:16px;display:none;font-family:\"Zen Maru Gothic\",\"Potta One\",system-ui,sans-serif;color:#e9eaf0}" +
@@ -424,7 +492,10 @@
     wrap.className = "ggr"; wrap.id = "ggRadio";
     wrap.innerHTML =
       '<button type="button" class="ggr-btn" id="ggrBtn" aria-haspopup="true" aria-expanded="false" title="Taiko Radio" aria-label="Taiko Radio">' +
-        '<span class="ggr-eq" aria-hidden="true"><i></i><i></i><i></i></span>' +
+        '<span class="ggr-ic ggr-ic-drum">'+DRUM_SVG+'</span>' +
+        '<span class="ggr-ic ggr-ic-live">'+LIVE_SVG+'</span>' +
+        '<span class="ggr-ic ggr-ic-play">'+PLAY_SVG+'</span>' +
+        '<span class="ggr-ic ggr-ic-pause">'+PAUSE_SVG+'</span>' +
       '</button>' +
       '<div class="ggr-panel" id="ggrPanel" role="dialog" aria-label="Taiko Radio">' +
         '<div class="ggr-panel__head"><span class="ggr-name">Taiko Radio</span><span class="ggr-sub">starting…</span></div>' +
@@ -449,7 +520,7 @@
     btn = wrap.querySelector("#ggrBtn"); panel = wrap.querySelector("#ggrPanel");
     nameEl = wrap.querySelector(".ggr-name"); subEl = wrap.querySelector(".ggr-sub");
     ppBtn = wrap.querySelector(".ggr-pp"); muteBtn = wrap.querySelector(".ggr-mute");
-    eqEl = wrap.querySelector(".ggr-eq"); volInput = wrap.querySelector(".ggr-vol");
+    eqEl = wrap; volInput = wrap.querySelector(".ggr-vol");   // the beat vars live on the wrapper
     volInput.value = Math.round(prefs.vol*100); reflectMute();
 
     btn.addEventListener("click", function (e) { e.stopPropagation(); setPanelOpen(!panelOpen); });

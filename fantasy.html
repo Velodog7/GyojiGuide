@@ -376,8 +376,8 @@
   .lg-name-form input{ font:inherit; font-size:1.05rem; color:var(--ink); background:var(--surface2);
     border:1px solid var(--line2); border-radius:9px; padding:7px 11px; min-width:min(280px,60vw) }
   .lg-name-form input:focus{ outline:none; border-color:var(--sun) }
-  .lg-name-status:empty{ display:none }
-  .lg-name-status{ display:block; text-align:left; margin-top:5px }
+  .lg-rename-status:empty{ display:none }
+  .lg-rename-status{ display:block; text-align:left; margin-top:5px }
   .lg-head h3{ margin:0; font-size:1.3rem }
   .lg-sub{ color:var(--faint); font-size:.82rem; margin-top:3px }
 
@@ -725,18 +725,18 @@
       <div id="lgPanel" hidden>
         <div class="lg-head">
           <div class="lg-head-main">
-            <div class="lg-name-row" id="lgNameRow">
+            <div class="lg-name-row" id="lgRenameRow">
               <h3 id="lgName">—</h3>
-              <button class="lg-name-edit" id="lgNameEdit" hidden type="button"
+              <button class="lg-name-edit" id="lgRenameBtn" hidden type="button"
                       title="Rename league" aria-label="Rename league">✎</button>
             </div>
-            <form class="lg-name-form" id="lgNameForm" hidden>
-              <input id="lgNameInput" type="text" maxlength="60" autocomplete="off"
+            <form class="lg-name-form" id="lgRenameForm" hidden>
+              <input id="lgRenameInput" type="text" maxlength="60" autocomplete="off"
                      aria-label="League name" placeholder="League name" />
-              <button class="btn sm" id="lgNameSave" type="submit">Save</button>
-              <button class="btn ghost sm" id="lgNameCancel" type="button">Cancel</button>
+              <button class="btn sm" id="lgRenameSave" type="submit">Save</button>
+              <button class="btn ghost sm" id="lgRenameCancel" type="button">Cancel</button>
             </form>
-            <span class="status lg-name-status" id="lgNameStatus"></span>
+            <span class="status lg-rename-status" id="lgRenameStatus"></span>
             <div class="lg-sub"><span id="lgRole"></span> · <span id="lgCount"></span></div>
           </div>
           <button class="btn ghost sm" id="lgInvite">Copy invite link</button>
@@ -1528,10 +1528,10 @@ const timeAgo = iso => {
    gg-account.js exposes leagueRename() and the Apps Script re-checks the
    commissioner server-side. There was simply no control for it on the page. */
 function setupLeagueRename(lg, meCommish){
-  const row = $("lgNameRow"), form = $("lgNameForm"), edit = $("lgNameEdit"),
-        input = $("lgNameInput"), save = $("lgNameSave"), st = $("lgNameStatus");
+  const row = $("lgRenameRow"), form = $("lgRenameForm"), edit = $("lgRenameBtn"),
+        input = $("lgRenameInput"), save = $("lgRenameSave"), st = $("lgRenameStatus");
   if (!row || !form) return;
-  const close = () => { form.hidden = true; row.hidden = false; st.textContent = ""; st.className = "status lg-name-status"; };
+  const close = () => { form.hidden = true; row.hidden = false; st.textContent = ""; st.className = "status lg-rename-status"; };
   close();
   edit.hidden = !meCommish;
   if (!meCommish) return;
@@ -1541,7 +1541,7 @@ function setupLeagueRename(lg, meCommish){
     row.hidden = true; form.hidden = false;
     input.focus(); input.select();
   };
-  $("lgNameCancel").onclick = close;
+  $("lgRenameCancel").onclick = close;
   input.onkeydown = e => { if (e.key === "Escape"){ e.preventDefault(); close(); } };
 
   form.onsubmit = async e => {
@@ -1549,7 +1549,7 @@ function setupLeagueRename(lg, meCommish){
     const name = input.value.trim().slice(0, 60);      // the same cap the backend applies
     if (!name){ st.textContent = "Name can't be empty."; st.className = "status lg-name-status err"; input.focus(); return; }
     if (name === lg.name){ close(); return; }
-    save.disabled = true; st.textContent = "Saving\u2026"; st.className = "status lg-name-status";
+    save.disabled = true; st.textContent = "Saving\u2026"; st.className = "status lg-rename-status";
     let r = null; try { r = await GyojiGuide.leagueRename(lg.id, name); } catch(err){}
     save.disabled = false;
     if (!(r && r.ok)){
