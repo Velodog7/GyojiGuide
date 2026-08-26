@@ -502,7 +502,7 @@
   /* ================= NAME THAT RIKISHI =================
      Three difficulties over the sekitori in gg-rikishi.js:
        novice    photo + heya + rank + birthplace, pick the shikona from four
-       fan       photo + rank, type shikona / birthplace / heya
+       fan       photo + birthplace, type shikona / heya / exact rank
        super fan photo only, type all four including the exact rank
      Birthplace is the country for the foreign-born and the prefecture for the
      Japanese-born — 64 of 70 are Japanese, so "Japan" would be a freebie.
@@ -582,7 +582,7 @@
 
   function ntrFields(){
     if (ntr.mode === "novice") return ["name"];
-    if (ntr.mode === "fan")    return ["name","place","heya"];
+    if (ntr.mode === "fan")    return ["name","heya","rank"];
     return ["name","place","heya","rank"];
   }
   var NTR_LABEL = { name:"Shikona", place:"Birthplace", heya:"Heya (stable)", rank:"Rank" };
@@ -625,7 +625,7 @@
       var m = ntr.mode;
       $("ntrModeNote").textContent =
         m==="novice" ? "You’re given the heya, rank and birthplace — pick the shikona from four."
-      : m==="fan"    ? "You’re given the rank. Type the shikona, birthplace and heya."
+      : m==="fan"    ? "You’re given where he’s from. Type the shikona, heya and exact rank."
       :                "Portrait only. Type the shikona, birthplace, heya and the exact rank.";
     }
     note();
@@ -660,7 +660,7 @@
       given.push("<span>Rank <b>"+esc(GGRikishi.rank(name))+"</b></span>");
       given.push("<span>From <b>"+esc(A.p)+"</b></span>");
     } else if (ntr.mode === "fan"){
-      given.push("<span>Rank <b>"+esc(GGRikishi.rank(name))+"</b></span>");
+      given.push("<span>From <b>"+esc(A.p)+"</b></span>");
     }
 
     var body;
