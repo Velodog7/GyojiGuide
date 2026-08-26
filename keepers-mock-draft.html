@@ -706,7 +706,14 @@ let BOARD = { makuuchi: [], juryo: [] };
 let AUTODRAFT = false;
 let autoTimer = null;
 
-function boardKey(){ return "GG_MOCK_BOARD:" + ((CTX && CTX.league) || "__standalone__"); }
+/* Key the saved board on the league id where the fantasy page sends one — the
+   commissioner can rename a league, and keying on the name would strand every
+   member's ranking the moment they did. Falls back to the name for older
+   handovers that predate the id. */
+function boardKey(){
+  const c = CTX || {};
+  return "GG_MOCK_BOARD:" + (c.leagueId || c.league || "__standalone__");
+}
 function poolFor(div){ return div === "juryo" ? JUR : MAK; }
 function defaultBoard(div){ return poolFor(div).map(r => r.name); }
 
