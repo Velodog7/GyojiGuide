@@ -534,9 +534,13 @@
     // append if the nav isn't there (defensive only; on every real page
     // gg-nav.js runs synchronously near the top of <body>, well before
     // this deferred script fires).
-    var right = document.querySelector("#gg-nav .ggn-right");
-    if (right) right.insertBefore(wrap, right.firstChild);
-    else document.body.appendChild(wrap);
+    var slot = document.getElementById("ggnRadioSlot");
+    if (slot) slot.appendChild(wrap);                       // the nav already holds this space open
+    else {
+      var right = document.querySelector("#gg-nav .ggn-right");
+      if (right) right.insertBefore(wrap, right.firstChild);
+      else document.body.appendChild(wrap);
+    }
 
     btn = wrap.querySelector("#ggrBtn"); panel = wrap.querySelector("#ggrPanel");
     nameEl = wrap.querySelector(".ggr-name"); subEl = wrap.querySelector(".ggr-sub");

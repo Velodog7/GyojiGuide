@@ -583,6 +583,10 @@
   };
   A.close = function(){ if (ov){ ov.classList.remove("open"); document.body.style.overflow = ""; } };
   A.refresh = function(){ renderNav(); };
+  /* Lets gg-nav render the account control in the same tick it builds the bar,
+     so the browser never gets a chance to paint a nav whose account cluster is
+     still empty (which slides the links sideways a frame later). Idempotent. */
+  A.mountNav = function(){ ensureCSS(); mountNav(0); };
   A.get = function(){ return acct(); };
   function refresh(){ renderNav(); }
 

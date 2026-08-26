@@ -39,12 +39,22 @@
       }).join("") +
       '</div>' +
       '<div class="ggn-right">' +
+        /* taiko-radio.js is deferred, so it lands ~150ms after this bar is
+           built. Reserving its slot here means it drops into a space that
+           already exists instead of widening the cluster and dragging the
+           whole nav sideways on every page load. */
+        '<div class="ggn-slot" id="ggnRadioSlot"></div>' +
         '<button type="button" class="ggn-help" id="ggnHelp" aria-label="Help & feedback" title="Help & feedback">?</button>' +
         '<div class="ggn-acct"></div>' +
       '</div>' +
       '</div>';
     document.body.insertBefore(nav, document.body.firstChild);
     document.body.classList.add("has-gg-nav");
+    // Fill the account cluster now, in this same tick, rather than leaving it
+    // empty until gg-auth.js boots — otherwise a paint can land in between and
+    // the whole bar visibly shifts when the control finally arrives. If
+    // gg-auth hasn't loaded yet its own boot still handles it.
+    try { if (window.GGAuth && window.GGAuth.mountNav) window.GGAuth.mountNav(); } catch (e) {}
     var hb = document.getElementById("ggnHelp");
     if (hb) hb.onclick = openHelp;
     wireBurger();
@@ -85,7 +95,10 @@
       'display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px}' +
     '.ggn-brand{grid-column:1;justify-self:start;display:inline-flex;align-items:center;gap:8px;' +
       'text-decoration:none;color:#f4ecd8;font-weight:700;font-size:.98rem;letter-spacing:.01em;white-space:nowrap}' +
-    '.ggn-brand svg,.ggn-brand img{height:68px;width:auto;display:block}' +
+    /* aspect-ratio reserves the logo's width before the SVG decodes; with
+       width:auto alone the brand box starts at 0 and everything after it
+       jumps sideways the moment it lands. 1240x240 is its viewBox. */
+    '.ggn-brand svg,.ggn-brand img{height:68px;width:auto;aspect-ratio:1240/240;display:block}' +
     '.ggn-beta{align-self:flex-start;margin-top:14px;margin-left:-2px;font-family:"Zen Maru Gothic",system-ui,sans-serif;' +
       'font-weight:600;font-size:.62rem;letter-spacing:.14em;text-transform:lowercase;color:#d8b25a;opacity:.85}' +
     '.ggn-links{grid-column:2;justify-self:end;display:flex;gap:6px;align-items:stretch}' +
@@ -104,6 +117,7 @@
     '#gg-nav.ggn-open .ggn-burger span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}' +
     /* right wrapper + help button */
     '.ggn-right{grid-column:3;justify-self:end;display:flex;align-items:center;gap:10px}' +
+    '.ggn-slot{flex:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center}' +
     '.ggn-help{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid #39404f;background:rgba(255,255,255,.03);' +
       'color:#c7cbd9;font-family:"Zen Maru Gothic",system-ui,sans-serif;font-weight:700;font-size:.95rem;line-height:1;cursor:pointer;' +
       'display:grid;place-items:center;transition:color .15s,border-color .15s,background .15s}' +
@@ -133,6 +147,7 @@
       '.ggn-burger{width:34px;height:34px;padding:0 8px}' +
       '.ggn-right{gap:6px}' +
       '.ggn-help{width:34px;height:34px;font-size:.85rem}' +
+      '.ggn-slot{width:34px;height:34px}' +
     '}' +
     /* help modal */
     '.ggh-ov{position:fixed;inset:0;z-index:1100;display:none;align-items:center;justify-content:center;background:rgba(6,7,11,.72);' +
