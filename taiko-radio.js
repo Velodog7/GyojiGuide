@@ -395,7 +395,7 @@
      whole group is tipped, which is far easier to reason about than laying
      out a rotated barrel by hand. */
   var DRUM_BODY =
-    '<g class="ggr-drum" transform="rotate(-17 12 12) translate(.7 .3)">' +
+    '<g class="ggr-drum" transform="rotate(13 12 12) translate(.7 .3)">' +
       /* far rim — a tacked cream band, as on the reference */
       '<ellipse cx="17.5" cy="12" rx="2.5" ry="5.2" fill="' + C_RIM + '"/>' +
       '<g fill="' + C_TACK + '">' +
