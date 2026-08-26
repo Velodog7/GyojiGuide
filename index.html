@@ -188,11 +188,60 @@
   .res-card__b{ min-width:0; display:flex; flex-direction:column; gap:3px }
   .res-card__nm{ font-weight:700; font-size:1rem; line-height:1.2 }
   .res-card__d{ color:var(--dim); font-size:.86rem; line-height:1.45 }
+
+  /* ===== Name that rikishi ===== */
+  .ntr-setup{display:grid;gap:16px;margin-top:4px}
+  .ntr-grp{display:grid;gap:7px}
+  .ntr-grp>.ntr-lab{font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;color:var(--faint,#7d8496)}
+  .ntr-opts{display:flex;flex-wrap:wrap;gap:7px}
+  .ntr-opt{background:rgba(255,255,255,.04);border:1px solid var(--line,#2a2d38);color:var(--ink-2,#c3c8d4);
+    border-radius:9px;padding:8px 13px;font:inherit;font-size:.84rem;cursor:pointer;transition:.13s}
+  .ntr-opt:hover{border-color:var(--sun,#e0a23a);color:var(--sun,#e0a23a)}
+  .ntr-opt[aria-pressed="true"]{background:var(--sun,#e0a23a);border-color:var(--sun,#e0a23a);color:#141620;font-weight:600}
+  .ntr-opt small{display:block;font-size:.7rem;opacity:.72;font-weight:400}
+  .ntr-note{font-size:.8rem;color:var(--faint,#7d8496);margin:0}
+
+  .ntr-q{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:start;margin-top:6px}
+  @media(max-width:620px){.ntr-q{grid-template-columns:1fr}}
+  .ntr-shot{width:170px;aspect-ratio:3/5;border-radius:12px;border:1px solid var(--line,#2a2d38);
+    background:rgba(255,255,255,.03);display:grid;place-items:end center;overflow:hidden;justify-self:center}
+  .ntr-shot img{width:100%;height:100%;object-fit:contain;object-position:center bottom}
+  .ntr-given{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+  .ntr-given span{background:rgba(255,255,255,.05);border:1px solid var(--line,#2a2d38);border-radius:99px;
+    padding:4px 11px;font-size:.79rem;color:var(--ink-2,#c3c8d4)}
+  .ntr-given b{color:var(--sun,#e0a23a);font-weight:600}
+  .ntr-fields{display:grid;gap:9px;max-width:340px}
+  .ntr-fld{display:grid;gap:3px}
+  .ntr-fld>span{font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:var(--faint,#7d8496)}
+  .ntr-fld input{font:inherit;font-size:.94rem;color:var(--ink,#f1f2f6);background:rgba(255,255,255,.04);
+    border:1px solid var(--line,#2a2d38);border-radius:9px;padding:9px 12px;width:100%}
+  .ntr-fld input:focus{outline:none;border-color:var(--sun,#e0a23a)}
+  .ntr-fld.ok input{border-color:#43c08a}
+  .ntr-fld.no input{border-color:#e2564a}
+  .ntr-fld .ntr-real{font-size:.78rem;color:#e2564a}
+  .ntr-fld.ok .ntr-real{color:#43c08a}
+  .ntr-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:420px}
+  @media(max-width:480px){.ntr-choices{grid-template-columns:1fr}}
+  .ntr-choice{background:rgba(255,255,255,.04);border:1px solid var(--line,#2a2d38);color:var(--ink,#f1f2f6);
+    border-radius:10px;padding:11px 13px;font:inherit;font-size:.92rem;cursor:pointer;text-align:left;transition:.13s}
+  .ntr-choice:hover:not(:disabled){border-color:var(--sun,#e0a23a)}
+  .ntr-choice.correct{border-color:#43c08a;background:rgba(67,192,138,.15)}
+  .ntr-choice.wrong{border-color:#e2564a;background:rgba(226,86,74,.14)}
+  .ntr-choice:disabled{cursor:default}
+  .ntr-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .ntr-prog{font-size:.78rem;color:var(--faint,#7d8496);margin-left:auto}
+  .ntr-verdict{font-size:.86rem;margin:11px 0 0}
+  .ntr-verdict.ok{color:#43c08a}
+  .ntr-verdict.no{color:#e2564a}
+  .ntr-scorebig{font-size:2.1rem;font-weight:700;color:var(--sun,#e0a23a);line-height:1.1}
+  .ntr-missed{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 0}
+  .ntr-missed span{background:rgba(226,86,74,.12);border:1px solid rgba(226,86,74,.4);border-radius:99px;
+    padding:4px 11px;font-size:.79rem;color:#f0b3ac}
 </style>
 <script src="gg-config.js"></script><script src="gg-account.js"></script>
 </head>
 <body>
-<script src="gg-mawashi.js"></script><script src="gg-auth.js"></script><script src="gg-nav.js"></script>
+<script src="gg-mawashi.js"></script><script src="gg-auth.js"></script><script src="gg-rikishi.js"></script><script src="gg-nav.js"></script>
 
 <nav class="tabs" role="tablist">
   <div class="tabs-inner">
@@ -434,7 +483,8 @@
         "<p>The <b>gy\u014dji</b> (referee) directs the bout; a <b>yobidashi</b> announces the wrestlers. A <b>yokozuna</b> gets his own <b>dohy\u014d-iri</b> ring-entering ceremony in the sacred white rope.</p>"+
         "<p>These aren\u2019t just for show \u2014 they connect a modern sport to centuries of tradition, and they\u2019re a huge part of what makes watching sumo special.</p>" },
     { id:"vocab", icon:"\u8a9e", title:"Words to know", jp:"\u7528\u8a9e \u30fb y\u014dgo", deck:VOCAB },
-    { id:"quiz", icon:"\u554f", title:"Test yourself", jp:"\u30af\u30a4\u30ba \u30fb quiz", quiz:true }
+    { id:"quiz", icon:"\u554f", title:"Test yourself", jp:"\u30af\u30a4\u30ba \u30fb quiz", quiz:true },
+    { id:"ntr", icon:"\u56db", title:"Name that rikishi", jp:"\u56db\u885b \u30fb who\u2019s who", ntr:true }
   ];
   var QUIZ = [
     { q:"How many days does a grand tournament (honbasho) last?", opts:["7","15","30","3"], a:1,
@@ -448,10 +498,292 @@
     { q:"\u2018Hatakikomi\u2019 \u2014 the move this site is named after \u2014 means:", opts:["Force out","Overarm throw","Slap down","Push out"], a:2,
       fb:"Slap down! Pulling or slapping a charging opponent to the clay." }
   ];
+
+  /* ================= NAME THAT RIKISHI =================
+     Three difficulties over the sekitori in gg-rikishi.js:
+       novice    photo + heya + rank + birthplace, pick the shikona from four
+       fan       photo + rank, type shikona / birthplace / heya
+       super fan photo only, type all four including the exact rank
+     Birthplace is the country for the foreign-born and the prefecture for the
+     Japanese-born — 64 of 70 are Japanese, so "Japan" would be a freebie.
+     Answers are matched leniently: case, accents, spacing and punctuation are
+     ignored, and a single typo is forgiven on longer words. */
+  var NTR_MODES = [
+    { id:"novice", label:"Novice",    sub:"multiple choice" },
+    { id:"fan",    label:"Fan",       sub:"type your answers" },
+    { id:"super",  label:"Super fan", sub:"photo only" }
+  ];
+  var ntr = { mode:"novice", pool:"all", queue:[], i:0, results:[], answered:false, retry:false };
+  var ntrChapter = -1;   // set once CHAPTERS is built
+
+  function ntrAll(){ return (window.GGRikishi && GGRikishi.ALL) || {}; }
+  function ntrNames(pool){
+    var A = ntrAll(), ns = Object.keys(A);
+    if (pool === "makuuchi" || pool === "juryo") return ns.filter(function(n){ return A[n].d === pool; });
+    if (/^\d+$/.test(pool)) return ntrShuffle(ns).slice(0, Math.min(+pool, ns.length));
+    return ns;
+  }
+  function ntrShuffle(a){
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--){ var j = Math.floor(Math.random()*(i+1)); var x=a[i]; a[i]=a[j]; a[j]=x; }
+    return a;
+  }
+  /* lenient compare: fold case/accents/punctuation, then allow one typo */
+  function ntrFold(s){
+    s = String(s == null ? "" : s).toLowerCase();
+    if (s.normalize) s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return s.replace(/\u014d/g, "o").replace(/\u016b/g, "u");
+  }
+  function ntrNorm(s){ return ntrFold(s).replace(/[^a-z0-9]/g, ""); }
+  function ntrEdits1(a, b){                     // true when within one edit
+    if (a === b) return true;
+    if (Math.abs(a.length - b.length) > 1) return false;
+    var i=0, j=0, d=0;
+    while (i < a.length && j < b.length){
+      if (a[i] === b[j]){ i++; j++; continue; }
+      if (++d > 1) return false;
+      if (a.length > b.length) i++;
+      else if (a.length < b.length) j++;
+      else { i++; j++; }
+    }
+    return d + (a.length - i) + (b.length - j) <= 1;
+  }
+  function ntrSame(given, want){
+    var a = ntrNorm(given), b = ntrNorm(want);
+    if (!a) return false;
+    if (a === b) return true;
+    return b.length >= 6 && ntrEdits1(a, b);     // forgive one typo on longer words
+  }
+  /* rank typed any which way: "M12w", "maegashira 12 west", "Ozeki East" */
+  var NTR_TIERWORD = { y:"Y", yokozuna:"Y", o:"O", ozeki:"O", s:"S", sekiwake:"S",
+                       k:"K", komusubi:"K", m:"M", maegashira:"M", j:"J", juryo:"J" };
+  function ntrParseRank(s){
+    var raw = ntrFold(s);
+    var numM = raw.match(/\d+/), num = numM ? parseInt(numM[0],10) : 0;
+    var side = /(^|[^a-z])w(est)?([^a-z]|$)/.test(raw) ? "w" : (/(^|[^a-z])e(ast)?([^a-z]|$)/.test(raw) ? "e" : "");
+    var word = (raw.match(/[a-z]+/g)||[]).map(function(w){
+      return w.replace(/^(east|west)$/,"");
+    }).filter(Boolean);
+    var tier = "";
+    for (var i=0;i<word.length && !tier;i++){
+      var w = word[i];
+      if (NTR_TIERWORD[w]) tier = NTR_TIERWORD[w];
+      else if (w.length>1 && NTR_TIERWORD[w.charAt(0)] && /^[a-z]\d*$/.test(w)) tier = NTR_TIERWORD[w.charAt(0)];
+    }
+    if (!tier){ var lead = raw.match(/^\s*([yoskmj])\s*\d/); if (lead) tier = NTR_TIERWORD[lead[1]]; }
+    return { tier:tier, num:num, side:side };
+  }
+  function ntrRankOK(given, name){
+    var want = GGRikishi.parts(name), got = ntrParseRank(given);
+    if (!got.tier || got.tier !== want.tier) return false;
+    if ((want.num || 0) !== (got.num || 0)) return false;
+    return got.side === want.side;              // exact, East/West included
+  }
+
+  function ntrFields(){
+    if (ntr.mode === "novice") return ["name"];
+    if (ntr.mode === "fan")    return ["name","place","heya"];
+    return ["name","place","heya","rank"];
+  }
+  var NTR_LABEL = { name:"Shikona", place:"Birthplace", heya:"Heya (stable)", rank:"Rank" };
+  function ntrWant(f, n){
+    var A = ntrAll()[n];
+    return f === "name" ? n : f === "place" ? A.p : f === "heya" ? A.h : GGRikishi.rank(n);
+  }
+
+
+  /* ---- screens ---- */
+  function ntrStep(){ return $("learnPanel").querySelector(".learn-step[data-i='"+ntrChapter+"']"); }
+
+  function ntrSetup(){
+    var step = ntrStep(); if (!step) return;
+    var A = ntrAll(), total = Object.keys(A).length;
+    if (!total){ step.innerHTML = "<h3>Name that rikishi</h3><p>The rikishi table didn’t load.</p>"; return; }
+    var mk = Object.keys(A).filter(function(n){ return A[n].d==="makuuchi"; }).length;
+    var ju = total - mk;
+    var pools = [{id:"all",l:"Everyone",s:total+" rikishi"},
+                 {id:"makuuchi",l:"Makuuchi",s:mk+" rikishi"},
+                 {id:"juryo",l:"Jūryō",s:ju+" rikishi"}];
+    for (var k=10;k<=60;k+=10) if (k < total) pools.push({id:String(k), l:"Random "+k, s:"mixed"});
+    step.innerHTML =
+      "<h3>Name that rikishi</h3><div class='jp'>四衛 ・ who’s who on the banzuke</div>"+
+      "<p>Every sekitori on the current banzuke, from the portrait alone.</p>"+
+      "<div class='ntr-setup'>"+
+        "<div class='ntr-grp'><span class='ntr-lab'>Difficulty</span><div class='ntr-opts' id='ntrModes'>"+
+          NTR_MODES.map(function(m){
+            return "<button class='ntr-opt' data-m='"+m.id+"' aria-pressed='"+(ntr.mode===m.id)+"'>"+
+              esc(m.label)+"<small>"+esc(m.sub)+"</small></button>"; }).join("")+
+        "</div><p class='ntr-note' id='ntrModeNote'></p></div>"+
+        "<div class='ntr-grp'><span class='ntr-lab'>Who’s in it</span><div class='ntr-opts' id='ntrPools'>"+
+          pools.map(function(pl){
+            return "<button class='ntr-opt' data-p='"+pl.id+"' aria-pressed='"+(ntr.pool===pl.id)+"'>"+
+              esc(pl.l)+"<small>"+esc(pl.s)+"</small></button>"; }).join("")+
+        "</div></div>"+
+        "<div><button class='btn' id='ntrStart'>Start ›</button></div>"+
+      "</div>";
+    function note(){
+      var m = ntr.mode;
+      $("ntrModeNote").textContent =
+        m==="novice" ? "You’re given the heya, rank and birthplace — pick the shikona from four."
+      : m==="fan"    ? "You’re given the rank. Type the shikona, birthplace and heya."
+      :                "Portrait only. Type the shikona, birthplace, heya and the exact rank.";
+    }
+    note();
+    function wire(host, key){
+      Array.prototype.forEach.call(step.querySelectorAll(host+" .ntr-opt"), function(b){
+        b.onclick = function(){
+          ntr[key] = b.dataset.m || b.dataset.p;
+          Array.prototype.forEach.call(step.querySelectorAll(host+" .ntr-opt"), function(o){
+            o.setAttribute("aria-pressed", String(o === b)); });
+          note();
+        };
+      });
+    }
+    wire("#ntrModes","mode"); wire("#ntrPools","pool");
+    $("ntrStart").onclick = function(){ ntrBegin(ntrNames(ntr.pool), false); };
+  }
+
+  function ntrBegin(names, isRetry){
+    ntr.queue = ntrShuffle(names); ntr.i = 0; ntr.results = []; ntr.retry = !!isRetry;
+    ntrAsk();
+  }
+
+  function ntrAsk(){
+    var step = ntrStep(); if (!step) return;
+    if (ntr.i >= ntr.queue.length) return ntrResults();
+    var name = ntr.queue[ntr.i], A = ntrAll()[name], fields = ntrFields();
+    ntr.answered = false;
+
+    var given = [];
+    if (ntr.mode === "novice"){
+      given.push("<span>Heya <b>"+esc(A.h)+"</b></span>");
+      given.push("<span>Rank <b>"+esc(GGRikishi.rank(name))+"</b></span>");
+      given.push("<span>From <b>"+esc(A.p)+"</b></span>");
+    } else if (ntr.mode === "fan"){
+      given.push("<span>Rank <b>"+esc(GGRikishi.rank(name))+"</b></span>");
+    }
+
+    var body;
+    if (ntr.mode === "novice"){
+      var sameDiv = Object.keys(ntrAll()).filter(function(n){ return n!==name && ntrAll()[n].d===A.d; });
+      var picks = ntrShuffle(sameDiv).slice(0,3).concat([name]);
+      body = "<div class='ntr-choices' id='ntrChoices'>"+ ntrShuffle(picks).map(function(n){
+        return "<button class='ntr-choice' data-n='"+esc(n)+"'>"+esc(n)+"</button>"; }).join("") +"</div>";
+    } else {
+      body = "<div class='ntr-fields'>"+ fields.map(function(f){
+        return "<label class='ntr-fld' data-f='"+f+"'><span>"+esc(NTR_LABEL[f])+"</span>"+
+          "<input type='text' autocomplete='off' autocapitalize='off' spellcheck='false'"+
+          (f==="rank" ? " placeholder='e.g. Maegashira 3 East'" : "")+"></label>"; }).join("") +"</div>";
+    }
+
+    step.innerHTML =
+      "<h3>Name that rikishi</h3>"+
+      "<div class='jp'>"+(ntr.retry ? "復習 ・ the ones you missed" : "四衛 ・ who’s who")+"</div>"+
+      "<div class='ntr-q'>"+
+        "<div class='ntr-shot'><img src='"+GGRikishi.photo(name)+"' alt='' loading='eager' decoding='async'></div>"+
+        "<div>"+ (given.length ? "<div class='ntr-given'>"+given.join("")+"</div>" : "") + body +
+          "<div class='ntr-verdict' id='ntrVerdict'></div>"+
+          "<div class='ntr-bar'><span id='ntrBtnWrap'></span>"+
+            "<span class='ntr-prog'>"+(ntr.i+1)+" of "+ntr.queue.length+"</span></div>"+
+        "</div>"+
+      "</div>";
+
+    if (ntr.mode === "novice"){
+      Array.prototype.forEach.call(step.querySelectorAll(".ntr-choice"), function(b){
+        b.onclick = function(){ ntrGrade(name, { name:b.dataset.n }, b); };
+      });
+    } else {
+      $("ntrBtnWrap").innerHTML = "<button class='btn' id='ntrGo'>Check</button>";
+      var inputs = step.querySelectorAll(".ntr-fld input");
+      $("ntrGo").onclick = function(){
+        var got = {};
+        Array.prototype.forEach.call(step.querySelectorAll(".ntr-fld"), function(l){
+          got[l.dataset.f] = l.querySelector("input").value;
+        });
+        ntrGrade(name, got, null);
+      };
+      Array.prototype.forEach.call(inputs, function(inp, idx){
+        inp.onkeydown = function(e){
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          if (ntr.answered) { var nx=$("ntrNext"); if (nx) nx.click(); return; }
+          if (idx < inputs.length-1) inputs[idx+1].focus(); else $("ntrGo").click();
+        };
+      });
+      if (inputs[0]) inputs[0].focus();
+    }
+  }
+
+  function ntrGrade(name, got, btn){
+    if (ntr.answered) return;
+    ntr.answered = true;
+    var step = ntrStep(), fields = ntrFields(), hits = 0;
+
+    if (ntr.mode === "novice"){
+      var right = got.name === name;
+      if (right) hits = 1;
+      Array.prototype.forEach.call(step.querySelectorAll(".ntr-choice"), function(b){
+        b.disabled = true;
+        if (b.dataset.n === name) b.classList.add("correct");
+        else if (b === btn) b.classList.add("wrong");
+      });
+    } else {
+      fields.forEach(function(f){
+        var want = ntrWant(f, name);
+        var ok = f === "rank" ? ntrRankOK(got[f], name) : ntrSame(got[f], want);
+        if (ok) hits++;
+        var lab = step.querySelector(".ntr-fld[data-f='"+f+"']");
+        lab.classList.add(ok ? "ok" : "no");
+        lab.querySelector("input").disabled = true;
+        if (!ok) lab.insertAdjacentHTML("beforeend", "<span class='ntr-real'>"+esc(want)+"</span>");
+      });
+    }
+
+    var perfect = hits === fields.length;
+    ntr.results.push({ name:name, hits:hits, of:fields.length, perfect:perfect });
+    var v = $("ntrVerdict");
+    v.className = "ntr-verdict " + (perfect ? "ok" : "no");
+    v.textContent = perfect
+      ? "✓ " + name + " — " + GGRikishi.rank(name) + ", " + ntrAll()[name].h + " beya"
+      : "✗ That’s " + name + " — " + GGRikishi.rank(name) + ", " + ntrAll()[name].h +
+        " beya, from " + ntrAll()[name].p + (fields.length>1 ? "  ("+hits+"/"+fields.length+")" : "");
+    $("ntrBtnWrap").innerHTML = "<button class='btn' id='ntrNext'>"+
+      (ntr.i === ntr.queue.length-1 ? "See your score" : "Next") +" ›</button>";
+    $("ntrNext").onclick = function(){ ntr.i++; ntrAsk(); };
+    $("ntrNext").focus();
+  }
+
+  function ntrResults(){
+    var step = ntrStep();
+    var full = ntr.results.filter(function(r){ return r.perfect; }).length;
+    var n = ntr.results.length;
+    var ansGot = ntr.results.reduce(function(a,r){ return a+r.hits; }, 0);
+    var ansOf  = ntr.results.reduce(function(a,r){ return a+r.of;  }, 0);
+    var missed = ntr.results.filter(function(r){ return !r.perfect; }).map(function(r){ return r.name; });
+    var pct = n ? Math.round(full/n*100) : 0;
+    var word = pct===100 ? "Perfect — yokozuna form." : pct>=80 ? "Strong. Sanyaku material."
+             : pct>=50 ? "Not bad — solid maegashira." : "Early days. Back to the banzuke.";
+    step.innerHTML =
+      "<h3>"+(ntr.retry ? "Second time round" : "How you did")+"</h3>"+
+      "<div class='jp'>成績 ・ your score</div>"+
+      "<p class='ntr-scorebig'>"+full+" / "+n+"</p>"+
+      "<p>rikishi named in full"+(ansOf!==n ? " — "+ansGot+" of "+ansOf+" answers right" : "")+". "+esc(word)+"</p>"+
+      (missed.length ? "<p class='ntr-lab' style='margin-bottom:0;font-size:.74rem;letter-spacing:.16em;"+
+          "text-transform:uppercase;color:var(--faint,#7d8496)'>Missed</p>"+
+        "<div class='ntr-missed'>"+missed.map(function(m){ return "<span>"+esc(m)+"</span>"; }).join("")+"</div>" : "")+
+      "<div class='learn-cta' style='margin-top:16px'>"+
+        (missed.length ? "<button class='btn' id='ntrAgainMissed'>Retry the "+missed.length+" you missed ›</button>" : "")+
+        "<button class='btn"+(missed.length?" ghost":"")+"' id='ntrRestart'>New game</button>"+
+      "</div>";
+    if (missed.length) $("ntrAgainMissed").onclick = function(){ ntrBegin(missed, true); };
+    $("ntrRestart").onclick = function(){ ntrSetup(); };
+  }
+
   var quizIdx = 0, quizScore = 0;
 
   function buildLearn(){
     learnBuilt = true;
+    for (var ci = 0; ci < CHAPTERS.length; ci++) if (CHAPTERS[ci].ntr) ntrChapter = ci;
     $("learnNav").innerHTML = CHAPTERS.map(function(c,i){
       return "<button class='learn-navb' data-i='"+i+"' aria-current='"+(i===0?"true":"false")+"'>"+
         "<span class='lb-i'>"+c.icon+"</span>"+esc(c.title)+"</button>";
@@ -460,7 +792,7 @@
       btn.onclick = function(){ showStep(+btn.dataset.i); };
     });
     $("learnPanel").innerHTML = CHAPTERS.map(function(c,i){
-      return "<div class='learn-step' data-i='"+i+"'>"+ (c.quiz || c.deck ? "" :
+      return "<div class='learn-step' data-i='"+i+"'>"+ (c.quiz || c.deck || c.ntr ? "" :
         "<h3>"+esc(c.title)+"</h3><div class='jp'>"+esc(c.jp)+"</div>"+c.html) +
         renderNavCta(i) + "</div>";
     }).join("");
@@ -477,6 +809,7 @@
     });
     if (CHAPTERS[i].quiz) renderQuiz();
     if (CHAPTERS[i].deck) renderDeck(i);
+    if (CHAPTERS[i].ntr)  ntrSetup();
     // wire the prev/next buttons of the now-visible step
     var step = $("learnPanel").querySelector(".learn-step[data-i='"+i+"'].on");
     if (step) Array.prototype.forEach.call(step.querySelectorAll("[data-goto]"), function(btn){
