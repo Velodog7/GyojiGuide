@@ -537,6 +537,12 @@
         color:var(--ink); font:inherit; font-size:.9rem; padding:8px 10px; resize:vertical; box-sizing:border-box }
   .lg-post-edit:focus{ outline:none; border-color:var(--sun) }
   .lg-msg__editbar{ display:flex; gap:8px; margin-top:6px }
+  /* Host for the site-wide gunbai loader (gg-nav.js supplies .gg-spinner).
+     .gg-spinner is position:absolute/inset:0, so it needs a positioned parent
+     with a height — this gives it one, and can be dropped into any innerHTML. */
+  .gg-load{ position:relative; min-height:240px }
+  .gg-load.sm{ min-height:150px }
+  .gg-load.lg{ min-height:320px }
 </style>
 <script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-mawashi.js"></script></head>
 <body>
@@ -698,6 +704,7 @@
         <div class="lg-switch" id="lgSwitch"></div>
         <button class="btn ghost sm" id="lgNewBtn">+ New league</button>
       </div>
+      <div id="lgBusy" hidden></div>
 
       <div id="lgEmpty" class="lg-empty" hidden>
         <p>You're not in any leagues yet. Create one and share the invite link, or ask a friend for theirs.</p>
@@ -1263,7 +1270,7 @@ function togglePin(h){
 }
 
 async function loadBoard(){
-  $("lbBody").innerHTML = `<p class="empty-lb">Loading…</p>`;
+  $("lbBody").innerHTML = ggSpinner("Loading the leaderboard");
   let data = null;
   try { data = await apiGet(); } catch (e) {}
   if (!data || !data.ok){
@@ -1496,17 +1503,39 @@ const timeAgo = iso => {
 };
 function lgStatus(msg, cls){ const s=$("lgStatus"); if(s){ s.textContent=msg||""; s.className="status"+(cls?" "+cls:""); } }
 
+/* The site-wide gunbai loader, as a string you can drop into any innerHTML.
+   size: "" | "sm" | "lg" — just picks the reserved height. */
+function ggSpinner(label, size){
+  return '<div class="gg-load'+(size?" "+size:"")+'">'
+       +   '<div class="gg-spinner" role="status" aria-live="polite">'
+       +     '<div class="gg-spinner__ring"></div>'
+       +     '<span class="gg-spinner__label">'+esc(label||"Loading")+'</span>'
+       +   '</div></div>';
+}
+/* Leagues take the longest of anything on this page — a whole round trip to the
+   Sheet before the panel can paint. Show the fan there instead of a bare line
+   of text over an empty screen. */
+function lgBusy(on, label){
+  const b = $("lgBusy"); if(!b) return;
+  if(on){
+    b.innerHTML = ggSpinner(label, "lg"); b.hidden = false;
+    $("lgPanel").hidden = true; $("lgEmpty").hidden = true;
+  } else {
+    b.hidden = true; b.innerHTML = "";   // clear so the animation stops
+  }
+}
+
 async function loadLeagues(preferId){
   if (!acct){ $("lgLocked").hidden=false; $("lgMain").hidden=true; $("lgN").textContent="0"; return; }
   $("lgLocked").hidden=true; $("lgMain").hidden=false;
   if (!hasAPI()){ $("lgEmpty").hidden=false; $("lgEmpty").innerHTML="<p>Leagues need the shared Sheet API. Deploy the Apps Script and set <code>API_URL</code> to enable leagues, invites, and the message board.</p>"; $("lgPanel").hidden=true; $("lgSwitch").innerHTML=""; $("lgN").textContent="0"; return; }
   if (!cache.meta || !cache.meta.basho) loadBoard();   // fire off in parallel so league scores have results to work with
-  lgStatus("Loading…");
+  lgBusy(true, "Loading your leagues");
   let res=null; try{ res=await GyojiGuide.leagues(acct.handle); }catch(e){}
   leaguesCache = (res && res.leagues) || [];
   $("lgN").textContent = leaguesCache.length;
-  lgStatus("");
-  if (!leaguesCache.length){ $("lgEmpty").hidden=false; $("lgPanel").hidden=true; $("lgSwitch").innerHTML=""; return; }
+  lgBusy(false); lgStatus("");
+  if (!leaguesCache.length){ lgBusy(false); $("lgEmpty").hidden=false; $("lgPanel").hidden=true; $("lgSwitch").innerHTML=""; return; }
   $("lgEmpty").hidden=true;
   if (preferId && leaguesCache.some(l=>l.id===preferId)) curLeagueId=preferId;
   if (!curLeagueId || !leaguesCache.some(l=>l.id===curLeagueId)) curLeagueId=leaguesCache[0].id;
@@ -1524,9 +1553,14 @@ let lgTeam = {};   // in-progress picks for the league currently open in the pan
 
 async function renderLeague(){
   const lg = leaguesCache.find(l=>l.id===curLeagueId);
-  if (!lg){ $("lgPanel").hidden=true; return; }
+  if (!lg){ lgBusy(false); $("lgPanel").hidden=true; return; }
 
-  lgStatus("Loading league…");
+  /* Full-area loader only when there is nothing on screen yet — first paint or
+     a league switch. If the panel is already up (posting a message, an add/drop,
+     a trade response) keep the quiet inline note so the layout doesn't jump. */
+  const coldStart = $("lgPanel").hidden;
+  if (coldStart) lgBusy(true, "Loading " + (lg.name || "your league"));
+  else lgStatus("Loading league\u2026");
   let d = null; try { d = await GyojiGuide.leagueDetail(lg.id); } catch(e){}
   if (d && d.ok){
     lg.members = d.members || []; lg.messages = d.messages || [];
@@ -1535,9 +1569,9 @@ async function renderLeague(){
       lg.draftAgreedCount = d.league.draftAgreedCount || 0; lg.draftMemberCount = d.league.draftMemberCount || (d.members||[]).length;
       lg.iAgreedDraft = !!d.league.iAgreedDraft; }
   } else { lg.members = Array.isArray(lg.members) ? lg.members : []; lg.messages = lg.messages || []; }
-  lgStatus("");
+  lgBusy(false); lgStatus("");
 
-  if (curLeagueId !== lg.id) return;   // the user switched leagues while this was loading
+  if (curLeagueId !== lg.id) return;   // the user switched leagues while this was loading (that render owns the spinner)
   $("lgPanel").hidden=false;
   const meCommish = acct && lg.commissioner.toLowerCase()===acct.handle.toLowerCase();
   $("lgName").innerHTML = esc(lg.name) + (lg.mode==="keepers" ? '<span class="lg-mode-badge">Keepers</span>' : '');
@@ -1797,7 +1831,7 @@ async function renderKeepers(lg, meCommish){
   if (lg.draftStatus === "active") {
     el.innerHTML = `<div class="lg-draftroom">
       <h4>Snake draft — live</h4>
-      <div class="lg-draft-turn" id="lgDraftTurn">Loading…</div>
+      <div class="lg-draft-turn" id="lgDraftTurn"><span class="gg-spin"></span>Loading…</div>
       <div class="lg-draft-grid" id="lgDraftGrid"></div>
       <h4 style="margin-top:14px">Picks so far</h4>
       <div class="lg-draft-board" id="lgDraftBoard"></div>
@@ -1808,7 +1842,7 @@ async function renderKeepers(lg, meCommish){
   }
 
   if (lg.draftStatus === "redraft") {
-    el.innerHTML = `<div class="lg-draftroom"><h4>Supplemental re-draft <span class="lg-rm-window open">new banzuke</span></h4><div id="redraftBody"><p class="lg-locked-note">Loading the re-draft…</p></div></div>`;
+    el.innerHTML = `<div class="lg-draftroom"><h4>Supplemental re-draft <span class="lg-rm-window open">new banzuke</span></h4><div id="redraftBody">${ggSpinner('Loading the re-draft','sm')}</div></div>`;
     await renderRedraft(lg);
     if (redraftPollTimer) clearInterval(redraftPollTimer);
     redraftPollTimer = setInterval(()=>renderRedraft(lg), 4000);
@@ -2029,7 +2063,7 @@ function wireTradeAndWaiverForms(lg, members){
 }
 async function loadTradesList(id){
   const box = $("lgTradesList"); if (!box) return;
-  box.innerHTML = "Loading…";
+  box.innerHTML = ggSpinner("Loading trades", "sm");
   let res=null; try { res = await GyojiGuide.myTrades(id); } catch(e){}
   const trades = (res && res.trades) || [];
   if (!trades.length){ box.innerHTML = `<p class="lg-locked-note">No trades yet.</p>`; return; }
@@ -2393,7 +2427,7 @@ if (acct) loadHistory();
   var note = $("rosterNote");
   function show(html, color){ if(!note) return; note.hidden=false; note.innerHTML=html; if(color) note.style.color=color; }
   if (!window.GGRoster) return;
-  show("Checking the current banzuke\u2026", "#9aa0b0");
+  show('<span class="gg-spin"></span>Checking the current banzuke\u2026', "#9aa0b0");
   GGRoster.load().then(function(res){
     if (!res || !res.ok){ show("Showing the bundled roster \u2014 couldn\u2019t reach sumo-api.", "#9aa0b0"); return; }
     var sum = GGRoster.applyTo(RK, res.ranks, {
