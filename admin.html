@@ -49,8 +49,17 @@ button,input,textarea{ font-family:inherit }
 #dash{ }
 header.adm-top{ border-bottom:1px solid var(--line); background:rgba(20,22,30,.9) }
 .adm-top-inner{ max-width:var(--maxw); margin:0 auto; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px }
-.adm-brand{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.05rem }
-.adm-brand span{ color:var(--sun) }
+.adm-brand{ display:flex; align-items:center; gap:13px; min-width:0 }
+.adm-brand img{ height:38px; width:auto; display:block; flex:none }
+/* "Admin" set in the site nav's button face — see .ggn-link in gg-nav.js */
+.adm-brand span{ font-family:"Potta One","Zen Maru Gothic",system-ui,sans-serif; font-weight:400;
+  font-size:.9rem; letter-spacing:.05em; text-transform:uppercase; color:var(--sun); line-height:1;
+  padding-top:2px }
+@media (max-width:560px){
+  .adm-brand{ gap:9px }
+  .adm-brand img{ height:28px }
+  .adm-brand span{ font-size:.78rem }
+}
 .adm-lock{ background:none; border:1px solid var(--line); color:var(--dim); border-radius:var(--radius-sm); padding:7px 13px; font-size:.8rem; cursor:pointer }
 .adm-lock:hover{ border-color:var(--red); color:var(--down) }
 
@@ -200,7 +209,10 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
 <div id="dash" hidden>
   <header class="adm-top">
     <div class="adm-top-inner">
-      <div class="adm-brand">Sumo Slapdown <span>Admin</span></div>
+      <div class="adm-brand">
+        <img src="SumoSlapdown-logowide.svg" alt="Sumo Slap Down" />
+        <span>Admin</span>
+      </div>
       <button class="adm-lock" id="lockBtn">Lock</button>
     </div>
   </header>
