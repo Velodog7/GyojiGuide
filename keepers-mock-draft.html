@@ -42,7 +42,7 @@
   .card h2{font-family:"Space Grotesk",sans-serif;font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--sun);margin:0 0 14px;font-weight:600}
   .card h2 .n{color:var(--faint);margin-left:6px}
 
-  label.fld{display:block;font-size:.82rem;color:var(--ink-2);margin-bottom:12px}
+  label.fld{display:block;font-size:.82rem;color:var(--ink-2);margin-bottom:12px;min-width:0}.fld .hint{display:block}@media(max-width:520px){.kd-2col{grid-template-columns:1fr;gap:0}}
   label.fld span.lab{display:block;font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:5px}
   input[type=number],input[type=text],input[type=datetime-local],select{
     background:var(--surface-2);border:1px solid var(--line);color:var(--ink);border-radius:9px;
@@ -348,7 +348,7 @@
   <!-- ===== SETUP (commissioner) ===== -->
   <section id="setupCard" class="card">
     <h2>Draft setup <span class="n">— commissioner only</span></h2>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 26px;max-width:680px">
+    <div class="kd-2col" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 26px;max-width:680px">
       <label class="fld"><span class="lab">Roster size per division</span>
         <input type="number" id="rosterSize" min="5" max="10" value="6">
         <span class="hint">Each team drafts this many Makuuchi (active) and the same number of Jūryō (farm). 5–10.</span>

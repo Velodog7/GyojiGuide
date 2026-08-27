@@ -28,9 +28,10 @@
     nav.innerHTML =
       '<div class="ggn-inner">' +
       '<a class="ggn-brand" href="index.html">'+GGN_LOGO+'<span class="ggn-beta">beta</span></a>' +
-      '<button type="button" class="ggn-burger" id="ggnBurger" aria-label="Menu" aria-expanded="false" aria-controls="ggnLinks">' +
+      '<button type="button" class="ggn-burger" id="ggnBurger" aria-label="Menu" aria-expanded="false" aria-controls="ggnPanel">' +
         '<span></span><span></span><span></span>' +
       '</button>' +
+      '<div class="ggn-panel" id="ggnPanel">' +
       '<div class="ggn-links" id="ggnLinks">' +
       LINKS.map(function (l) {
         var active = l.match.indexOf(here) >= 0;
@@ -46,6 +47,7 @@
         '<div class="ggn-slot" id="ggnRadioSlot"></div>' +
         '<button type="button" class="ggn-help" id="ggnHelp" aria-label="Help & feedback" title="Help & feedback">?</button>' +
         '<div class="ggn-acct"></div>' +
+      '</div>' +
       '</div>' +
       '</div>';
     document.body.insertBefore(nav, document.body.firstChild);
@@ -72,8 +74,11 @@
       burger.setAttribute("aria-expanded", String(open));
     }
     burger.onclick = function (e) { e.stopPropagation(); setOpen(!nav.classList.contains("ggn-open")); };
-    document.getElementById("ggnLinks").addEventListener("click", function (e) {
-      if (e.target.closest(".ggn-link")) setOpen(false);   // navigating away
+    var panel = document.getElementById("ggnPanel");
+    if (panel) panel.addEventListener("click", function (e) {
+      // a link navigates away; help / account open a modal over the top — either
+      // way the dropdown has done its job and should get out of the way
+      if (e.target.closest(".ggn-link,.ggn-help,.ggn-acct button,.gga-btn,.gga-chip")) setOpen(false);
     });
     document.addEventListener("click", function (e) {
       if (nav.classList.contains("ggn-open") && !e.target.closest("#gg-nav")) setOpen(false);
@@ -101,6 +106,10 @@
     '.ggn-brand svg,.ggn-brand img{height:68px;width:auto;aspect-ratio:1240/240;display:block}' +
     '.ggn-beta{align-self:flex-start;margin-top:14px;margin-left:-2px;font-family:"Zen Maru Gothic",system-ui,sans-serif;' +
       'font-weight:600;font-size:.62rem;letter-spacing:.14em;text-transform:lowercase;color:#d8b25a;opacity:.85}' +
+    /* the panel is a wrapper only so the phone dropdown can hold the links AND
+   the radio/help/account cluster. display:contents keeps the desktop grid
+   exactly as it was. */
+    '.ggn-panel{display:contents}'+
     '.ggn-links{grid-column:2;justify-self:end;display:flex;gap:6px;align-items:stretch}' +
     '.ggn-link{display:flex;align-items:center;justify-content:center;box-sizing:border-box;height:40px;' +
       'font-family:"Potta One","Zen Maru Gothic",system-ui,sans-serif;font-weight:400;font-size:.9rem;letter-spacing:.05em;text-transform:uppercase;' +
@@ -122,8 +131,9 @@
       'color:#c7cbd9;font-family:"Zen Maru Gothic",system-ui,sans-serif;font-weight:700;font-size:.95rem;line-height:1;cursor:pointer;' +
       'display:grid;place-items:center;transition:color .15s,border-color .15s,background .15s}' +
     '.ggn-help:hover{color:#e0a23a;border-color:#e0a23a}' +
-    /* ── narrow layout: collapse links into a hamburger dropdown ── */
-    '@media(max-width:820px){' +
+    /* ── links collapse into the burger; the radio/help/account cluster still
+       fits beside the logo down to about 820px ── */
+    '@media(max-width:1200px){' +
       '.ggn-inner{grid-template-columns:auto 1fr auto;gap:10px;padding:0 14px;min-height:60px}' +
       '.ggn-brand{grid-column:1}' +
       '.ggn-brand svg,.ggn-brand img{height:52px}' +
@@ -138,16 +148,39 @@
       '#gg-nav.ggn-open .ggn-links{max-height:60vh;opacity:1;pointer-events:auto}' +
       '.ggn-link{height:auto;justify-content:flex-start;padding:12px 14px;font-size:1rem}' +
     '}' +
-    /* ── very thin: shrink the logo further so burger, help, and the account
-       control all still fit on one row without crowding or overflow ── */
-    '@media(max-width:430px){' +
+    /* ── phone: the bar is just the logo and the burger. Radio, help and the
+       account control move into the dropdown with the page links, because on a
+       390px screen the logo alone eats 45% of the width and the cluster cannot
+       fit beside it without running off the page. ── */
+    '@media(max-width:820px){' +
+      '.ggn-inner{grid-template-columns:1fr auto;gap:8px;padding:0 12px;min-height:56px}' +
+      '.ggn-brand{grid-column:1;min-width:0}' +
+      '.ggn-brand svg,.ggn-brand img{height:44px;max-width:100%}' +
+      '.ggn-beta{display:none}' +
+      '.ggn-burger{display:flex;grid-column:2;justify-self:end;width:38px;height:36px;padding:0 9px}' +
+      '.ggn-panel{display:block;grid-column:1 / -1;position:absolute;left:0;right:0;top:100%;' +
+        /* fully opaque: the dropdown covers page content, and a translucent
+           panel here reads as a rendering bug rather than a menu */
+        'background:#12141b;' +
+        'border-bottom:1px solid rgba(216,178,90,.25);box-shadow:0 18px 40px rgba(0,0,0,.5);' +
+        'max-height:0;overflow:hidden;opacity:0;pointer-events:none;transition:max-height .25s ease,opacity .2s ease}' +
+      '#gg-nav.ggn-open .ggn-panel{max-height:80vh;overflow-y:auto;opacity:1;pointer-events:auto}' +
+      /* inside the panel the links are just a stacked list again */
+      '.ggn-links{position:static;grid-column:auto;justify-self:stretch;width:100%;box-sizing:border-box;' +
+        'display:flex;flex-direction:column;align-items:stretch;gap:4px;' +
+        'padding:10px 12px 4px;background:none;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;' +
+        'max-height:none;overflow:visible;opacity:1;pointer-events:auto;transition:none}' +
+      '#gg-nav.ggn-open .ggn-links{max-height:none}' +
+      '.ggn-right{grid-column:auto;justify-self:stretch;width:auto;box-sizing:border-box;justify-content:flex-start;gap:10px;flex-wrap:wrap;' +
+        'padding:12px;margin:6px 12px 12px;border-top:1px solid rgba(255,255,255,.08)}' +
+      '.ggn-help{width:38px;height:38px}' +
+      '.ggn-slot{width:38px;height:38px}' +
+      '.ggn-acct{margin-left:auto;display:flex;gap:8px;align-items:center}' +
+    '}' +
+    /* ── very thin ── */
+    '@media(max-width:400px){' +
       '.ggn-inner{gap:6px;padding:0 10px;min-height:52px}' +
       '.ggn-brand svg,.ggn-brand img{height:34px}' +
-      '.ggn-beta{display:none}' +
-      '.ggn-burger{width:34px;height:34px;padding:0 8px}' +
-      '.ggn-right{gap:6px}' +
-      '.ggn-help{width:34px;height:34px;font-size:.85rem}' +
-      '.ggn-slot{width:34px;height:34px}' +
     '}' +
     /* help modal */
     '.ggh-ov{position:fixed;inset:0;z-index:1100;display:none;align-items:center;justify-content:center;background:rgba(6,7,11,.72);' +

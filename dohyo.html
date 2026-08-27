@@ -1140,9 +1140,9 @@
   .intro__slots{ display:grid; gap:10px;
         grid-template-columns:repeat(auto-fill,minmax(260px,1fr)) }
 
-  .intro__opts{ display:grid; gap:10px; grid-template-columns:1fr 1fr }
+  .intro__opts{ display:grid; gap:10px; grid-template-columns:repeat(2,minmax(0,1fr)) }
   #introDiv{ grid-template-columns:repeat(3,1fr) }
-  .optcard{ text-align:left; background:var(--surface); color:var(--ink);
+  .optcard{ text-align:left; background:var(--surface); color:var(--ink); min-width:0;
         border:1px solid var(--line); border-radius:var(--radius); padding:15px 16px; cursor:pointer;
         transition:border-color .15s ease, background .15s ease }
   .optcard:hover{ border-color:var(--line2) }
@@ -1159,7 +1159,7 @@
         padding:13px 26px; cursor:pointer; white-space:nowrap }
   .intro__go:hover:not(:disabled){ filter:brightness(1.1) }
   .intro__go:disabled{ background:none; color:var(--dim); border-color:var(--line); cursor:not-allowed; font-weight:400 }
-  @media (max-width:620px){ .intro__opts{ grid-template-columns:1fr } }
+  @media (max-width:620px){ .intro__opts{ grid-template-columns:minmax(0,1fr) } }
 
   /* ── dohyō-iri: the ring-entering ceremony, during setup ────── */
   .ceremony{ position:absolute; inset:0; z-index:2; pointer-events:none }
@@ -1320,7 +1320,7 @@
         font-size:16px; cursor:pointer; }
   .pickmodal__close:hover{ border-color:var(--tangerine); color:var(--tangerine) }
   .pickmodal__grid{ display:grid; gap:14px;
-        grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); }
+        grid-template-columns:repeat(auto-fill,minmax(min(180px,100%),1fr)); }
 
   /* Each option is a two-sided card that flips in 3D to reveal the rikishi.
      Inside the flip, container-query containment on the card would break its

@@ -341,11 +341,12 @@
   .acctview__row{ display:flex; gap:8px } .acctview__row .btn{ margin-top:0 }
 
   /* ---- leaderboard search + pins ---- */
-  .lb-search{ display:flex; align-items:center; gap:10px; margin:10px 0 6px }
+  .lb-search{ display:flex; align-items:center; gap:10px; margin:10px 0 6px; flex-wrap:wrap; min-width:0 }
   .lb-search input{ flex:1; background:var(--surface); border:1px solid var(--line); border-radius:10px;
         color:var(--ink); font:inherit; font-size:.92rem; padding:9px 13px }
   .lb-search input:focus{ outline:none; border-color:var(--sun) }
   .lb-search__hint{ font-size:.72rem; color:var(--faint); white-space:nowrap }
+  @media(max-width:420px){ .lb-search__hint{ white-space:normal } }
   .lb-pinned{ border:1px solid rgba(var(--sun-rgb),.35); background:rgba(var(--sun-rgb),.05);
         border-radius:12px; padding:10px 12px; margin:0 0 14px }
   .lb-pinned h4{ margin:0 0 8px; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun) }

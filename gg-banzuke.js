@@ -142,6 +142,23 @@
 
   var CSS =
   '#ggBanzuke{position:absolute;inset:0;z-index:1;overflow:hidden}'
+  /* Phones: the sheet stops being a backdrop and becomes a thing you scroll.
+     Sixteen columns of rikishi squeezed into 390px is unreadable, so the sheet
+     keeps a legible width and you swipe across it like a real banzuke. This
+     lives here rather than in the page because this file's CSS is injected at
+     runtime and would otherwise override the page's own mobile rule. */
+  +'@media(max-width:640px){'
+    +'#ggBanzuke{position:static;inset:auto;order:2;z-index:auto;width:100%;margin-top:10px;'
+      +'overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;'
+      +'border-top:1px solid rgba(216,178,90,.28);border-bottom:1px solid rgba(216,178,90,.28)}'
+    +'#ggBanzuke .ggb{position:relative;inset:auto;width:760px;height:auto;flex:none}'
+    /* let the columns run to their natural height: the page scrolls down
+       through the crowd, the sheet swipes sideways. Clipping here would hide
+       most of the banzuke. */
+    +'#ggBanzuke .ggb-col{overflow:visible}'
+    +'#ggBanzuke .ggb-body{min-height:0}'
+    +'#ggBanzuke::-webkit-scrollbar{height:0}'
+  +'}'
   +'.ggb{position:absolute;inset:0;display:flex;flex-direction:column;'
     +'background:#e9e1d0 url('+PAPER+') center/cover no-repeat;'
     +'filter:sepia(.14) saturate(1.02) contrast(.98) brightness(1.05);'   /* gently aged, not washed out */
