@@ -458,7 +458,6 @@
       ".ggr{position:relative;flex:none;display:flex;align-items:center}" +
       ".ggr-btn{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid #39404f;background:rgba(255,255,255,.03);" +
         "color:#c7cbd9;cursor:pointer;display:grid;place-items:center;padding:0;transition:color .15s,border-color .15s,background .15s}" +
-      ".ggr-btn:hover{color:#e0a23a;border-color:#e0a23a}" +
       ".ggr[data-state='playing'] .ggr-btn,.ggr[data-state='gap'] .ggr-btn{color:#e0a23a;border-color:#e0a23a}" +
       /* the four button faces stack on top of each other and cross-fade */
       ".ggr-btn{position:relative}" +
@@ -467,16 +466,28 @@
       /* the drum carries its own colour now, so idle is dimmed to keep reading
          as "off" and full colour is reserved for actually playing */
       ".ggr-ic-drum{opacity:1;filter:saturate(.3) brightness(.82)}" +
-      ".ggr-btn:is(:hover,:focus-visible) .ggr-ic-drum{filter:saturate(.75) brightness(.95)}" +
-      /* hovering (or keyboard-focused) offers the transport icon instead */
-      ".ggr-btn:is(:hover,:focus-visible) .ggr-ic-drum{opacity:0}" +
-      ".ggr-btn:is(:hover,:focus-visible) .ggr-ic-play{opacity:1}" +
-      /* playing: the drum plays itself, and hover offers pause */
+      /* playing: the drum plays itself */
       ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-ic-drum{opacity:0}" +
       ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-ic-live{opacity:1}" +
-      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:is(:hover,:focus-visible) .ggr-ic-live{opacity:0}" +
-      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:is(:hover,:focus-visible) .ggr-ic-play{opacity:0}" +
-      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:is(:hover,:focus-visible) .ggr-ic-pause{opacity:1}" +
+      /* Swapping the drum for a play/pause icon is a HOVER affordance, so it is
+         gated on a real pointer. On a touch screen :hover latches after a tap —
+         the button would be left showing "pause" forever, with no way to clear
+         it. Keyboard focus still gets the same preview. */
+      "@media (hover:hover) and (pointer:fine){" +
+        ".ggr-btn:hover{color:#e0a23a;border-color:#e0a23a}" +
+        ".ggr-btn:hover .ggr-ic-drum{filter:saturate(.75) brightness(.95)}" +
+        ".ggr-btn:hover .ggr-ic-drum{opacity:0}" +
+        ".ggr-btn:hover .ggr-ic-play{opacity:1}" +
+        ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:hover .ggr-ic-live{opacity:0}" +
+        ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:hover .ggr-ic-play{opacity:0}" +
+        ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:hover .ggr-ic-pause{opacity:1}" +
+      "}" +
+      /* keyboard focus is safe on every device */
+      ".ggr-btn:focus-visible .ggr-ic-drum{filter:saturate(.75) brightness(.95);opacity:0}" +
+      ".ggr-btn:focus-visible .ggr-ic-play{opacity:1}" +
+      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:focus-visible .ggr-ic-live{opacity:0}" +
+      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:focus-visible .ggr-ic-play{opacity:0}" +
+      ".ggr:is([data-state='playing'],[data-state='gap']) .ggr-btn:focus-visible .ggr-ic-pause{opacity:1}" +
       /* beat-driven: --ggr-kick decays 1 -> 0 after each beat, --ggr-l / --ggr-r
          say which hand struck it, so the sticks alternate with the music */
       ".ggr-ic-live .ggr-skin{transform-box:fill-box;transform-origin:center;" +
@@ -491,6 +502,9 @@
       ".ggr-panel{position:absolute;top:calc(100% + 10px);right:0;z-index:950;width:min(272px,calc(100vw - 24px));" +
         "background:#14161d;border:1px solid #2a2d38;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.5);" +
         "padding:16px;display:none;font-family:\"Zen Maru Gothic\",\"Potta One\",system-ui,sans-serif;color:#e9eaf0}" +
+      /* in the phone menu the button sits at the LEFT edge, so a right-anchored
+         popup lands off-screen — flip the anchor there */
+      "@media(max-width:820px){.ggr-panel{left:0;right:auto}}" +
       ".ggr-panel.open{display:block}" +
       ".ggr-panel__head{margin-bottom:14px}" +
       ".ggr-name{display:block;font-weight:700;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +

@@ -158,13 +158,14 @@
       '.ggn-brand svg,.ggn-brand img{height:44px;max-width:100%}' +
       '.ggn-beta{display:none}' +
       '.ggn-burger{display:flex;grid-column:2;justify-self:end;width:38px;height:36px;padding:0 9px}' +
-      '.ggn-panel{display:block;grid-column:1 / -1;position:absolute;left:0;right:0;top:100%;' +
-        /* fully opaque: the dropdown covers page content, and a translucent
-           panel here reads as a rendering bug rather than a menu */
-        'background:#12141b;' +
-        'border-bottom:1px solid rgba(216,178,90,.25);box-shadow:0 18px 40px rgba(0,0,0,.5);' +
-        'max-height:0;overflow:hidden;opacity:0;pointer-events:none;transition:max-height .25s ease,opacity .2s ease}' +
-      '#gg-nav.ggn-open .ggn-panel{max-height:80vh;overflow-y:auto;opacity:1;pointer-events:auto}' +
+      /* the menu sits IN THE FLOW so it pushes the page down instead of
+         covering it, and it never clips: the radio popup opens out of it. That
+         rules out a max-height transition (which needs overflow:hidden), so the
+         open/close is a display swap with a short slide-in. */
+      '.ggn-panel{display:none;grid-column:1 / -1;position:static;background:#12141b;' +
+        'border-bottom:1px solid rgba(216,178,90,.25);box-shadow:0 18px 40px rgba(0,0,0,.5)}' +
+      '#gg-nav.ggn-open .ggn-panel{display:block;animation:ggn-drop .18s ease}' +
+      '@keyframes ggn-drop{from{opacity:0;transform:translateY(-6px)}}' +
       /* inside the panel the links are just a stacked list again */
       '.ggn-links{position:static;grid-column:auto;justify-self:stretch;width:100%;box-sizing:border-box;' +
         'display:flex;flex-direction:column;align-items:stretch;gap:4px;' +
