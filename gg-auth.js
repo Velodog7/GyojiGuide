@@ -72,6 +72,11 @@
     ".gga-modal{width:min(420px,100%);max-height:90vh;overflow:auto;background:#14161d;border:1px solid #2a2d38;"+
       "border-radius:16px;padding:22px;box-shadow:0 24px 70px rgba(0,0,0,.6);font-family:'Zen Maru Gothic','Potta One',system-ui,sans-serif}"+
     ".gga-modal.wide{width:min(560px,100%)}"+
+      ".gga-modal.acct{width:min(600px,100%)}"+
+      /* below this the two columns have nowhere to go, so stack them */
+      "@media (max-width:560px){.gga-modal.acct .gga-acctrow{flex-direction:column;align-items:center}"+
+      ".gga-modal.acct .gga-acctrow__main{width:100%}"+
+      ".gga-modal.acct .gga-acctrow__top{justify-content:center;text-align:center;min-height:0}}"+
     ".gga-x{float:right;background:none;border:0;color:#878da0;font-size:1.2rem;cursor:pointer;line-height:1;padding:2px 6px}"+
     ".gga-x:hover{color:#e9eaf0}"+
     ".gga-title{font-weight:700;font-size:1.15rem;color:#f1f2f6;margin:0 0 14px}"+
@@ -86,11 +91,15 @@
     ".gga-switch a{color:#e0a23a;cursor:pointer;text-decoration:underline}"+
     ".gga-status{min-height:18px;font-size:.82rem;margin-top:10px;color:#878da0}"+
     ".gga-status.err{color:#f0655a}.gga-status.ok{color:#43c08a}"+
-    ".gga-acctrow{display:flex;align-items:center;gap:12px;margin-bottom:16px}"+
-    ".gga-acctrow__ava{flex:none;width:40px;height:60px;border-radius:8px;overflow:hidden;"+
+    ".gga-acctrow{display:flex;align-items:flex-start;gap:18px;margin-bottom:16px}"+
+      /* the summary sits in the right column so it lines up with the handle */
+      ".gga-acctrow__main{flex:1;min-width:0}"+
+      ".gga-acctrow__top{display:flex;align-items:center;gap:10px;margin-bottom:14px;min-height:44px;padding-right:34px}"+
+      ".gga-acctrow__top .gga-acctrow__id{flex:0 1 auto}"+
+    ".gga-acctrow__ava{flex:none;width:120px;height:180px;border-radius:12px;overflow:hidden;"+
       "background:#0d0f15;border:1px solid #2a2d38;display:flex;align-items:center;justify-content:center}"+
     ".gga-acctrow__ava svg{display:block;width:100%;height:100%}"+
-    ".gga-acctrow__initials{color:#e0a23a;font-weight:700;font-size:1.1rem}"+
+    ".gga-acctrow__initials{color:#e0a23a;font-weight:700;font-size:2.6rem}"+
     ".gga-acctrow__id{flex:1;min-width:0}"+
     ".gga-acctrow b{display:block;color:#f1f2f6;font-size:1rem}"+
     ".gga-acctrow small{color:#878da0;font-family:'WDXL Lubrifont TC',monospace;font-size:0.885rem}"+
@@ -129,10 +138,12 @@
       "background:#1b1e27;border:1px solid #2a2d38;color:#e9eaf0;font:inherit;font-size:.78rem;font-weight:600;"+
       "padding:12px 8px;border-radius:11px;cursor:pointer;transition:border-color .12s,background .12s}"+
     ".gga-act:hover{border-color:#e0a23a;background:#20232d}"+
-    ".gga-act__ico{font-size:1.15rem;line-height:1;color:#e0a23a}"+
+    ".gga-act__ico{display:flex;line-height:0;color:#e0a23a}"+
+      ".gga-act__ico svg{width:22px;height:22px;display:block}"+
     ".gga-act.danger{color:#f0655a}.gga-act.danger .gga-act__ico{color:#f0655a}"+
     ".gga-act.danger:hover{border-color:#f0655a}"+
     ".gga-act .gga-dm-badge{position:absolute;top:6px;right:8px;margin:0}"+
+      ".gga-dm-badge[hidden]{display:none}"+
     /* ---- direct messages ---- */
     ".gga-dm-badge{display:inline-block;min-width:18px;padding:0 5px;height:18px;line-height:18px;text-align:center;"+
       "background:#e0554a;color:#fff;border-radius:9px;font-size:.68rem;font-weight:700;margin-left:6px;vertical-align:1px}"+
@@ -187,7 +198,7 @@
   }
   function avaFull(a){
     if (window.MawashiDesigner) {
-      try { return window.MawashiDesigner.renderSVG((a && a.avatar) || window.MawashiDesigner.DEFAULT, { variant:"full", size:56 }); } catch (e) {}
+      try { return window.MawashiDesigner.renderSVG((a && a.avatar) || window.MawashiDesigner.DEFAULT, { variant:"full", size:168 }); } catch (e) {}
     }
     return '<span class="gga-acctrow__initials">'+esc(initials(a))+'</span>';
   }
@@ -256,11 +267,14 @@
 
   function renderModal(){
     var a = acct();
-    modal.classList.remove("wide");
+    modal.classList.remove("wide"); modal.classList.remove("acct");
     if (mode === "account" && a){
+      modal.classList.add("acct");
       modal.innerHTML =
         '<button class="gga-x" aria-label="Close">\u2715</button>'+
         '<div class="gga-acctrow"><span class="gga-acctrow__ava">'+avaFull(a)+'</span>'+
+          '<div class="gga-acctrow__main">'+
+          '<div class="gga-acctrow__top">'+
           '<span class="gga-acctrow__id"><b>'+esc(a.name || a.handle)+'</b><small>@'+esc(a.handle)+'</small></span>'+
           '<button class="gga-editbtn" id="ggaEditHandle" title="Edit handle" aria-label="Edit handle">\u270e</button></div>'+
         '<div class="gga-handleform" id="ggaHandleForm" hidden>'+
@@ -270,10 +284,11 @@
           '<div class="gga-status" id="ggaHandleStatus"></div>'+
         '</div>'+
         '<div class="gga-summary" id="ggaSummary"><p class="gga-empty"><span class="gg-spin"></span>Loading your stats\u2026</p></div>'+
+        '</div></div>'+
         '<div class="gga-actions">'+
-          '<button class="gga-act" id="ggaMessages"><span class="gga-act__ico">\u2709</span><span class="gga-act__lab">Messages</span><span class="gga-dm-badge" id="ggaDmBadge" hidden>0</span></button>'+
-          (window.MawashiDesigner ? '<button class="gga-act" id="ggaEdit"><span class="gga-act__ico">\u25c9</span><span class="gga-act__lab">Avatar</span></button>' : '')+
-          '<button class="gga-act danger" id="ggaLogout"><span class="gga-act__ico">\u23fb</span><span class="gga-act__lab">Log out</span></button>'+
+          '<button class="gga-act" id="ggaMessages"><span class="gga-act__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="5" width="18.8" height="14" rx="2.6"/><path d="M3.6 7.6 12 13.3 20.4 7.6"/></svg></span><span class="gga-act__lab">Messages</span><span class="gga-dm-badge" id="ggaDmBadge" hidden>0</span></button>'+
+          (window.MawashiDesigner ? '<button class="gga-act" id="ggaEdit"><span class="gga-act__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1.6 1.6 0 0 1 1.6 1.6v9.2a1.6 1.6 0 0 1-1.6 1.6H7a1.6 1.6 0 0 1-1.6-1.6V5.6A1.6 1.6 0 0 1 7 4Z"/><path d="M8.6 8.4h6.8"/><path d="M6.6 18.6v2.4M9.8 18.6v2.4M13 18.6v2.4M16.2 18.6v2.4"/></svg></span><span class="gga-act__lab">Avatar</span></button>' : '')+
+          '<button class="gga-act danger" id="ggaLogout"><span class="gga-act__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.6 3.6h2.9A2.5 2.5 0 0 1 20 6.1v11.8a2.5 2.5 0 0 1-2.5 2.5h-2.9"/><path d="M9.8 16.4 5.4 12l4.4-4.4"/><path d="M5.4 12h9.4"/></svg></span><span class="gga-act__lab">Log out</span></button>'+
         '</div>';
       modal.querySelector(".gga-x").onclick = A.close;
       var eb = modal.querySelector("#ggaEdit"); if (eb) eb.onclick = openAvatar;
@@ -439,6 +454,7 @@
   }
 
   function openMessages(a){
+    modal.classList.remove("acct");   // account-only width
     modal.innerHTML =
       '<button class="gga-x" aria-label="Close">\u2715</button>'+
       '<button class="gga-back" id="ggaDmBack">\u2039 Back to account</button>'+
@@ -454,6 +470,7 @@
   /* searchable directory picker: you can only pick a verified user. */
   var dirCache = null;
   async function openPicker(a){
+    modal.classList.remove("acct");   // account-only width
     modal.innerHTML =
       '<button class="gga-x" aria-label="Close">\u2715</button>'+
       '<button class="gga-back" id="ggaDmBack">\u2039 All messages</button>'+
@@ -509,6 +526,7 @@
   }
 
   async function openConvo(a, otherHandle, otherName){
+    modal.classList.remove("acct");   // account-only width
     modal.innerHTML =
       '<button class="gga-x" aria-label="Close">\u2715</button>'+
       '<button class="gga-back" id="ggaDmBack">\u2039 All messages</button>'+
@@ -550,6 +568,7 @@
   function openAvatar(){
     if (!window.MawashiDesigner) return;
     modal.classList.add("wide");
+    modal.classList.remove("acct");   // account-only width
     modal.innerHTML =
       '<button class="gga-x" aria-label="Close">\u2715</button>'+
       '<h2 class="gga-title">Edit your mawashi</h2>'+
