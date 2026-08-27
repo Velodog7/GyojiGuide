@@ -151,7 +151,7 @@
     +'#ggBanzuke{position:static;inset:auto;order:2;z-index:auto;width:100%;margin-top:10px;'
       +'overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;'
       +'border-top:1px solid rgba(216,178,90,.28);border-bottom:1px solid rgba(216,178,90,.28)}'
-    +'#ggBanzuke .ggb{position:relative;inset:auto;width:760px;height:auto;flex:none}'
+    +'#ggBanzuke .ggb{position:relative;inset:auto;width:1200px;height:auto;flex:none}'
     /* let the columns run to their natural height: the page scrolls down
        through the crowd, the sheet swipes sideways. Clipping here would hide
        most of the banzuke. */
@@ -231,23 +231,27 @@
     +'background-size:100% 100%;background-repeat:no-repeat;mix-blend-mode:multiply;opacity:.15}'
   /* hide all kanji names once figures get small (set by JS via .ggb-nonames) */
   +'.ggb-nonames .ggb-fig figcaption{display:none}'
-  /* ── Mobile (≤640px): there is no room for the rikishi beside the card, so the
-        banzuke flows as its own full-width block BELOW the card. index.html puts
-        the card first in the flow; here the crowd becomes a plain full-width grid. */
+  /* ── Mobile (≤640px): the sheet stops being a backdrop and becomes a fixed-width
+        canvas you swipe across (see the #ggBanzuke rules above). Everything here
+        is sized in px against that 1200px sheet, NOT in vw — the sheet no longer
+        tracks the viewport, so vw units would shrink the art on a narrow phone.
+        The sanyaku lead the sheet the way they do on a printed banzuke: roughly
+        1.5x the width of a maegashira, with the gyoji and yobidashi between them. */
   +'@media(max-width:640px){'
     +'.ggb{position:static;inset:auto;min-height:0;padding-bottom:10px}'
     +'.ggb-water,.ggb-texfx{display:none}'
-    +'.ggb-top{padding:6px 6px 0}'
-    +'.ggb-sanyaku{gap:6px;align-items:flex-end}'
-    +'.ggb-sancenter{display:none}'                                   /* officials hidden on mobile */
+    +'.ggb-top{padding:10px 10px 0}'
+    +'.ggb-sanyaku{gap:10px;align-items:flex-end}'
+    +'.ggb-sancenter{display:flex;gap:10px}'
+    +'.ggb-off{width:74px}'
     +'.ggb-san{justify-content:space-around}'
-    +'.ggb-san .ggb-fig{--fw:clamp(30px,9vw,52px);aspect-ratio:1/2}'
-    +'.ggb-body{grid-template-columns:1fr 1fr;gap:2px 4px;margin-top:4px}'
-    +'.ggb-center{display:none}'
-    +'.ggb-col{overflow:visible;grid-template-columns:repeat(4,minmax(0,1fr));padding:0;gap:2px}'
-    +'.ggb-col .ggb-fig{aspect-ratio:3/5}'
+    +'.ggb-san .ggb-fig{--fw:100px;width:100px;aspect-ratio:1/2}'
+    +'.ggb-body{grid-template-columns:1fr auto 1fr;gap:2px 6px;margin-top:8px}'
+    +'.ggb-center{display:flex}'
+    +'.ggb-col{overflow:visible;grid-template-columns:repeat(8,minmax(0,1fr));padding:0 4px;gap:3px 2px}'
+    +'.ggb-col .ggb-fig{--fw:auto;width:auto;aspect-ratio:3/5}'
     +'.ggb-col .ggb-fig figcaption{display:none}'
-    +'.ggb-side-h{align-self:flex-start;font-size:14px}'
+    +'.ggb-side-h{align-self:flex-start;font-size:18px}'
   +'}'
   /* ── click-to-spotlight: the figure lifts forward onto a card revealed behind it ── */
   +'.ggb-fig[data-n]{cursor:pointer}'
