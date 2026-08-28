@@ -216,6 +216,7 @@
 
   /* ---- Keepers: mode, draft, trades, waivers ---- */
   GG.setLeagueMode = function (id, mode, rosterSize){ return GG.apiPost(authed({ action:"setLeagueMode", id:id, mode:mode, rosterSize:rosterSize })); };
+  GG.setLeagueRoster = function (id, sizes){ return GG.apiPost(authed(Object.assign({ action:"setLeagueRoster", id:id }, sizes || {}))); };
   GG.setLeagueScoring = function (id, scoring){ return GG.apiPost(authed({ action:"setLeagueScoring", id:id, scoring:scoring })); };
   GG.setDraftDate  = function (id, draftDate){ return GG.apiPost(authed({ action:"setDraftDate", id:id, draftDate:draftDate })); };
   GG.agreeDraftDate = function (id, agree){ return GG.apiPost(authed({ action:"agreeDraftDate", id:id, agree:agree !== false })); };

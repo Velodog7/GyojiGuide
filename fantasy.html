@@ -564,6 +564,15 @@
   .gg-load{ position:relative; min-height:240px }
   .gg-load.sm{ min-height:150px }
   .gg-load.lg{ min-height:320px }
+  /* commissioner's roster-size panel — matches the scoring panel beside it */
+  .lg-roster-set{ margin-bottom:16px }
+  .lg-set-sum{ margin:0 0 6px; font-size:.9rem; color:var(--ink-2) }
+  .lg-score-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr)); gap:12px; margin-bottom:10px }
+  .lg-score-fld input{ width:100%; box-sizing:border-box; background:var(--bg); color:var(--ink);
+        border:1px solid var(--line2); border-radius:8px; padding:8px 10px; font:inherit; font-size:.92rem }
+  .lg-score-fld input:focus{ outline:none; border-color:var(--sun) }
+  .lg-score-fld small{ color:var(--faint); font-size:.74rem; line-height:1.35 }
+  .lg-score-btns{ display:flex; align-items:center; gap:8px; flex-wrap:wrap }
 </style>
 <script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-mawashi.js"></script></head>
 <body>
@@ -756,6 +765,10 @@
           <div class="lg-sched" id="lgSched" hidden>
             <div class="lg-set-head"><h4>Draft date</h4><span class="lg-agree-count" id="lgAgreeCount"></span></div>
             <div class="lg-sched-body" id="lgSchedBody"></div>
+          </div>
+          <div class="lg-roster-set" id="lgRosterSet" hidden>
+            <div class="lg-set-head"><h4>Roster sizes</h4><span class="lg-agree-count" id="lgRosterLock"></span></div>
+            <div class="lg-set-body" id="lgRosterBody"></div>
           </div>
           <div class="lg-scoring">
             <div class="lg-set-head"><h4>Scoring rules</h4><button class="btn ghost sm" id="lgScoreEdit" hidden>Edit</button></div>
@@ -1640,7 +1653,8 @@ async function renderLeague(){
   let d = null; try { d = await GyojiGuide.leagueDetail(lg.id); } catch(e){}
   if (d && d.ok){
     lg.members = d.members || []; lg.messages = d.messages || [];
-    if (d.league) { lg.mode = d.league.mode || lg.mode || "classic"; lg.rosterSize = d.league.rosterSize; lg.draftStatus = d.league.draftStatus;
+    if (d.league) { lg.mode = d.league.mode || lg.mode || "classic"; lg.rosterSize = d.league.rosterSize;
+      lg.benchSize = d.league.benchSize; lg.farmSize = d.league.farmSize; lg.draftStatus = d.league.draftStatus;
       lg.scoring = d.league.scoring || null; lg.draftDate = d.league.draftDate || "";
       lg.draftAgreedCount = d.league.draftAgreedCount || 0; lg.draftMemberCount = d.league.draftMemberCount || (d.members||[]).length;
       lg.iAgreedDraft = !!d.league.iAgreedDraft; }
@@ -1714,8 +1728,77 @@ function scoringOf(lg){ return (window.GyojiGuide && GyojiGuide.normalizeScoring
 function renderLeagueSettings(lg, meCommish){
   const wrap = $("lgSettings"); if (!wrap) return;
   wrap.hidden = false;
+  renderRosterPanel(lg, meCommish, false);
   renderScoringPanel(lg, meCommish, false);
   renderSchedPanel(lg, meCommish);
+}
+
+/* Roster sizes — keepers only, and only until the first pick lands. After that
+   the draft order, the pick count and everyone's roster are all sized against
+   these numbers, so the server refuses to change them too. */
+const ROSTER_FIELDS = [
+  { key:"rosterSize", label:"Makuuchi \u2014 active", min:1, max:12, hint:"These are the wrestlers who score each basho." },
+  { key:"benchSize",  label:"Makuuchi \u2014 bench",  min:0, max:8,  hint:"Kept on your roster but they don\u2019t score. Set 0 for no bench." },
+  { key:"farmSize",   label:"J\u016bry\u014d \u2014 farm",  min:0, max:10, hint:"Second-division wrestlers you hold for the future. Never score." }
+];
+function renderRosterPanel(lg, meCommish, editing){
+  const box = $("lgRosterSet"), body = $("lgRosterBody"), lockNote = $("lgRosterLock");
+  if (!box) return;
+  if (lg.mode !== "keepers"){ box.hidden = true; return; }
+  box.hidden = false;
+  const p = planOf(lg);
+  const drafted = lg.draftStatus === "active" || lg.draftStatus === "complete";
+  lockNote.textContent = drafted ? "Locked \u2014 draft has run" : "";
+
+  if (!editing){
+    const teams = (lg.members || []).length || 1;
+    body.innerHTML =
+      `<p class="lg-set-sum">Each team drafts ${planSummary(lg)}.</p>` +
+      `<p class="lg-set-note">That\u2019s <b>${p.mk + p.farm}</b> picks per team \u2014 ${(p.mk + p.farm) * teams} in total across ${teams} team${teams===1?"":"s"}.</p>` +
+      (drafted ? `<p class="lg-set-note">Roster sizes lock once the draft starts.</p>` : "") +
+      (meCommish && !drafted ? `<button class="btn sm" id="lgRosterEdit">Edit roster sizes</button>` : "");
+    const b = $("lgRosterEdit");
+    if (b) b.onclick = () => renderRosterPanel(lg, meCommish, true);
+    return;
+  }
+
+  body.innerHTML =
+    `<div class="lg-score-grid">` +
+    ROSTER_FIELDS.map(f => `<label class="lg-score-fld"><span>${f.label}</span>
+        <input type="number" id="rs_${f.key}" min="${f.min}" max="${f.max}" step="1" value="${p[f.key==="rosterSize"?"active":f.key==="benchSize"?"bench":"farm"]}">
+        <small>${f.hint}</small></label>`).join("") +
+    `</div>
+     <p class="lg-set-note" id="rsPreview"></p>
+     <div class="lg-score-btns"><button class="btn" id="rsSave">Save</button>
+       <button class="btn ghost" id="rsCancel">Cancel</button><span class="status" id="rsStatus"></span></div>`;
+
+  const read = () => ({
+    rosterSize: +$("rs_rosterSize").value || 0,
+    benchSize:  +$("rs_benchSize").value  || 0,
+    farmSize:   +$("rs_farmSize").value   || 0
+  });
+  const preview = () => {
+    const v = read(), teams = (lg.members || []).length || 1;
+    const per = v.rosterSize + v.benchSize + v.farmSize;
+    $("rsPreview").innerHTML = `That\u2019s <b>${per}</b> picks per team \u2014 ${per * teams} across ${teams} team${teams===1?"":"s"}.`;
+  };
+  ROSTER_FIELDS.forEach(f => { const el = $("rs_"+f.key); if (el) el.oninput = preview; });
+  preview();
+
+  $("rsCancel").onclick = () => renderRosterPanel(lg, meCommish, false);
+  $("rsSave").onclick = async () => {
+    const st = $("rsStatus"); st.textContent = "Saving\u2026"; st.className = "status";
+    const r = await GyojiGuide.setLeagueRoster(lg.id, read());
+    if (r && r.ok){
+      lg.rosterSize = r.rosterSize; lg.benchSize = r.benchSize; lg.farmSize = r.farmSize;
+      st.textContent = r.warn ? "Saved \u2014 " + r.warn : "Saved \u2713";
+      st.className = r.warn ? "status err" : "status ok";
+      renderRosterPanel(lg, meCommish, false);
+      renderLgTeamsBoard(lg);
+    } else {
+      st.textContent = (r && r.error) || "Couldn\u2019t save."; st.className = "status err";
+    }
+  };
 }
 
 /* ---- scoring rules ---- */
@@ -1862,6 +1945,21 @@ function renderSchedPanel(lg, meCommish){
 let draftPollTimer = null;
 let redraftPollTimer = null;
 function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } }
+/* Mirrors rosterPlan() in sumo-fantasy.gs. rosterSize keeps its original
+   meaning — the ACTIVE Makuuchi cap — so a league saved before benches existed
+   reads back as bench 0 / farm = active, exactly as it behaved before. */
+function planOf(lg){
+  const active = Math.max(1, Math.min(12, +(lg && lg.rosterSize) || 6));
+  const bench  = Math.max(0, Math.min(8,  +(lg && lg.benchSize)  || 0));
+  const farm   = (lg && lg.farmSize != null && lg.farmSize !== "")
+        ? Math.max(0, Math.min(10, +lg.farmSize || 0)) : active;
+  return { active, bench, farm, mk: active + bench };
+}
+function planSummary(lg){
+  const p = planOf(lg);
+  return `<b>${p.active}</b> active` + (p.bench ? ` + <b>${p.bench}</b> bench` : "") +
+         ` Makuuchi` + (p.farm ? ` and <b>${p.farm}</b> J\u016bry\u014d (farm)` : " and no J\u016bry\u014d farm");
+}
 function rikDivision(name){ return (RK[name] && RK[name].code && RK[name].code[0]==="J") ? "juryo" : "makuuchi"; }
 function tournamentActiveClient(){ const m = scoreModel({ results:cache.results, meta:cache.meta }); return m.started && m.lastDay < 15; }
 
@@ -1874,7 +1972,7 @@ async function renderKeepers(lg, meCommish){
       : (meCommish ? `<p class="lg-sched-hint">Tip: schedule a draft date up in League settings so members can agree before you start.</p>` : "");
     el.innerHTML = `<div class="lg-draftroom">
       <h4>Keepers draft</h4>
-      <p class="lg-myteam__hint">Roster size: <b>${lg.rosterSize||6}</b> Makuuchi (active) + <b>${lg.rosterSize||6}</b> Jūryō (farm) per team, drafted once in a randomized snake draft, then kept basho after basho.</p>
+      <p class="lg-myteam__hint">Each team drafts ${planSummary(lg)}, in a randomized snake draft, then keeps them basho after basho. Only active wrestlers score.</p>
       ${dateInfo}
       ${meCommish
         ? `<button class="btn" id="lgStartDraft"${(lg.members||[]).length<2 ? ' disabled title="Need at least two members"' : ""}>Start snake draft</button><span class="status" id="lgDraftStartStatus"></span>`
@@ -1899,7 +1997,7 @@ async function renderKeepers(lg, meCommish){
         leagueId: lg.id,      // the mock draft keys a saved board on this, so a rename can't orphan it
         you: acct ? { handle: acct.handle, name: acct.name } : { handle:"you", name:"You" },
         members: (lg.members||[]).map(m=>({ handle:m.handle, name:m.name })),
-        rosterSize: lg.rosterSize || 6, pickClock: 120
+        rosterSize: planOf(lg).active, benchSize: planOf(lg).bench, farmSize: planOf(lg).farm, pickClock: 120
       })); }catch(e){}
       location.href = "keepers-mock-draft.html";
     };
@@ -1956,9 +2054,9 @@ async function renderKeepers(lg, meCommish){
         <span class="lg-team-row__name">${esc(m.name)}${you?`<span class="lg-team-row__you">You</span>`:""}<span class="lg-team-row__h">@${esc(m.handle)}</span></span>
       </div>
       <div class="lg-team-expand" hidden>
-        <div class="lg-roster-block"><h5>Active · ${mkActive.length}/${lg.rosterSize}</h5>${cardsFor(mkActive)}</div>
-        ${mkBench.length ? `<div class="lg-roster-block lg-bench"><h5>Bench · ${mkBench.length}</h5>${cardsFor(mkBench)}</div>` : ""}
-        <div class="lg-roster-block"><h5>Jūryō (farm) · ${r.juryo.length}/${lg.rosterSize}</h5>${cardsFor(r.juryo)}</div>
+        <div class="lg-roster-block"><h5>Active · ${mkActive.length}/${planOf(lg).active}</h5>${cardsFor(mkActive)}</div>
+        ${planOf(lg).bench || mkBench.length ? `<div class="lg-roster-block lg-bench"><h5>Bench · ${mkBench.length}/${planOf(lg).bench}</h5>${cardsFor(mkBench)}</div>` : ""}
+        ${planOf(lg).farm ? `<div class="lg-roster-block"><h5>Jūryō (farm) · ${r.juryo.length}/${planOf(lg).farm}</h5>${cardsFor(r.juryo)}</div>` : ""}
       </div>
     </div>`;
   }).join("");

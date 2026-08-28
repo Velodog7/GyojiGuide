@@ -350,7 +350,7 @@
     <h2>Draft setup <span class="n">— commissioner only</span></h2>
     <div class="kd-2col" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 26px;max-width:680px">
       <label class="fld"><span class="lab">Roster size per division</span>
-        <input type="number" id="rosterSize" min="5" max="10" value="6">
+        <input type="number" id="rosterSize" min="1" max="12" value="6">
         <span class="hint">Each team drafts this many Makuuchi (active) and the same number of Jūryō (farm). 5–10.</span>
       </label>
       <label class="fld"><span class="lab">Time per pick</span>
@@ -434,7 +434,7 @@
 
       <div class="mine" id="mineWrap">
         <div class="mhead"><h4>My team</h4><span class="cnt" id="mineCnt"></span></div>
-        <div class="mgroup"><div class="glab">Makuuchi — active roster</div><div class="mgrid" id="mineMak"></div></div>
+        <div class="mgroup"><div class="glab" data-mine-head="mak">Makuuchi</div><div class="mgrid" id="mineMak"></div></div>
         <div class="mgroup"><div class="glab">Jūryō — farm team</div><div class="mgrid" id="mineJur"></div></div>
       </div>
 
@@ -645,7 +645,7 @@ function applyCtx(){
   if(!CTX) return;
   var h=document.getElementById("dtTitle");
   if(h) h.innerHTML = esc(CTX.league||"Your league")+' <span class="badge">Mock Draft</span>';
-  if(CTX.rosterSize) $("rosterSize").value = Math.max(5, Math.min(10, +CTX.rosterSize || 6));
+  if(CTX.rosterSize) $("rosterSize").value = Math.max(1, Math.min(12, +CTX.rosterSize || 6));
   if(CTX.pickClock){
     /* Snap to the nearest option we actually offer. Assigning a value the
        <select> doesn't have leaves it with nothing selected, and +"" is 0 —
@@ -874,23 +874,41 @@ function fmtClock(s){
   return (s/3600)+" hr";
 }
 function clampRoster(){
-  let rs = Math.max(5, Math.min(10, +$("rosterSize").value||6));
-  // cap so the pool can supply everyone
-  const n = members.length;
+  // each phase draws from its own pool, so clamp them separately
+  const n = members.length || 1;
   const capM = Math.floor(MAK.length/n), capJ = Math.floor(JUR.length/n);
-  rs = Math.min(rs, capM, capJ);
-  return rs;
+  const wantA = Math.max(1, Math.min(12, +$("rosterSize").value||6));
+  const C = CTX || {};          // null when the room is opened standalone
+  const wantB = Math.max(0, Math.min(8,  +(C.benchSize||0)));
+  const wantF = (C.farmSize != null) ? Math.max(0, Math.min(10, +C.farmSize)) : wantA;
+  const mk = Math.min(wantA + wantB, capM);
+  const active = Math.min(wantA, mk);
+  return { active, bench: Math.max(0, mk - active), farm: Math.min(wantF, capJ), mk };
 }
 
 // ---------- snake order ----------
-function snakeTurn(order, rosterSize, pickIdx){
-  const N=order.length, R=rosterSize, perPhase=N*R, total=perPhase*2;
-  if(pickIdx>=total) return {phase:"done"};
-  const phase = pickIdx<perPhase ? "makuuchi" : "juryo";
-  const local = pickIdx<perPhase ? pickIdx : pickIdx-perPhase;
+/* Mirrors draftTurn() in sumo-fantasy.gs. The two phases can be different
+   lengths now: Makuuchi fills active+bench, Juryo fills the farm. `plan` may be
+   a plain number for older saved drafts, which means the pre-bench shape. */
+function planOf(plan){
+  if (plan && typeof plan === "object") {
+    const active = Math.max(1, Math.min(12, +plan.active || 6));
+    const bench  = Math.max(0, Math.min(8,  +plan.bench  || 0));
+    const farm   = (plan.farm != null) ? Math.max(0, Math.min(10, +plan.farm || 0)) : active;
+    return { active, bench, farm, mk: active + bench };
+  }
+  const a = Math.max(1, Math.min(12, +plan || 6));
+  return { active:a, bench:0, farm:a, mk:a };
+}
+function snakeTurn(order, plan, pickIdx){
+  const N=order.length, p=planOf(plan);
+  const mkPicks=N*p.mk, jrPicks=N*p.farm, total=mkPicks+jrPicks;
+  if(pickIdx>=total) return {phase:"done", total};
+  const phase = pickIdx<mkPicks ? "makuuchi" : "juryo";
+  const local = pickIdx<mkPicks ? pickIdx : pickIdx-mkPicks;
   const round = Math.floor(local/N), pos = local%N;
   const who = round%2===0 ? order[pos] : order[N-1-pos];
-  return {phase, who, round:round+1, pos:pos+1, perPhase, total};
+  return {phase, who, round:round+1, pos:pos+1, perPhase:(phase==="makuuchi"?mkPicks:jrPicks), total};
 }
 
 // ---------- start draft ----------
@@ -1060,15 +1078,20 @@ function renderMine(){
   const mine = S.picks.filter(p=>isMe(p.handle));
   const mak = mine.filter(p=>p.phase==="makuuchi");
   const jur = mine.filter(p=>p.phase==="juryo");
-  $("mineCnt").textContent = mine.length+" of "+(S.rosterSize*2)+" drafted";
-  const cards = (arr, band) => {
+  const P = planOf(S.rosterSize);
+  $("mineCnt").textContent = mine.length+" of "+(P.mk + P.farm)+" drafted";
+  const cards = (arr, band, cap) => {
     const filled = arr.map(p=>`<div class="pcard filled r-${byName[p.rikishi].code[0]}">${pcardInner(p.rikishi, band)}</div>`).join("");
-    const empties = Math.max(0, S.rosterSize-arr.length);
+    const empties = Math.max(0, cap-arr.length);
     let e=""; for(let i=0;i<empties;i++) e+=`<div class="mslot">Open</div>`;
     return filled+e;
   };
-  $("mineMak").innerHTML = cards(mak, "Makuuchi");
-  $("mineJur").innerHTML = cards(jur, "Juryo");
+  /* Makuuchi holds active + bench; the first P.active picks are the starters,
+     so label the overflow rather than showing one undifferentiated block. */
+  $("mineMak").innerHTML = cards(mak, "Makuuchi", P.mk);
+  $("mineJur").innerHTML = cards(jur, "Juryo", P.farm);
+  const mh = document.querySelector('[data-mine-head="mak"]');
+  if (mh) mh.textContent = P.bench ? `Makuuchi \u00b7 ${P.active} active + ${P.bench} bench` : "Makuuchi";
 }
 
 function renderBoard(){

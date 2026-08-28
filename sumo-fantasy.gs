@@ -124,7 +124,8 @@ function setup() {
   migrateUsersV3(users);                       // upgrades a v1/v2/v3 sheet (no status/warnMsg columns) in place
   ensureSheet(ss, SHEET_RESULTS, ['day', 'division', 'east', 'west', 'winner', 'kimarite']);
   var leagues = ensureSheet(ss, SHEET_LEAGUES, ['id', 'name', 'commissioner', 'created', 'inviteCode',
-    'mode', 'rosterSize', 'draftStatus', 'draftOrder', 'draftPickIdx', 'draftPhase', 'scoring', 'draftDate', 'draftAgree']);
+    'mode', 'rosterSize', 'draftStatus', 'draftOrder', 'draftPickIdx', 'draftPhase', 'scoring', 'draftDate', 'draftAgree',
+    'benchSize', 'farmSize']);
   migrateLeaguesV2(leagues);   // upgrades an older Leagues sheet (no keeper columns) in place
   ensureSheet(ss, SHEET_MEMBERS, ['leagueId', 'handle', 'joined']);
   ensureSheet(ss, SHEET_MESSAGES, ['id', 'leagueId', 'handle', 'name', 'body', 'parentId', 'created']);
@@ -203,6 +204,15 @@ function migrateLeaguesV2(sh) {
   if (String(head[11] || '').toLowerCase() !== 'scoring') {
     sh.getRange(1, 12, 1, 3).setValues([['scoring', 'draftDate', 'draftAgree']]);
   }
+  /* v4: Makuuchi splits into ACTIVE (scores) + BENCH (kept, doesn't score), and
+     the Juryo farm gets its own size. rosterSize keeps its old meaning — the
+     active cap — so leagues written before this migration behave identically:
+     a blank benchSize reads as 0 and a blank farmSize falls back to rosterSize,
+     which is exactly what the farm used to be. */
+  head = sh.getRange(1, 1, 1, Math.max(14, sh.getLastColumn())).getValues()[0];
+  if (String(head[14] || '').toLowerCase() !== 'benchsize') {
+    sh.getRange(1, 15, 1, 2).setValues([['benchSize', 'farmSize']]);
+  }
 }
 
 // pre-regionality PageViews sheets had only [ts,page,visitorId]. Append the
@@ -265,6 +275,7 @@ function doPost(e) {
     if (body.action === 'deleteLeague') return json(deleteLeague(body));
     if (body.action === 'postMessage')  return json(postMessage(body));
     if (body.action === 'setLeagueMode') return json(setLeagueMode(body));
+    if (body.action === 'setLeagueRoster')  return json(setLeagueRoster(body));
     if (body.action === 'setLeagueScoring') return json(setLeagueScoring(body));
     if (body.action === 'setDraftDate')  return json(setDraftDate(body));
     if (body.action === 'agreeDraftDate') return json(agreeDraftDate(body));
@@ -609,7 +620,11 @@ function leagueRow(id){
     draftPhase: String(v[r][10]||''),
     scoring: parseScoring(v[r][11]),
     draftDate: String(v[r][12]||''),
-    draftAgree: (function(){ try { return JSON.parse(v[r][13]||'{}'); } catch(e){ return {}; } })()
+    draftAgree: (function(){ try { return JSON.parse(v[r][13]||'{}'); } catch(e){ return {}; } })(),
+    benchSize: Number(v[r][14] || 0) || 0,
+    /* blank (pre-v4 row) means "farm was the same size as the active roster" —
+       0 is a real, different answer, so test for blank rather than falsy */
+    farmSize: (v[r][15] === '' || v[r][15] == null) ? (Number(v[r][6]||6) || 6) : (Number(v[r][15]) || 0)
   };
   return null;
 }
@@ -675,7 +690,7 @@ function leagueDetail(id, handle){
     if (m.agreedDraft) agreedCount++;
   });
   return { ok:true, league:{ id:L.id, name:L.name, commissioner:L.commissioner, inviteCode:L.inviteCode,
-    mode:L.mode, rosterSize:L.rosterSize, draftStatus:L.draftStatus,
+    mode:L.mode, rosterSize:L.rosterSize, benchSize:L.benchSize, farmSize:L.farmSize, draftStatus:L.draftStatus,
     scoring:L.scoring, draftDate:L.draftDate,
     draftAgreedCount:agreedCount, draftMemberCount:mem.length,
     isCommissioner: handle && L.commissioner.toLowerCase()===handle.toLowerCase(),
@@ -697,16 +712,20 @@ function createLeague(body){
   var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
   var name = String(body.name||'').trim().slice(0,60); if (!name) return { ok:false, error:'Name your league first.' };
   var mode = (body.mode === 'keepers') ? 'keepers' : 'classic';
-  var rosterSize = Math.max(5, Math.min(10, Number(body.rosterSize) || 6));
+  var rosterSize = Math.max(1, Math.min(12, Number(body.rosterSize) || 6));
+  var benchSize  = Math.max(0, Math.min(8,  Number(body.benchSize)  || 0));
+  var farmSize   = (body.farmSize == null || body.farmSize === '')
+        ? rosterSize : Math.max(0, Math.min(10, Number(body.farmSize) || 0));
   var scoring = normalizeScoring(body.scoring);
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var id = newId('lg_'), code = inviteCode(), when = new Date().toISOString();
     // full row incl. mode + scoring columns so a league is never momentarily default
     sh_(SHEET_LEAGUES).appendRow([id, name, u.handle, when, code, mode, rosterSize, 'none', '', 0, 'makuuchi',
-      JSON.stringify(scoring), '', '{}']);
+      JSON.stringify(scoring), '', '{}', benchSize, farmSize]);
     sh_(SHEET_MEMBERS).appendRow([id, u.handle, when]);
-    return { ok:true, id:id, inviteCode:code, mode:mode, rosterSize:rosterSize, scoring:scoring };
+    return { ok:true, id:id, inviteCode:code, mode:mode, rosterSize:rosterSize,
+             benchSize:benchSize, farmSize:farmSize, scoring:scoring };
   } finally { lock.releaseLock(); }
 }
 
@@ -1190,17 +1209,34 @@ function tournamentActive(){
   return results.length > 0 && Number(meta.lastDay || 0) < 15;
 }
 
-// whose turn is it, given the draft order, roster size (per division), and
-// a single pick counter that runs across BOTH phases (Makuuchi then Juryo)
-function draftTurn(order, rosterSize, pickIdx){
-  var N = order.length, R = Number(rosterSize) || 6;
-  var perPhase = N * R, total = perPhase * 2;
-  if (!N || pickIdx >= total) return { phase:'done', handle:null };
-  var phase = pickIdx < perPhase ? 'makuuchi' : 'juryo';
-  var local = pickIdx < perPhase ? pickIdx : pickIdx - perPhase;
+/* The three roster numbers, normalised in one place so the draft, the roster
+   caps and the lineup rules can never disagree:
+     active — Makuuchi wrestlers that score
+     bench  — Makuuchi wrestlers you keep but who don't score (may be 0)
+     farm   — Juryo wrestlers (may be 0)
+   mk = the whole Makuuchi roster, which is what the draft fills. */
+function rosterPlan(L){
+  var active = Math.max(1, Math.min(12, Number(L && L.rosterSize) || 6));
+  var bench  = Math.max(0, Math.min(8,  Number(L && L.benchSize)  || 0));
+  var farm   = (L && L.farmSize != null) ? Math.max(0, Math.min(10, Number(L.farmSize) || 0)) : active;
+  return { active: active, bench: bench, farm: farm, mk: active + bench };
+}
+
+// whose turn is it, given the draft order, the league's roster plan, and a
+// single pick counter that runs across BOTH phases (Makuuchi then Juryo).
+// The phases can now be different lengths: Makuuchi fills active+bench.
+function draftTurn(order, plan, pickIdx){
+  var N = order.length;
+  var p = (plan && plan.mk != null) ? plan : rosterPlan({ rosterSize: plan });   // tolerate an old numeric arg
+  var mkPicks = N * p.mk, jrPicks = N * p.farm, total = mkPicks + jrPicks;
+  if (!N || pickIdx >= total) return { phase:'done', handle:null, total:total };
+  var phase = pickIdx < mkPicks ? 'makuuchi' : 'juryo';
+  var local = pickIdx < mkPicks ? pickIdx : pickIdx - mkPicks;
   var round = Math.floor(local / N), pos = local % N;
   var handle = (round % 2 === 0) ? order[pos] : order[N - 1 - pos];
-  return { phase:phase, handle:handle, round:round+1, pickInRound:pos+1, perPhase:perPhase, total:total, pickIdx:pickIdx };
+  return { phase:phase, handle:handle, round:round+1, pickInRound:pos+1,
+           perPhase:(phase==='makuuchi'?mkPicks:jrPicks), mkPicks:mkPicks, jrPicks:jrPicks,
+           total:total, pickIdx:pickIdx };
 }
 
 function setLeagueMode(body){
@@ -1209,9 +1245,52 @@ function setLeagueMode(body){
   if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can change the league mode.' };
   if (L.draftStatus === 'active' || L.draftStatus === 'complete') return { ok:false, error:'Mode is locked once a draft has started.' };
   var mode = (body.mode === 'keepers') ? 'keepers' : 'classic';
-  var rosterSize = Math.max(5, Math.min(10, Number(body.rosterSize) || 6));
-  sh_(SHEET_LEAGUES).getRange(L.row, 6, 1, 2).setValues([[mode, rosterSize]]);
-  return { ok:true, mode:mode, rosterSize:rosterSize };
+  var sizes = clampRoster(body, L);
+  sh_(SHEET_LEAGUES).getRange(L.row, 6, 1, 2).setValues([[mode, sizes.active]]);
+  sh_(SHEET_LEAGUES).getRange(L.row, 15, 1, 2).setValues([[sizes.bench, sizes.farm]]);
+  return { ok:true, mode:mode, rosterSize:sizes.active, benchSize:sizes.bench, farmSize:sizes.farm };
+}
+
+/* Clamp a submitted roster shape, falling back to whatever the league already
+   has for any field the caller left out. */
+function clampRoster(body, L){
+  var cur = rosterPlan(L);
+  var active = (body.rosterSize == null || body.rosterSize === '') ? cur.active : Number(body.rosterSize);
+  var bench  = (body.benchSize  == null || body.benchSize  === '') ? cur.bench  : Number(body.benchSize);
+  var farm   = (body.farmSize   == null || body.farmSize   === '') ? cur.farm   : Number(body.farmSize);
+  return {
+    active: Math.max(1, Math.min(12, active || 6)),
+    bench:  Math.max(0, Math.min(8,  bench  || 0)),
+    farm:   Math.max(0, Math.min(10, farm   || 0))
+  };
+}
+
+/* Commissioner resizes the roster. Open right up until the first pick — after
+   that the draft order, pick count and everyone's roster are all sized against
+   these numbers, so changing them would corrupt a draft in progress or leave a
+   finished league with slots nobody drafted. */
+function setLeagueRoster(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can change roster sizes.' };
+  if (L.draftStatus === 'active')   return { ok:false, error:'The draft has started — roster sizes are locked.' };
+  if (L.draftStatus === 'complete') return { ok:false, error:'This league has already drafted — roster sizes are locked.' };
+
+  var sizes = clampRoster(body, L);
+  var members = membersOf(L.id).length || 1;
+  /* Warn rather than silently shrink: the commissioner should know if the pool
+     cannot cover what they asked for once everyone drafts. */
+  var mkMax = Math.floor(MAKUUCHI_POOL / members), jrMax = Math.floor(JURYO_POOL / members);
+  var warn = '';
+  if (sizes.active + sizes.bench > mkMax) warn = 'With ' + members + ' teams there are only ' + mkMax + ' Makuuchi wrestlers each — the draft will stop short.';
+  else if (sizes.farm > jrMax) warn = 'With ' + members + ' teams there are only ' + jrMax + ' Juryo wrestlers each — the farm draft will stop short.';
+
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    sh_(SHEET_LEAGUES).getRange(L.row, 7, 1, 1).setValue(sizes.active);
+    sh_(SHEET_LEAGUES).getRange(L.row, 15, 1, 2).setValues([[sizes.bench, sizes.farm]]);
+    return { ok:true, rosterSize:sizes.active, benchSize:sizes.bench, farmSize:sizes.farm, warn:warn };
+  } finally { lock.releaseLock(); }
 }
 
 /* commissioner edits the league's scoring rules (both classic & keepers).
@@ -1270,8 +1349,17 @@ function startDraft(body){
   if (L.draftStatus === 'complete') return { ok:false, error:'This league has already drafted.' };
   var members = membersOf(L.id);
   if (members.length < 2) return { ok:false, error:'Need at least two members to draft.' };
-  var maxByPool = Math.floor(Math.min(MAKUUCHI_POOL, JURYO_POOL) / members.length);
-  var rosterSize = Math.max(5, Math.min(10, L.rosterSize || 6, maxByPool || 10));
+  /* Each phase draws from its own pool, so clamp them separately: the whole
+     Makuuchi roster (active + bench) against MAKUUCHI_POOL, the farm against
+     JURYO_POOL. Clamping both against the smaller of the two, as this used to,
+     would needlessly shrink a bench-heavy league. */
+  var plan = rosterPlan(L);
+  var mkMax = Math.max(1, Math.floor(MAKUUCHI_POOL / members.length));
+  var jrMax = Math.max(0, Math.floor(JURYO_POOL / members.length));
+  var mkTotal = Math.min(plan.mk, mkMax);
+  var rosterSize = Math.max(1, Math.min(plan.active, mkTotal));
+  var benchSize = Math.max(0, mkTotal - rosterSize);
+  var farmSize = Math.min(plan.farm, jrMax);
   var order = members.slice();
   for (var i = order.length - 1; i > 0; i--) {           // Fisher–Yates shuffle
     var j = Math.floor(Math.random() * (i + 1));
@@ -1282,7 +1370,8 @@ function startDraft(body){
     sh_(SHEET_LEAGUES).getRange(L.row, 6, 1, 6).setValues([[
       'keepers', rosterSize, 'active', JSON.stringify(order), 0, 'makuuchi'
     ]]);
-    return { ok:true, order:order, rosterSize:rosterSize };
+    sh_(SHEET_LEAGUES).getRange(L.row, 15, 1, 2).setValues([[benchSize, farmSize]]);
+    return { ok:true, order:order, rosterSize:rosterSize, benchSize:benchSize, farmSize:farmSize };
   } finally { lock.releaseLock(); }
 }
 
@@ -1300,8 +1389,9 @@ function draftPicksOf(id){
 function draftState(id){
   var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
   var picks = draftPicksOf(L.id);
-  var turn = L.draftStatus === 'active' ? draftTurn(L.draftOrder, L.rosterSize, L.draftPickIdx) : { phase:L.draftStatus==='complete'?'done':'none' };
-  return { ok:true, league:{ id:L.id, mode:L.mode, rosterSize:L.rosterSize, draftStatus:L.draftStatus, draftOrder:L.draftOrder },
+  var turn = L.draftStatus === 'active' ? draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx) : { phase:L.draftStatus==='complete'?'done':'none' };
+  return { ok:true, league:{ id:L.id, mode:L.mode, rosterSize:L.rosterSize, benchSize:L.benchSize, farmSize:L.farmSize,
+                             draftStatus:L.draftStatus, draftOrder:L.draftOrder },
     picks:picks, turn:turn, pickedNames:picks.map(function(p){ return p.rikishi; }) };
 }
 
@@ -1316,18 +1406,28 @@ function makePick(body){
   try {
     // re-read fresh inside the lock — another pick may have landed since the client last polled
     L = leagueRow(body.id);
-    var turn = draftTurn(L.draftOrder, L.rosterSize, L.draftPickIdx);
+    var turn = draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx);
     if (turn.phase === 'done') return { ok:false, error:'The draft is already complete.' };
     if (!turn.handle || turn.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'It\u2019s not your turn.' };
     var already = draftPicksOf(L.id).some(function(p){ return p.rikishi.toLowerCase() === rikishi.toLowerCase(); });
     if (already) return { ok:false, error: rikishi + ' has already been drafted in this league.' };
 
     var now = new Date().toISOString();
+    /* Write the slot explicitly. keeperRostersOf() treats a BLANK slot on a
+       Makuuchi row as active — right for pre-bench leagues, but it would make
+       every bench pick score here. Fill the starting lineup first, then bench;
+       the Juryo farm never scores. */
+    var plan = rosterPlan(L);
+    var slot = 'bench';
+    if (turn.phase !== 'juryo') {
+      var mineNow = (keeperRostersOf(L.id)[u.handle.toLowerCase()] || { active:[] }).active.length;
+      slot = mineNow < plan.active ? 'active' : 'bench';
+    }
     sh_(SHEET_PICKS).appendRow([L.id, L.draftPickIdx, turn.round, turn.phase, u.handle, rikishi, now]);
-    sh_(SHEET_ROSTERS).appendRow([L.id, u.handle, rikishi, turn.phase, 'draft', now]);
+    sh_(SHEET_ROSTERS).appendRow([L.id, u.handle, rikishi, turn.phase, 'draft', now, slot]);
 
     var nextIdx = L.draftPickIdx + 1;
-    var nextTurn = draftTurn(L.draftOrder, L.rosterSize, nextIdx);
+    var nextTurn = draftTurn(L.draftOrder, rosterPlan(L), nextIdx);
     var status = nextTurn.phase === 'done' ? 'complete' : 'active';
     sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue(status);                                 // draftStatus (col 8)
     sh_(SHEET_LEAGUES).getRange(L.row, 10, 1, 2).setValues([[nextIdx, nextTurn.phase]]);     // draftPickIdx (10) + draftPhase (11); leave draftOrder (col 9) intact
@@ -2048,9 +2148,10 @@ function redraftPool_(id, rd){
 function redraftTurn_(id, L, rd, rosters){
   rd = rd || getRedraft_(id); if (!rd) return { phase:'done' };
   rosters = rosters || keeperRostersOf(id);
-  var order = rd.order||[], n = order.length, size = L.rosterSize;
+  var order = rd.order||[], n = order.length, plan = rosterPlan(L);
   if (!n) return { phase:'done' };
-  function open(h){ var r=rosters[h.toLowerCase()]||{makuuchi:[],juryo:[]}; return { mk:Math.max(0,size-r.makuuchi.length), jr:Math.max(0,size-r.juryo.length) }; }
+  function open(h){ var r=rosters[h.toLowerCase()]||{makuuchi:[],juryo:[]};
+    return { mk:Math.max(0,plan.mk-r.makuuchi.length), jr:Math.max(0,plan.farm-r.juryo.length) }; }
   var cursor = Number(rd.cursor)||0;
   for (var i=0;i<n;i++){
     var idx=(cursor+i)%n, o=open(order[idx]);
@@ -2087,7 +2188,7 @@ function redraftState(id){
   var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
   if (L.draftStatus !== 'redraft') return { ok:true, redraft:false, draftStatus:L.draftStatus };
   var rd = getRedraft_(L.id), rosters = keeperRostersOf(L.id);
-  return { ok:true, redraft:true, rosterSize:L.rosterSize, order:(rd&&rd.order)||[],
+  return { ok:true, redraft:true, rosterSize:L.rosterSize, benchSize:L.benchSize, farmSize:L.farmSize, order:(rd&&rd.order)||[],
     turn: redraftTurn_(L.id, L, rd, rosters), pool: redraftPool_(L.id, rd) };
 }
 function redraftPick(body){
@@ -2107,7 +2208,9 @@ function redraftPick(body){
     for (var i=0;i<pool.length;i++){ if (pool[i].name.toLowerCase()===rikishi.toLowerCase()){ pick=pool[i]; break; } }
     if (!pick) return { ok:false, error: rikishi + ' isn\u2019t available.' };
     var mine = rosters[u.handle.toLowerCase()] || { makuuchi:[], juryo:[] };
-    var openInDiv = L.rosterSize - (pick.division==='juryo' ? mine.juryo.length : mine.makuuchi.length);
+    var plan = rosterPlan(L);
+    var capInDiv = (pick.division === 'juryo') ? plan.farm : plan.mk;   // mk = active + bench
+    var openInDiv = capInDiv - (pick.division==='juryo' ? mine.juryo.length : mine.makuuchi.length);
     if (openInDiv <= 0) return { ok:false, error:'You have no open ' + pick.division + ' slot.' };
     var now = new Date().toISOString();
     sh_(SHEET_PICKS).appendRow([L.id, 0, 0, 'redraft', u.handle, pick.name, now]);
