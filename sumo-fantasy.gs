@@ -55,6 +55,7 @@ var SHEET_PAGEVIEWS = 'PageViews';
 var SHEET_BOARD = 'LeaderboardBoard';
 var SHEET_BOARD_VOTES = 'LeaderboardVotes';
 var SHEET_DMS = 'DirectMessages';
+var SHEET_CHAMPS = 'Champions';
 
 // Label for the current tournament (shown in the app).
 var BASHO_LABEL   = 'Aki 2026';
@@ -113,7 +114,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-08-23-region-redraft';
+var BACKEND_VERSION = '2026-08-28-champions';
 
 /* ---------- one-time: build the tabs ---------- */
 function setup() {
@@ -142,6 +143,7 @@ function setup() {
   ensureSheet(ss, SHEET_BOARD, ['id', 'handle', 'name', 'body', 'parentId', 'created', 'updated', 'editedByAdmin']);
   ensureSheet(ss, SHEET_BOARD_VOTES, ['msgId', 'handle', 'value', 'votedAt']);
   ensureSheet(ss, SHEET_DMS, ['id', 'fromHandle', 'fromName', 'toHandle', 'body', 'created', 'readByRecipient']);
+  ensureSheet(ss, SHEET_CHAMPS, CHAMP_HEAD);
   var meta = ensureSheet(ss, SHEET_META, ['key', 'value']);
   if (meta.getLastRow() < 2) {
     meta.appendRow(['basho', BASHO_LABEL]);
@@ -252,7 +254,8 @@ function doGet(e) {
     if (action === 'dmThreads') return json(dmThreads(e.parameter.handle));
     if (action === 'dmUnread')  return json(dmUnread(e.parameter.handle));
     if (action === 'dmDirectory') return json(dmDirectory(e.parameter.handle));
-    return json({ ok: true, users: readUsers(), results: readResults(), meta: readMeta() });
+    return json({ ok: true, users: readUsers(), results: readResults(), meta: readMeta(),
+                  champion: reigningChampion_('') });
   } catch (err) {
     return json({ ok: false, error: String(err) });
   }
@@ -696,6 +699,7 @@ function leagueDetail(id, handle){
     isCommissioner: handle && L.commissioner.toLowerCase()===handle.toLowerCase(),
     iAgreedDraft: handle ? !!agree[handle.toLowerCase()] : false,
     isMember: handle ? isMember(id, handle) : false },
+    champion: reigningChampion_(id),
     members:mem, messages:msgs };
 }
 
@@ -1618,20 +1622,21 @@ function allHistoryRows_(){
   }
   return out;
 }
+/* Minor accolades \u2014 the things worth noting that AREN'T titles.
+   "Highest Scorer" used to live here and has been retired: it was the public
+   championship computed on the fly, so keeping it would hand the same player
+   two awards for one achievement. What remains is deliberately not a title:
+   backing the yusho winner says a rikishi YOU picked took the Emperor's Cup,
+   which a last-placed team can manage. It's named to say exactly that \u2014 the
+   old label, "Y\u016bsh\u014d Winner", read like a championship it never was. */
 function computeBadges_(handle, allHistory) {
   var key = handle.toLowerCase();
-  var mine = allHistory.filter(function (h) { return h.handle.toLowerCase() === key; });
-  var byBasho = {};
-  allHistory.forEach(function (h) { (byBasho[h.basho] = byBasho[h.basho] || []).push(h); });
   var badges = [];
-  mine.forEach(function (h) {
+  allHistory.forEach(function (h) {
+    if (h.handle.toLowerCase() !== key) return;
     if ((h.rows || []).some(function (row) { return row.yusho; })) {
-      badges.push({ id: 'yusho-' + h.basho, icon: '\ud83c\udfc6', label: 'Y\u016bsh\u014d Winner \u2014 ' + h.basho });
-    }
-    var peers = byBasho[h.basho] || [];
-    var top = peers.reduce(function (m, p) { return Math.max(m, p.score || 0); }, 0);
-    if (peers.length > 1 && top > 0 && h.score === top) {
-      badges.push({ id: 'top-' + h.basho, icon: '\u2b50', label: 'Highest Scorer \u2014 ' + h.basho });
+      badges.push({ id: 'yusho-' + h.basho, icon: '\ud83c\udf3f',
+                    label: 'Backed the Y\u016bsh\u014d \u2014 ' + h.basho });
     }
   });
   return badges;
@@ -1656,7 +1661,8 @@ function accountSummary(handle) {
   var leaguesRes = myLeagues(handle);
   return {
     ok: true,
-    badges: computeBadges_(handle, allHistory),
+    titles: championsOf_(handle),                 // championships — the trophy case proper
+    badges: computeBadges_(handle, allHistory),   // minor accolades, shown beneath
     history: mine.map(function (h) { return { basho: h.basho, score: h.score, wins: h.wins, savedAt: h.savedAt }; }),
     allTime: allTimeRank_(allHistory, handle),
     leagues: (leaguesRes && leaguesRes.ok) ? leaguesRes.leagues : []
@@ -2317,10 +2323,200 @@ function setMeta_(key, value){
   for (r=1;r<v.length;r++){ if (String(v[r][0])===key){ sh.getRange(r+1,2).setValue(value); return; } }
   sh.appendRow([key, value]);
 }
+/* ============================================================
+   CHAMPIONS
+   ------------------------------------------------------------
+   One row per title won. Two scopes:
+     public — the Sumo Slap Down League, i.e. the top archived score on the
+              shared board for that basho
+     league — one per private league, scored under THAT league's own rules
+   Titles are crowned once, at basho close, from applyBashoRanking() — so
+   there is a single button to press and a single idempotency guard. Nothing
+   here is ever recomputed afterwards: a title is a historical fact, and if
+   the banzuke or the scoring rules change next basho, last basho's champion
+   must not silently change with them.
+   ============================================================ */
+var CHAMP_HEAD = ['id', 'basho', 'scope', 'leagueId', 'leagueName', 'handle', 'score',
+                  'runnerUp', 'runnerUpScore', 'entrants', 'awardedAt'];
+function champSheet_(){ return ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_CHAMPS, CHAMP_HEAD); }
+
+/* Sanyaku rank levels, mirroring LEVEL in gg-account.js. The bonus for
+   beating a higher-ranked opponent is (loserLevel - winnerLevel) steps. */
+var TIER_LEVEL = { Y:4, O:3, S:2, K:1, M:0, J:0 };
+
+/* name -> banzuke tier for one basho, in order of trust:
+     1. the map the admin page posts at award time (gg-account.js RANKS, the
+        same table every score on the site was computed from). It's stored in
+        Meta so a title can be explained months later.
+     2. the tiers embedded in archived TeamHistory rows, if no map was posted
+     3. 'M' for an unknown name — exactly what gg-account.js falls back to */
+function tierMapFor_(basho, posted){
+  var key = 'tiers:' + basho, map = {}, n;
+  if (posted && typeof posted === 'object' && Object.keys(posted).length){
+    for (n in posted){
+      if (!posted.hasOwnProperty(n)) continue;
+      map[String(n)] = String(posted[n] || 'M').toUpperCase().charAt(0);
+    }
+    setMeta_(key, JSON.stringify(map));
+    return map;
+  }
+  try { map = JSON.parse(readMeta()[key] || '{}'); } catch(e){ map = {}; }
+  if (Object.keys(map).length) return map;
+  var v = sh_(SHEET_HISTORY).getDataRange().getValues();
+  for (var r = 1; r < v.length; r++){
+    if (String(v[r][1]) !== basho) continue;
+    var rows = []; try { rows = JSON.parse(v[r][5] || '[]'); } catch(e){ rows = []; }
+    rows.forEach(function(x){ if (x && x.name && x.tier) map[String(x.name)] = String(x.tier); });
+  }
+  return map;
+}
+function tierLevel_(name, tiers){ return TIER_LEVEL[String((tiers || {})[name] || 'M')] || 0; }
+
+/* Server mirror of GG.scoreModel + GG.teamScore in gg-account.js.
+   KEEP THESE TWO IN STEP. If the client's scoring changes and this doesn't,
+   a league's crowned champion won't be the player its members watched top the
+   table all basho — the worst kind of bug, because nothing errors. */
+function serverScoreModel_(scoring, tiers){
+  var results = readResults(), meta = readMeta();
+  var wins = {}, bonus = {};
+  results.forEach(function(b){
+    var w = String(b.winner || ''); if (!w) return;
+    var loser = (w === b.east) ? b.west : b.east;
+    wins[w] = (wins[w] || 0) + 1;
+    var diff = tierLevel_(loser, tiers) - tierLevel_(w, tiers);
+    if (diff > 0) bonus[w] = (bonus[w] || 0) + diff * scoring.sanyakuBonus;
+  });
+  var sansho = {};
+  String(meta.sansho || '').split(/[,;\/]+/).forEach(function(x){ x = x.trim(); if (x) sansho[x] = 1; });
+  return { wins:wins, bonus:bonus, sansho:sansho, yusho:String(meta.yusho || '').trim(), scoring:scoring };
+}
+function serverTeamScore_(names, model){
+  var sc = model.scoring, pts = 0;
+  (names || []).forEach(function(n){
+    if (!n) return;
+    pts += (model.wins[n] || 0) * sc.winPoint
+         + (model.bonus[n] || 0)
+         + (model.sansho[n] ? sc.sansho : 0)
+         + ((model.yusho && model.yusho === n) ? sc.yusho : 0);
+  });
+  return pts;
+}
+
+/* Given [{handle,score}], who takes the title?
+   A title needs a contest, so: at least two scored teams, and a top score
+   above zero. A tie crowns co-champions rather than nobody — sumo settles
+   these with a playoff we have no way to run, and splitting the honour reads
+   better than voiding it. */
+function championsFrom_(entries){
+  if (!entries || entries.length < 2) return null;
+  var top = entries.reduce(function(m, e){ return Math.max(m, e.score); }, 0);
+  if (top <= 0) return null;
+  var winners = entries.filter(function(e){ return e.score === top; });
+  var rest = entries.filter(function(e){ return e.score < top; })
+                    .sort(function(a, b){ return b.score - a.score; });
+  return { winners:winners, top:top, runnerUp:rest[0] || null, entrants:entries.length };
+}
+
+/* Crown every title for a finished basho. Idempotent: if the sheet already
+   holds a row for this basho we return untouched, so a re-run of the ranking
+   pass can never mint a second set of trophies. */
+function awardChampions_(basho, tiers){
+  var sh = champSheet_(), v = sh.getDataRange().getValues(), r;
+  for (r = 1; r < v.length; r++) if (String(v[r][1]) === basho) return { already:true, awarded:0 };
+  var now = new Date().toISOString(), rows = [];
+
+  function push(scope, leagueId, leagueName, res){
+    if (!res) return;
+    res.winners.forEach(function(w){
+      // index-suffixed: newId() alone collides often enough to matter in a
+      // batch this size, and two trophies sharing an id would be confusing
+      rows.push([newId('ch_') + '_' + rows.length, basho, scope, leagueId, leagueName, w.handle, w.score,
+                 res.runnerUp ? res.runnerUp.handle : '', res.runnerUp ? res.runnerUp.score : '',
+                 res.entrants, now]);
+    });
+  }
+
+  /* --- the public title: the top archived score on the shared board --- */
+  var hv = sh_(SHEET_HISTORY).getDataRange().getValues(), pub = [];
+  for (r = 1; r < hv.length; r++){
+    if (String(hv[r][1]) !== basho) continue;
+    var h = String(hv[r][0] || ''); if (!h) continue;
+    pub.push({ handle:h, score:Number(hv[r][3] || 0) });
+  }
+  push('public', '', 'Sumo Slap Down League', championsFrom_(pub));
+
+  /* --- one title per private league, under that league's own scoring --- */
+  var lv = sh_(SHEET_LEAGUES).getDataRange().getValues();
+  var modelCache = {};
+  for (r = 1; r < lv.length; r++){
+    var id = String(lv[r][0] || ''); if (!id) continue;
+    var name = String(lv[r][1] || 'League');
+    var mode = String(lv[r][5] || 'classic') || 'classic';
+    var scoring = parseScoring(lv[r][11]);
+    var ck = JSON.stringify(scoring);
+    var model = modelCache[ck] || (modelCache[ck] = serverScoreModel_(scoring, tiers));
+    var members = membersOf(id), entries = [];
+    if (mode === 'keepers'){
+      var rosters = keeperRostersOf(id);
+      members.forEach(function(mh){
+        var ros = rosters[mh.toLowerCase()];
+        if (!ros || !ros.active.length) return;          // no lineup set, no title shot
+        entries.push({ handle:mh, score:serverTeamScore_(ros.active, model) });
+      });
+    } else {
+      var teams = leagueTeamsOf(id);
+      members.forEach(function(mh){
+        var t = teams[mh.toLowerCase()]; if (!t) return;
+        var names = Object.keys(t.team || {}).map(function(k){ return t.team[k]; })
+                          .filter(function(x){ return !!x; });
+        if (!names.length) return;
+        entries.push({ handle:mh, score:serverTeamScore_(names, model) });
+      });
+    }
+    push('league', id, name, championsFrom_(entries));
+  }
+
+  if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, CHAMP_HEAD.length).setValues(rows);
+  return { already:false, awarded:rows.length };
+}
+
+/* Every title one handle holds, newest first — the trophy case. */
+function championsOf_(handle){
+  var key = String(handle || '').toLowerCase(); if (!key) return [];
+  var v = champSheet_().getDataRange().getValues(), out = [];
+  for (var r = 1; r < v.length; r++){
+    if (String(v[r][5] || '').toLowerCase() !== key) continue;
+    out.push({ id:String(v[r][0]), basho:String(v[r][1]), scope:String(v[r][2]),
+               leagueId:String(v[r][3] || ''), leagueName:String(v[r][4] || ''),
+               score:Number(v[r][6] || 0), runnerUp:String(v[r][7] || ''),
+               runnerUpScore:(v[r][8] === '' ? null : Number(v[r][8])),
+               entrants:Number(v[r][9] || 0), awardedAt:String(v[r][10] || '') });
+  }
+  out.sort(function(a, b){ return new Date(b.awardedAt) - new Date(a.awardedAt); });
+  return out;
+}
+
+/* The reigning title-holder in one scope — what the league banner and the
+   leaderboard crown show. leagueId '' means the public board. Returns handles
+   only (plural: co-champions); callers already hold a handle->name map and
+   shouldn't pay for a second Users read on a hot endpoint. */
+function reigningChampion_(leagueId){
+  var want = String(leagueId || ''), scope = want ? 'league' : 'public';
+  var v = champSheet_().getDataRange().getValues(), best = null;
+  for (var r = 1; r < v.length; r++){
+    if (String(v[r][2]) !== scope) continue;
+    if (scope === 'league' && String(v[r][3]) !== want) continue;
+    var at = String(v[r][10] || '');
+    if (!best || new Date(at) > new Date(best.at)) best = { at:at, basho:String(v[r][1]), handles:[], score:Number(v[r][6] || 0) };
+    if (best.at === at) best.handles.push(String(v[r][5]));
+  }
+  return best ? { basho:best.basho, handles:best.handles, score:best.score } : null;
+}
+
 /* Compute promotions for a completed basho from everyone archived win rate.
    Idempotent per basho (guarded by Meta.rankedBasho). New handles start at
    Jonokuchi; returning handles carry rankIdx/bashoCount/topStreak forward. */
-function applyBashoRanking(basho){
+function applyBashoRanking(basho, tiers){
   basho = String(basho || readMeta().basho || '').trim();
   if (!basho) return { ok:false, error:'no basho' };
   if (String(readMeta().rankedBasho||'') === basho) return { ok:true, already:true, basho:basho };
@@ -2336,16 +2532,30 @@ function applyBashoRanking(basho){
       var size = rankTeamSize_(team), possible = (size>0?size:1)*15;
       arr.push({ handle:handle, score: possible>0 ? wins/possible : 0 });
     }
-    if (!arr.length) return { ok:false, error:'no archived results for '+basho };
+    /* Crown the basho's titles in the same pass, and do it BEFORE the
+       no-archives bail-out: private leagues score off LeagueTeams and are
+       perfectly rankable even in a basho where nobody saved to the public
+       board. It runs inside the same lock, before the rankedBasho guard is
+       set, and is idempotent — so a run that dies half-way is safe to repeat. */
+    var champs = { awarded:0 };
+    try { champs = awardChampions_(basho, tierMapFor_(basho, tiers)); }
+    catch (e){ champs = { awarded:0, error:String(e) }; }   // never lose a ranking over a trophy
+
+    if (!arr.length) return { ok:false, error:'no archived results for '+basho,
+                              champions:champs.awarded };
     var state = rankStateMap_();
     arr.forEach(function(u){ var st = state[u.handle.toLowerCase()] || {}; u.rankIdx=st.rankIdx||0; u.bashoCount=st.bashoCount||0; u.topStreak=st.topStreak||0; });
     rankApplyBasho(arr);
     writeRankings_(arr, basho);
     setMeta_('rankedBasho', basho);
-    return { ok:true, ranked:arr.length, basho:basho };
+    return { ok:true, ranked:arr.length, basho:basho,
+             champions:champs.awarded, championError:champs.error || '' };
   } finally { lock.releaseLock(); }
 }
-function adminApplyRanking(body){ var bad = adminGate(body.adminKey); if (bad) return bad; return applyBashoRanking(body && body.basho); }
+function adminApplyRanking(body){
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  return applyBashoRanking(body && body.basho, body && body.tiers);
+}
 
 
 /* ---------- JSON helper ----------

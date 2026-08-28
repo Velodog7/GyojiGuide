@@ -214,6 +214,10 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
 </head>
 <body>
 <script src="gg-config.js"></script>
+<!-- gg-account.js is here only for its RANKS table: the ranking/champion pass
+     posts it to the backend so league titles score on the same banzuke every
+     score on the site was computed from. -->
+<script src="gg-account.js"></script>
 
 <div id="gate">
   <div class="gate-card">
@@ -286,7 +290,7 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
       </div>
       <div class="card" style="max-width:480px">
         <h3>Long-term ranking</h3>
-        <p class="v-sub" style="margin:0 0 12px">Grades every player&#8217;s win rate for the basho on the curve and updates the banzuke ranks on the public leaderboard. Run this once, after all results for the basho are archived.</p>
+        <p class="v-sub" style="margin:0 0 12px">Grades every player&#8217;s win rate for the basho on the curve, updates the banzuke ranks on the public leaderboard, and crowns the basho&#8217;s champions &#8212; the Sumo Slap Down title plus one per private league. Run this once, after all results for the basho are archived.</p>
         <button class="btn gold" id="applyRankBtn">Apply ranking for this basho</button>
         <div id="applyRankMsg" style="margin-top:10px;font-size:.9rem"></div>
       </div>
@@ -584,15 +588,21 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
   };
   $("applyRankBtn").onclick = async function(){
     var btn = $("applyRankBtn"), msg = $("applyRankMsg");
-    if (!confirm("Apply banzuke ranking for the current basho?\n\nDo this once, after every player\u2019s results are archived \u2014 it promotes and demotes everyone on the curve and can\u2019t be safely re-run for the same basho.")) return;
+    if (!confirm("Apply banzuke ranking for the current basho?\n\nDo this once, after every player\u2019s results are archived \u2014 it promotes and demotes everyone on the curve, crowns the basho\u2019s champions, and can\u2019t be safely re-run for the same basho.")) return;
     btn.disabled = true; msg.style.color = ""; msg.textContent = "Computing ranks\u2026";
-    var res = await aPost("adminApplyRanking");
+    var res = await aPost("adminApplyRanking", { tiers: (window.GyojiGuide && GyojiGuide.RANKS) || null });
     btn.disabled = false;
     if (res && res.ok){
       msg.style.color = "#5fd08a";
-      msg.textContent = res.already
-        ? ("Already ranked for " + (res.basho || "this basho") + ".")
-        : ("Done \u2014 ranked " + (res.ranked || 0) + " players for " + (res.basho || "this basho") + ".");
+      if (res.already){
+        msg.textContent = "Already ranked for " + (res.basho || "this basho") + ".";
+      } else {
+        var champ = res.championError
+          ? " \u2014 but the champion pass failed: " + res.championError
+          : (" and crowned " + (res.champions || 0) + " champion" + (res.champions === 1 ? "" : "s") + ".");
+        if (res.championError) msg.style.color = "#e8b04b";
+        msg.textContent = "Done \u2014 ranked " + (res.ranked || 0) + " players for " + (res.basho || "this basho") + champ;
+      }
     } else {
       msg.style.color = "#e0736a";
       msg.textContent = (res && res.error) || "Couldn\u2019t apply ranking \u2014 is the backend deployed?";

@@ -109,7 +109,8 @@
       var s = GG.teamScore(u.team || {}, model);
       return { handle: u.handle, name: u.name || u.handle, pts: s.pts, rows: s.rows };
     }).sort(function (a, b) { return b.pts - a.pts || String(a.name).localeCompare(String(b.name)); });
-    return { rows: rows, model: model, count: users.length };
+    // the reigning public title rides along on the same payload — no extra call
+    return { rows: rows, model: model, count: users.length, champion: (data && data.champion) || null };
   };
 
   /* ---- accounts (shared across pages via one localStorage key) ---- */

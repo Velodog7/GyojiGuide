@@ -114,6 +114,32 @@
     ".gga-sec{margin:0 0 16px}"+
     ".gga-sec h3{margin:0 0 8px;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:#878da0;font-weight:600}"+
     ".gga-empty{margin:0;font-size:.84rem;color:#66697a;font-style:italic}"+
+    /* ---- trophy case ----
+       Two tiers, and the difference has to be obvious at a glance: a TITLE is
+       a card with an emblem, a minor accolade is a pill. When they looked
+       alike, "you won the league" and "a wrestler you picked did well" read as
+       the same achievement. */
+    ".gga-titles{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}"+
+    ".gga-title{display:flex;align-items:center;gap:12px;padding:11px 13px;border-radius:12px;"+
+      "background:linear-gradient(135deg,rgba(224,162,58,.13),rgba(224,162,58,.04));"+
+      "border:1px solid rgba(224,162,58,.34)}"+
+    /* the public championship is the one title on the whole site — let it glow */
+    ".gga-title.is-public{background:linear-gradient(135deg,rgba(224,162,58,.24),rgba(224,162,58,.06));"+
+      "border-color:rgba(224,162,58,.62);box-shadow:0 0 0 1px rgba(224,162,58,.1),0 6px 20px rgba(224,162,58,.13)}"+
+    ".gga-title__ico{flex:none;width:34px;height:44px;color:#e0a23a}"+
+    ".gga-title.is-league .gga-title__ico{color:#c58f6a;width:30px;height:40px}"+
+    ".gga-title__ico svg{width:100%;height:100%;display:block}"+
+    ".gga-title__txt{min-width:0;display:block}"+
+    /* these are spans so the card can sit inside inline contexts — they have to
+       be told to stack, or all three run together on one line */
+    ".gga-title__nm,.gga-title__sub,.gga-title__meta{display:block;overflow:hidden;text-overflow:ellipsis}"+
+    ".gga-title__nm{font-size:.88rem;font-weight:700;color:#f2ead6;line-height:1.25;white-space:nowrap}"+
+    ".gga-title.is-league .gga-title__nm{color:#e9dfd2;font-size:.85rem}"+
+    ".gga-title__sub{font-size:.7rem;color:#e0a23a;letter-spacing:.07em;text-transform:uppercase;"+
+      "font-weight:600;margin-top:3px;white-space:nowrap}"+
+    ".gga-title.is-league .gga-title__sub{color:#c58f6a}"+
+    ".gga-title__meta{font-size:.75rem;color:#878da0;margin-top:3px;white-space:nowrap}"+
+    ".gga-minor{margin:0 0 4px;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:#5f6373;font-weight:600}"+
     ".gga-badges{display:flex;flex-wrap:wrap;gap:7px}"+
     ".gga-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(224,162,58,.12);border:1px solid rgba(224,162,58,.35);"+
       "color:#e0a23a;border-radius:999px;padding:5px 11px;font-size:.78rem;font-weight:600;white-space:nowrap}"+
@@ -379,11 +405,62 @@
       };
     });
   }
+  /* ---- trophy emblems ----
+     Flat fills and currentColor strokes on purpose: these get injected many
+     times over, and <defs> gradients would need unique ids per copy or the
+     duplicates would silently take the first one's colours. */
+  var EMBLEM = {
+    /* The Emperor's Cup \u2014 the public Sumo Slap Down title. */
+    cup:
+      '<svg viewBox="0 0 44 56" fill="none" aria-hidden="true">'+
+        '<path d="M11 13c-5.4 0-8.5 3.2-8.5 7.4 0 4.2 3.2 7.4 7.6 7.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'+
+        '<path d="M33 13c5.4 0 8.5 3.2 8.5 7.4 0 4.2-3.2 7.4-7.6 7.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>'+
+        '<path d="M10 11h24v9.5c0 8-5.4 14-12 14s-12-6-12-14V11Z" fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'+
+        '<path d="M7.5 10.5h29" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>'+
+        '<path d="M22 34.5v6.5" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/>'+
+        '<path d="M13.5 41h17l1.8 5.5H11.7L13.5 41Z" fill="currentColor" fill-opacity=".22" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'+
+        '<path d="M8.5 47.5h27" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>'+
+      '</svg>',
+    /* A gunbai, the gyoji's war-fan \u2014 a private league title. The blade has to
+       be genuinely WIDE: at 34px tall a narrow one just reads as a wine glass. */
+    gunbai:
+      '<svg viewBox="0 0 44 56" fill="none" aria-hidden="true">'+
+        '<path d="M13 4h18c3.3 0 6 2.7 6 6v9.6c0 8.1-4.7 15.4-12 18.7l-3 1.4-3-1.4C11.7 35 7 27.7 7 19.6V10c0-3.3 2.7-6 6-6Z" fill="currentColor" fill-opacity=".2" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'+
+        '<circle cx="22" cy="18" r="5" stroke="currentColor" stroke-width="1.7" opacity=".7"/>'+
+        '<path d="M22 39.7v6.3" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/>'+
+        '<circle cx="22" cy="47.6" r="2.4" fill="currentColor"/>'+
+        '<path d="M18.6 51.4v3.1M22 51.9v3.4M25.4 51.4v3.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".85"/>'+
+      '</svg>'
+  };
+  GG.EMBLEM = EMBLEM;
+
+  function titleCard(t){
+    var pub = t.scope === "public";
+    var meta = t.score + " pts";
+    if (t.runnerUp) meta += " \u00b7 beat " + esc(t.runnerUp) +
+      (t.runnerUpScore != null ? " (" + t.runnerUpScore + ")" : "");
+    else if (t.entrants > 1) meta += " \u00b7 " + t.entrants + " teams";
+    return '<div class="gga-title '+(pub?"is-public":"is-league")+'">'+
+      '<span class="gga-title__ico">'+(pub?EMBLEM.cup:EMBLEM.gunbai)+'</span>'+
+      '<span class="gga-title__txt">'+
+        '<span class="gga-title__nm">'+esc(pub ? "Sumo Slap Down League" : t.leagueName)+'</span>'+
+        '<span class="gga-title__sub">'+(pub?"Champion":"League champion")+' \u00b7 '+esc(t.basho)+'</span>'+
+        '<span class="gga-title__meta">'+meta+'</span>'+
+      '</span>'+
+    '</div>';
+  }
+
   function summaryHTML(res){
-    var badges = res.badges || [];
-    var trophyHTML = badges.length
-      ? '<div class="gga-badges">'+badges.map(function(b){ return '<span class="gga-badge" title="'+esc(b.label)+'">'+b.icon+' '+esc(b.label)+'</span>'; }).join("")+'</div>'
-      : '<p class="gga-empty">No trophies yet \u2014 keep playing!</p>';
+    var titles = res.titles || [], badges = res.badges || [];
+    var trophyHTML = "";
+    if (titles.length)
+      trophyHTML += '<div class="gga-titles">'+titles.map(titleCard).join("")+'</div>';
+    if (badges.length)
+      trophyHTML += (titles.length ? '<p class="gga-minor">Also earned</p>' : '')+
+        '<div class="gga-badges">'+badges.map(function(b){
+          return '<span class="gga-badge" title="'+esc(b.label)+'">'+b.icon+' '+esc(b.label)+'</span>'; }).join("")+'</div>';
+    if (!trophyHTML)
+      trophyHTML = '<p class="gga-empty">No titles yet \u2014 win a basho and one lands here.</p>';
     var hist = res.history || [];
     var histHTML = hist.length
       ? '<div class="gga-hist">'+hist.map(function(h){ return '<div class="gga-hist__row"><span>'+esc(h.basho)+'</span><span>'+h.score+' pts \u00b7 '+h.wins+' wins</span></div>'; }).join("")+'</div>'

@@ -160,6 +160,17 @@ three** and re-upload them.
    recipient count appears. That count is a live `dryRun` call, so if it stays
    blank the backend is out of date — paste `sumo-fantasy.gs` in again and
    redeploy (the broadcast needs the `adminBroadcast` action).
+9. **Champions.** Titles are crowned once per basho, by the same
+   **Admin page → Apply ranking for this basho** button that promotes and
+   demotes everyone. After running it, the message should read
+   "…and crowned N champions", and the Sheet gains a **Champions** tab.
+   Then check all three surfaces: the account modal's **Trophy case** (a gold
+   Emperor's Cup card for the public title, a bronze gunbai card per private
+   league), the **leaderboard** (a small cup beside the reigning champion's
+   name), and a **league page** (a "Reigning champion" pill under the name).
+   If the button reports a `championError`, the ranking still went through —
+   the trophies didn't. Nothing is lost: fix the cause, clear the
+   `rankedBasho` row in **Meta**, and run it again.
 
 Hard-refresh (Cmd/Ctrl+Shift+R) after uploading to clear cached old copies.
 
