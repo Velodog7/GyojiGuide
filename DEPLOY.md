@@ -156,6 +156,10 @@ three** and re-upload them.
    for the new row. (If it says it couldn't send, the backend URL/access or the
    `setup()` step needs attention.)
 7. **Admin page** → Feedback tab (Reply) and Users tab (Message).
+8. **Admin page → Users → Broadcast a message**: open it and confirm the
+   recipient count appears. That count is a live `dryRun` call, so if it stays
+   blank the backend is out of date — paste `sumo-fantasy.gs` in again and
+   redeploy (the broadcast needs the `adminBroadcast` action).
 
 Hard-refresh (Cmd/Ctrl+Shift+R) after uploading to clear cached old copies.
 

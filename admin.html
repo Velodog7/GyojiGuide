@@ -192,6 +192,24 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
 .dm-compose textarea:focus{ outline:none; border-color:var(--sun) }
 .dm-status{ min-height:16px; margin-top:8px; font-size:.8rem; color:var(--muted) }
 .dm-status.err{ color:var(--down) } .dm-status.ok{ color:var(--up) }
+  .bc summary{ list-style:none; cursor:pointer; display:flex; align-items:baseline; gap:10px }
+  .bc summary::-webkit-details-marker{ display:none }
+  .bc summary::before{ content:"\25B8"; color:var(--sun); transition:transform .15s }
+  .bc[open] summary::before{ transform:rotate(90deg) }
+  .bc__hint{ color:var(--muted); font-size:.8rem }
+  .bc__note{ color:var(--muted); font-size:.82rem; line-height:1.5; margin:10px 0 12px }
+  .bc textarea{ width:100%; box-sizing:border-box; background:var(--bg); color:var(--ink);
+        border:1px solid var(--line2); border-radius:10px; padding:11px 13px; font:inherit; font-size:.92rem; resize:vertical }
+  .bc textarea:focus{ outline:none; border-color:var(--sun) }
+  .bc__row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:11px }
+  .bc__aud{ color:var(--muted); font-size:.82rem; display:flex; align-items:center; gap:7px }
+  .bc__aud select{ background:var(--surface-2,#1b1e27); color:var(--ink); border:1px solid var(--line2);
+        border-radius:8px; padding:7px 9px; font:inherit; font-size:.82rem }
+  .bc__count{ color:var(--sun); font-size:.82rem; font-weight:600 }
+  .bc__len{ margin-left:auto; color:var(--muted); font-size:.76rem; font-variant-numeric:tabular-nums }
+  .bc__confirm{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:12px; padding:11px 13px;
+        background:rgba(224,162,58,.1); border:1px solid rgba(224,162,58,.4); border-radius:10px; font-size:.86rem }
+  .bc__confirm[hidden]{ display:none }
 </style>
 </head>
 <body>
@@ -336,6 +354,29 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
       <h2 class="v-title">Users</h2>
       <p class="v-sub">Everyone with an account. Warn leaves a message they'll see next time they log in; ban blocks login and posting until unbanned; delete removes the account row (their past posts and league history stay).</p>
       <div id="pinResetsBox"></div>
+
+      <details class="card bc" id="bcCard">
+        <summary class="bc__sum"><b>Broadcast a message</b><span class="bc__hint">one DM to every user</span></summary>
+        <p class="bc__note">Arrives in each person&rsquo;s inbox as a message from <b>@gyoji</b>, so the unread badge in their nav picks it up and they can reply in the same thread.</p>
+        <textarea id="bcText" maxlength="2000" rows="4" placeholder="What do you want everyone to know?"></textarea>
+        <div class="bc__row">
+          <label class="bc__aud">Send to
+            <select id="bcAudience">
+              <option value="active">Active users</option>
+              <option value="all">Everyone, including suspended</option>
+            </select>
+          </label>
+          <span class="bc__count" id="bcCount">&nbsp;</span>
+          <span class="bc__len" id="bcLen">0 / 2000</span>
+          <button class="btn gold" id="bcSend">Review &amp; send</button>
+        </div>
+        <div class="bc__confirm" id="bcConfirm" hidden>
+          <span id="bcConfirmMsg"></span>
+          <button class="btn gold" id="bcYes">Yes, send it</button>
+          <button class="btn" id="bcNo">Cancel</button>
+        </div>
+        <div class="dm-status" id="bcStatus"></div>
+      </details>
       <div class="toolbar">
         <input class="filter" id="userFilter" placeholder="Filter by handle or name…" />
         <button class="btn" id="usersRefresh">Refresh</button>
@@ -835,6 +876,65 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     var res = await aPost("adminDeleteFeedback", { id: id });
     if (res && res.ok) loadFeedback(); else alert((res && res.error) || "Couldn\u2019t delete that.");
   };
+
+  /* ---------- broadcast: one DM to every user ---------- */
+  (function(){
+    var card = $("bcCard"); if (!card) return;
+    var text = $("bcText"), aud = $("bcAudience"), cnt = $("bcCount"), len = $("bcLen");
+    var sendBtn = $("bcSend"), box = $("bcConfirm"), st = $("bcStatus");
+    var lastCount = null;
+
+    function setStatus(msg, cls){ st.textContent = msg || ""; st.className = "dm-status" + (cls ? " " + cls : ""); }
+    function hideConfirm(){ box.hidden = true; }
+
+    function paintLen(){
+      var n = (text.value || "").length;
+      len.textContent = n + " / 2000";
+    }
+    text.addEventListener("input", function(){ paintLen(); hideConfirm(); setStatus(""); });
+    paintLen();
+
+    /* ask the backend how many people this audience actually covers, so the
+       confirmation names a real number rather than a guess */
+    async function refreshCount(){
+      cnt.textContent = "counting\u2026";
+      var res = await aPost("adminBroadcast", { dryRun: true, audience: aud.value });
+      lastCount = (res && res.ok) ? res.recipients : null;
+      cnt.textContent = lastCount == null ? ""
+        : lastCount + (lastCount === 1 ? " recipient" : " recipients");
+      return lastCount;
+    }
+    aud.onchange = function(){ hideConfirm(); setStatus(""); refreshCount(); };
+    card.addEventListener("toggle", function(){ if (card.open && lastCount === null) refreshCount(); });
+
+    sendBtn.onclick = async function(){
+      var body = (text.value || "").trim();
+      if (!body){ setStatus("Write the message first.", "err"); text.focus(); return; }
+      setStatus("");
+      var n = await refreshCount();
+      if (n == null){ setStatus("Couldn\u2019t reach the server.", "err"); return; }
+      if (!n){ setStatus("No one matches that audience.", "err"); return; }
+      $("bcConfirmMsg").textContent =
+        "Send this to " + n + (n === 1 ? " person" : " people") + "? It lands in their inbox straight away and can\u2019t be unsent.";
+      box.hidden = false;
+      $("bcYes").focus();
+    };
+    $("bcNo").onclick = function(){ hideConfirm(); };
+    $("bcYes").onclick = async function(){
+      hideConfirm();
+      var body = (text.value || "").trim(); if (!body) return;
+      $("bcYes").disabled = true; sendBtn.disabled = true;
+      setStatus("Sending\u2026");
+      var res = await aPost("adminBroadcast", { body: body, audience: aud.value });
+      $("bcYes").disabled = false; sendBtn.disabled = false;
+      if (res && res.ok){
+        setStatus("Sent to " + res.sent + (res.sent === 1 ? " person" : " people") + " \u2713", "ok");
+        text.value = ""; paintLen();
+      } else {
+        setStatus((res && res.error) || "Couldn\u2019t send.", "err");
+      }
+    };
+  })();
 
   /* ---------- direct-message reply drawer ---------- */
   var dmOther = "";

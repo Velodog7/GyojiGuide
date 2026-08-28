@@ -311,6 +311,7 @@ function doPost(e) {
     if (body.action === 'dmMarkRead')   return json(dmMarkRead(body));
     if (body.action === 'dmDelete')     return json(dmDelete(body));
     if (body.action === 'adminDmSend')     return json(adminDmSend(body));
+    if (body.action === 'adminBroadcast')  return json(adminBroadcast(body));
     if (body.action === 'adminDmMarkRead') return json(adminDmMarkRead(body));
     return json({ ok: false, error: 'unknown action' });
   } catch (err) {
@@ -1065,6 +1066,52 @@ function adminDmSend(body) {
     var id = newId('dm_');
     sh_(SHEET_DMS).appendRow([id, ADMIN_HANDLE, ADMIN_NAME, target.handle, text, new Date().toISOString(), '']);
     return { ok: true, id: id };
+  } finally { lock.releaseLock(); }
+}
+
+/* One message to every user, delivered as a normal DM from the admin account so
+   it lands in the inbox they already have and the nav's unread badge picks it up
+   — no new delivery channel to build, and they can reply in the same thread.
+
+   Written with a single setValues() rather than appendRow() per user: appendRow
+   is one Sheets round trip each, which would crawl and then hit the 6-minute
+   execution ceiling on a real roster.
+
+   dryRun:true returns the recipient count without writing, so the admin screen
+   can show "this will reach N people" before anything is sent. */
+function adminBroadcast(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var audience = String(body.audience || 'active') === 'all' ? 'all' : 'active';
+  var dry = !!body.dryRun;
+  var text = String(body.body || '').trim().slice(0, 2000);
+  if (!dry && !text) return { ok: false, error: 'Empty message.' };
+
+  var v = sh_(SHEET_USERS).getDataRange().getValues();
+  var adminLc = String(ADMIN_HANDLE).toLowerCase(), to = [];
+  for (var i = 1; i < v.length; i++) {
+    var h = String(v[i][0] || '').trim(); if (!h) continue;
+    if (h.toLowerCase() === adminLc) continue;                 // never message yourself
+    var status = String(v[i][6] || 'active') || 'active';
+    if (audience === 'active' && status !== 'active') continue;  // skip banned/suspended
+    to.push(h);
+  }
+  if (dry) return { ok: true, recipients: to.length, dryRun: true, audience: audience };
+  if (!to.length) return { ok: false, error: 'No one matches that audience.' };
+
+  /* newId() is time + 6 random base36 chars; called in a tight loop the time
+     half is identical, so a few hundred rows would collide often enough to
+     matter (those ids are what dmDelete works from). The index makes each
+     broadcast row unique by construction. */
+  var stamp = new Date().toISOString(), batch = newId('bc_');
+  var rows = to.map(function (h, idx) {
+    return [batch + '_' + idx, ADMIN_HANDLE, ADMIN_NAME, h, text, stamp, ''];
+  });
+
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    var sh = sh_(SHEET_DMS);
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+    return { ok: true, sent: rows.length, audience: audience, batch: batch };
   } finally { lock.releaseLock(); }
 }
 
