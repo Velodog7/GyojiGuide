@@ -18,7 +18,9 @@
  *     window.GGRoster. No build step, matches the rest of the site.
  *
  *  Usage:
- *      const res = await GGRoster.load();          // {ok, live, bashoId, label, ranks, count}
+ *      const res = await GGRoster.load();          // {ok, live, bashoId, label, ranks, started, count}
+ *      // res.started === false  -> this banzuke's basho has not been fought yet:
+ *      //   ranks are real, records are null. Never write those over a real result.
  *      if (res.ok) {
  *        const summary = GGRoster.applyTo(RK, res.ranks, { codeField:"code", ... });
  *        // then re-render; summary = {updated:[], newcomers:[], missing:[]}
@@ -120,9 +122,23 @@
         .then(function (pair) {
           var mak = pair[0], jur = pair[1];
           if (mak.length >= 20 && jur.length >= 10) {
+            var all = mak.concat(jur);
+            /* A banzuke is published ~2 weeks before its basho, so the newest
+               one we find is usually for a tournament that hasn't been fought
+               yet. sumo-api still sends wins/losses on those rows — as 0 — and
+               a caller doing `if (w.record)` would happily overwrite the last
+               basho's real result with a meaningless 0-0. So decide here, once:
+               if not a single bout has been recorded across the whole banzuke,
+               the basho hasn't started, and we hand back NO records at all
+               rather than a set of zeroes that look like results. */
+            var bouts = 0;
+            all.forEach(function (w) { bouts += (w.wins || 0) + (w.losses || 0); });
+            var started = bouts > 0;
+            if (!started) all.forEach(function (w) { w.record = null; w.wins = null; w.losses = null; });
             var ranks = {};
-            mak.concat(jur).forEach(function (w) { ranks[w.name] = w; });
+            all.forEach(function (w) { ranks[w.name] = w; });
             return { ok: true, live: true, bashoId: id, label: label(id), ranks: ranks,
+                     started: started, upcoming: !started,
                      count: { makuuchi: mak.length, juryo: jur.length } };
           }
           return tryNext();                    // published-but-empty (future basho) → walk back
