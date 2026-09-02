@@ -20,8 +20,54 @@
 
   var here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
 
+  /* MINIMAL MODE — for a page you are *inside* rather than browsing: the draft
+     room, where wandering off to Analysis mid-pick or opening the account modal
+     over a running clock is a way to lose your turn, not a feature. Declare it
+     on the body tag, which exists before this script builds:
+
+       <body data-gg-nav="minimal" data-gg-back="fantasy.html"
+             data-gg-back-label="Back to Fantasy">
+
+     Same logo, same bar, same radio — the section links, the help button and
+     the account cluster are simply not built. */
+  function navMode(){ return (document.body && document.body.getAttribute("data-gg-nav")) || "full"; }
+  function backTarget(){ return (document.body && document.body.getAttribute("data-gg-back")) || "index.html"; }
+  function backLabel(){ return (document.body && document.body.getAttribute("data-gg-back-label")) || "Back"; }
+
+  function buildMinimal() {
+    var nav = document.createElement("nav");
+    nav.id = "gg-nav";
+    nav.className = "ggn-min";
+    nav.setAttribute("aria-label", "Sumo Slapdown");
+    nav.innerHTML =
+      '<div class="ggn-inner">' +
+      '<a class="ggn-brand" href="index.html">'+GGN_LOGO+'<span class="ggn-beta">beta</span></a>' +
+      '<div class="ggn-panel">' +
+      '<div class="ggn-links">' +
+        '<button type="button" class="ggn-back" id="ggnBack">' +
+          '<span class="ggn-back-ico" aria-hidden="true">\u2190</span>' + hesc(backLabel()) +
+        '</button>' +
+      '</div>' +
+      '<div class="ggn-right"><div class="ggn-slot" id="ggnRadioSlot"></div></div>' +
+      '</div>' +
+      '</div>';
+    document.body.insertBefore(nav, document.body.firstChild);
+    document.body.classList.add("has-gg-nav");
+    var bb = document.getElementById("ggnBack");
+    if (bb) bb.onclick = function () {
+      /* Prefer the real back step — it restores the Fantasy page's scroll and
+         open league. Only fall back to a hard link when there is nothing to go
+         back to (opened in a fresh tab, or arrived from off-site). */
+      var sameSite = false;
+      try { sameSite = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (e) {}
+      if (sameSite && history.length > 1) history.back();
+      else location.href = backTarget();
+    };
+  }
+
   function build() {
     if (document.getElementById("gg-nav")) return;
+    if (navMode() === "minimal") return buildMinimal();
     var nav = document.createElement("nav");
     nav.id = "gg-nav";
     nav.setAttribute("aria-label", "Sumo Slapdown sections");
@@ -127,6 +173,14 @@
     /* right wrapper + help button */
     '.ggn-right{grid-column:3;justify-self:end;display:flex;align-items:center;gap:10px}' +
     '.ggn-slot{flex:none;width:40px;height:40px;display:flex;align-items:center;justify-content:center}' +
+    /* minimal bar: no burger, so the panel is always laid out inline */
+    '.ggn-min .ggn-panel{display:flex;align-items:center;gap:12px}' +
+    '.ggn-back{display:inline-flex;align-items:center;gap:7px;background:none;border:1px solid rgba(216,178,90,.3);' +
+      'border-radius:999px;color:#f4ecd8;font:inherit;font-size:.9rem;padding:7px 15px;cursor:pointer;' +
+      'white-space:nowrap;transition:border-color .15s,color .15s,background .15s}' +
+    '.ggn-back:hover{border-color:rgba(216,178,90,.75);background:rgba(216,178,90,.1)}' +
+    '.ggn-back:focus-visible{outline:2px solid rgba(216,178,90,.8);outline-offset:2px}' +
+    '.ggn-back-ico{font-size:1.05rem;line-height:1}' +
     '.ggn-help{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid #39404f;background:rgba(255,255,255,.03);' +
       'color:#c7cbd9;font-family:"Zen Maru Gothic",system-ui,sans-serif;font-weight:700;font-size:.95rem;line-height:1;cursor:pointer;' +
       'display:grid;place-items:center;transition:color .15s,border-color .15s,background .15s}' +
@@ -254,7 +308,24 @@
     '@keyframes gg-gunbai{0%,10%{transform:rotateY(0deg)}40%,60%{transform:rotateY(180deg)}90%,100%{transform:rotateY(360deg)}}' +
     '@keyframes gg-spin{to{transform:rotate(360deg)}}' +
     '@keyframes gg-pulse{0%,100%{opacity:.45}50%{opacity:1}}' +
-    '@media (prefers-reduced-motion:reduce){.gg-spinner__ring,.gg-spin{animation-duration:7s}.gg-spinner__label{animation:none}}';
+    '@media (prefers-reduced-motion:reduce){.gg-spinner__ring,.gg-spin{animation-duration:7s}.gg-spinner__label{animation:none}}' +
+    /* ── minimal bar, last so it wins the breakpoints above ──
+       There is no burger to open, so nothing may be tucked behind one: the
+       Back button and the radio stay in the bar at every width. Below 820px
+       the logo is given room by letting the pair shrink rather than wrap. ── */
+    '#gg-nav.ggn-min .ggn-inner{grid-template-columns:1fr auto;gap:10px;align-items:center}' +
+    '#gg-nav.ggn-min .ggn-panel{display:flex;position:static;grid-column:2;justify-self:end;width:auto;' +
+      'background:none;border:0;box-shadow:none;padding:0;animation:none}' +
+    '#gg-nav.ggn-min .ggn-links{position:static;display:flex;flex-direction:row;align-items:center;width:auto;' +
+      'grid-column:auto;padding:0;margin:0;background:none;border:0;box-shadow:none;backdrop-filter:none;' +
+      '-webkit-backdrop-filter:none;max-height:none;overflow:visible;opacity:1;pointer-events:auto;transition:none}' +
+    '#gg-nav.ggn-min .ggn-right{grid-column:auto;justify-self:auto;width:auto;padding:0;margin:0;border:0;' +
+      'display:flex;align-items:center;gap:10px}' +
+    '@media(max-width:820px){' +
+      '#gg-nav.ggn-min .ggn-brand svg,#gg-nav.ggn-min .ggn-brand img{height:40px}' +
+      '#gg-nav.ggn-min .ggn-back{padding:6px 11px;font-size:.82rem}' +
+      '#gg-nav.ggn-min .ggn-back-ico{font-size:.95rem}' +
+    '}';
 
   function ensureFont() {
     if (document.getElementById("gg-nav-font")) return;   // once per page

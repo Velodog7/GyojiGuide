@@ -337,7 +337,13 @@
      browser. Neither touches the DOM. -->
 <script src="gg-config.js"></script><script src="gg-account.js"></script>
 </head>
-<body>
+<!-- The shared bar in MINIMAL mode: same logo, same radio, but no section
+     links, no help button and no account control. You are inside a draft with a
+     clock running — wandering off to Analysis mid-pick loses your turn, and the
+     account modal has nothing to offer here. Back is a real history step where
+     there is one, so Fantasy comes back with its scroll and open league intact. -->
+<body data-gg-nav="minimal" data-gg-back="fantasy.html" data-gg-back-label="Back to Fantasy">
+<script src="gg-nav.js"></script>
 <div class="wrap">
   <div class="pv-flag">
     <span class="tag">Preview</span>
@@ -1271,4 +1277,5 @@ applyCtx();
 renderRoom();
 initRoster();   // pull the live banzuke in the background; falls back to the bundled roster on any failure
 </script>
+<script src="taiko-radio.js" defer></script>
 </body></html>
