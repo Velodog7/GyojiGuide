@@ -221,7 +221,14 @@
   GG.setLeagueScoring = function (id, scoring){ return GG.apiPost(authed({ action:"setLeagueScoring", id:id, scoring:scoring })); };
   GG.setDraftDate  = function (id, draftDate){ return GG.apiPost(authed({ action:"setDraftDate", id:id, draftDate:draftDate })); };
   GG.agreeDraftDate = function (id, agree){ return GG.apiPost(authed({ action:"agreeDraftDate", id:id, agree:agree !== false })); };
-  GG.startDraft     = function (id){ return GG.apiPost(authed({ action:"startDraft", id:id })); };
+  /* The server has no idea what the banzuke is, so the page that starts the
+     draft hands the current order over once. It becomes the fallback board for
+     any member who never arranged one of his own — which is exactly what that
+     member would have seen if he had opened the panel. */
+  GG.startDraft     = function (id, pickClock, pool){
+    return GG.apiPost(authed({ action:"startDraft", id:id,
+      pickClock: pickClock || 120, pool: pool || null }));
+  };
   GG.draftState     = function (id){ return GG.apiGetQ("draftState", { id:id }); };
   GG.makePick       = function (id, rikishi){ return GG.apiPost(authed({ action:"makePick", id:id, rikishi:rikishi })); };
   GG.proposeTrade   = function (id, toHandle, offer, request){ return GG.apiPost(authed({ action:"proposeTrade", id:id, toHandle:toHandle, offer:offer, request:request })); };
@@ -229,6 +236,13 @@
   GG.myTrades       = function (id){ return GG.apiGetQ("trades", { id:id, handle:(GG.account.get()||{}).handle || "" }); };
   GG.addDrop        = function (id, add, drop){ return GG.apiPost(authed({ action:"addDrop", id:id, add:add, drop:drop })); };
   GG.setActive      = function (id, active){ return GG.apiPost(authed({ action:"setActive", id:id, active:active })); };
+  /* A member's auto-draft order for one keepers league. Set on the league page
+     before the draft, read back by the draft room on the day. Names, not ranks,
+     so a new banzuke can be reconciled against it rather than invalidating it. */
+  GG.saveDraftBoard = function (id, makuuchi, juryo, auto){
+    return GG.apiPost(authed({ action:"saveDraftBoard", id:id,
+      makuuchi: makuuchi || [], juryo: juryo || [], auto: !!auto }));
+  };
   GG.openRedraft    = function (id){ return GG.apiPost(authed({ action:"openRedraft", id:id })); };
   GG.redraftState   = function (id){ return GG.apiPost(authed({ action:"redraftState", id:id })); };
   GG.redraftPick    = function (id, rikishi){ return GG.apiPost(authed({ action:"redraftPick", id:id, rikishi:rikishi })); };

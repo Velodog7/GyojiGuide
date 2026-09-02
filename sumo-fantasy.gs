@@ -56,6 +56,7 @@ var SHEET_BOARD = 'LeaderboardBoard';
 var SHEET_BOARD_VOTES = 'LeaderboardVotes';
 var SHEET_DMS = 'DirectMessages';
 var SHEET_CHAMPS = 'Champions';
+var SHEET_BOARDS = 'DraftBoards';
 
 // Label for the current tournament (shown in the app).
 var BASHO_LABEL   = 'Aki 2026';
@@ -114,7 +115,14 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-08-28-champions';
+var BACKEND_VERSION = '2026-09-02-draftclock';
+/* The pick clock. A member with auto-draft ON is given only a short grace —
+   he asked to be drafted for, so there is nothing to wait for. A member with
+   it OFF gets the league's full clock before the board picks for him. Either
+   way the pick comes off HIS board, which defaults to banzuke order, so an
+   absentee who never touched it still drafts sensibly. */
+var DRAFT_GRACE = 30;            // seconds, auto-draft on
+var PICK_CLOCK_DEFAULT = 120;    // seconds, auto-draft off
 
 /* ---------- one-time: build the tabs ---------- */
 function setup() {
@@ -126,7 +134,7 @@ function setup() {
   ensureSheet(ss, SHEET_RESULTS, ['day', 'division', 'east', 'west', 'winner', 'kimarite']);
   var leagues = ensureSheet(ss, SHEET_LEAGUES, ['id', 'name', 'commissioner', 'created', 'inviteCode',
     'mode', 'rosterSize', 'draftStatus', 'draftOrder', 'draftPickIdx', 'draftPhase', 'scoring', 'draftDate', 'draftAgree',
-    'benchSize', 'farmSize']);
+    'benchSize', 'farmSize', 'pickClock', 'pickDeadline', 'defaultOrder']);
   migrateLeaguesV2(leagues);   // upgrades an older Leagues sheet (no keeper columns) in place
   ensureSheet(ss, SHEET_MEMBERS, ['leagueId', 'handle', 'joined']);
   ensureSheet(ss, SHEET_MESSAGES, ['id', 'leagueId', 'handle', 'name', 'body', 'parentId', 'created']);
@@ -144,6 +152,7 @@ function setup() {
   ensureSheet(ss, SHEET_BOARD_VOTES, ['msgId', 'handle', 'value', 'votedAt']);
   ensureSheet(ss, SHEET_DMS, ['id', 'fromHandle', 'fromName', 'toHandle', 'body', 'created', 'readByRecipient']);
   ensureSheet(ss, SHEET_CHAMPS, CHAMP_HEAD);
+  ensureSheet(ss, SHEET_BOARDS, DBOARD_HEAD);
   var meta = ensureSheet(ss, SHEET_META, ['key', 'value']);
   if (meta.getLastRow() < 2) {
     meta.appendRow(['basho', BASHO_LABEL]);
@@ -214,6 +223,14 @@ function migrateLeaguesV2(sh) {
   head = sh.getRange(1, 1, 1, Math.max(14, sh.getLastColumn())).getValues()[0];
   if (String(head[14] || '').toLowerCase() !== 'benchsize') {
     sh.getRange(1, 15, 1, 2).setValues([['benchSize', 'farmSize']]);
+  }
+  /* v5: the pick clock. Blank on an existing row is fine everywhere — pickClock
+     falls back to the default, a blank deadline means "no clock running", and a
+     blank defaultOrder just means a boardless member can't be auto-picked for
+     (the draft then waits for him, exactly as it did before this migration). */
+  head = sh.getRange(1, 1, 1, Math.max(16, sh.getLastColumn())).getValues()[0];
+  if (String(head[16] || '').toLowerCase() !== 'pickclock') {
+    sh.getRange(1, 17, 1, 3).setValues([['pickClock', 'pickDeadline', 'defaultOrder']]);
   }
 }
 
@@ -287,6 +304,7 @@ function doPost(e) {
     if (body.action === 'proposeTrade')  return json(proposeTrade(body));
     if (body.action === 'respondTrade')  return json(respondTrade(body));
     if (body.action === 'setActive')     return json(setActive(body));
+    if (body.action === 'saveDraftBoard') return json(saveDraftBoard(body));
     if (body.action === 'openRedraft')   return json(openSupplementalDraft(body));
     if (body.action === 'redraftState')  return json(redraftState(body.id));
     if (body.action === 'redraftPick')   return json(redraftPick(body));
@@ -627,7 +645,13 @@ function leagueRow(id){
     benchSize: Number(v[r][14] || 0) || 0,
     /* blank (pre-v4 row) means "farm was the same size as the active roster" —
        0 is a real, different answer, so test for blank rather than falsy */
-    farmSize: (v[r][15] === '' || v[r][15] == null) ? (Number(v[r][6]||6) || 6) : (Number(v[r][15]) || 0)
+    farmSize: (v[r][15] === '' || v[r][15] == null) ? (Number(v[r][6]||6) || 6) : (Number(v[r][15]) || 0),
+    pickClock: Number(v[r][16] || 0) || PICK_CLOCK_DEFAULT,
+    pickDeadline: String(v[r][17] || ''),
+    /* The banzuke order as the client saw it when the draft started — the
+       fallback board for a member who never saved one of his own. Snapshotted
+       once so a mid-draft banzuke change can't reshuffle anyone's queue. */
+    defaultOrder: (function(){ try { return JSON.parse(v[r][18]||'null') || null; } catch(e){ return null; } })()
   };
   return null;
 }
@@ -678,11 +702,18 @@ function leagueDetail(id, handle){
   users.forEach(function(u){ byh[u.handle.toLowerCase()] = u.name; });
   var teams = leagueTeamsOf(id);
   var rosters = L.mode === 'keepers' ? keeperRostersOf(id) : {};
+  var boards = L.mode === 'keepers' ? draftBoardsOf(id) : {};
   var mem = members.map(function(h){
     var t = teams[h.toLowerCase()];
     var ros = rosters[h.toLowerCase()] || { makuuchi:[], juryo:[] };
+    var bd = boards[h.toLowerCase()] || null;
     return { handle:h, name: byh[h.toLowerCase()] || h, team: t ? t.team : {}, teamUpdated: t ? t.updated : '',
-      roster: ros };
+      roster: ros,
+      /* everyone sees WHETHER a member has set a board (so the commissioner can
+         chase the stragglers) but only you get to see your own order */
+      boardSet: !!(bd && (bd.makuuchi.length || bd.juryo.length)),
+      boardUpdated: bd ? bd.updated : '',
+      draftBoard: (handle && h.toLowerCase() === handle.toLowerCase()) ? bd : null };
   });
   var msgs = messagesOf(id);
   // draft-date agreement: which members have agreed to the scheduled date
@@ -701,6 +732,77 @@ function leagueDetail(id, handle){
     isMember: handle ? isMember(id, handle) : false },
     champion: reigningChampion_(id),
     members:mem, messages:msgs };
+}
+
+/* =====================================================================
+   DRAFT BOARDS — a member's pre-draft auto-draft order for one league.
+   One row per (league, member): the ordered shikona for each division plus
+   the auto-draft toggle. Set on the league page any time before the draft,
+   read back by the draft room on the day, and re-saved from the room when
+   the order is changed there — so the two surfaces are the same board, not
+   two copies of one.
+
+   The order is stored as names, not ranks, so it survives a new banzuke:
+   the draft room reconciles it against whatever roster actually loads,
+   keeping your order for the men still ranked, dropping the departed and
+   appending newcomers in banzuke order.
+   ===================================================================== */
+var DBOARD_HEAD = ['leagueId', 'handle', 'makuuchi', 'juryo', 'auto', 'updated'];
+function boardSheet_(){ return ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_BOARDS, DBOARD_HEAD); }
+
+function parseNames_(cell){
+  var out = [];
+  try { out = JSON.parse(cell || '[]'); } catch(e){ out = []; }
+  if (!Array.isArray(out)) return [];
+  var seen = {}, keep = [];
+  for (var i = 0; i < out.length && keep.length < 200; i++){
+    var n = String(out[i] || '').trim().slice(0, 40);
+    if (!n) continue;
+    var k = n.toLowerCase(); if (seen[k]) continue;   // a duplicate would draft twice
+    seen[k] = 1; keep.push(n);
+  }
+  return keep;
+}
+
+/* Every member's board for one league, keyed by lowercase handle. The whole
+   league's boards ride along with leagueDetail so the page can show who has
+   set one — a commissioner chasing people before draft day needs to see it. */
+function draftBoardsOf(id){
+  var v = boardSheet_().getDataRange().getValues(), out = {};
+  for (var r = 1; r < v.length; r++){
+    if (String(v[r][0]) !== String(id)) continue;
+    var h = String(v[r][1] || ''); if (!h) continue;
+    out[h.toLowerCase()] = {
+      makuuchi: parseNames_(v[r][2]),
+      juryo:    parseNames_(v[r][3]),
+      auto:     String(v[r][4]) === 'true',
+      updated:  String(v[r][5] || '')
+    };
+  }
+  return out;
+}
+
+function saveDraftBoard(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.mode !== 'keepers') return { ok:false, error:'Draft boards are for keepers leagues.' };
+  if (!isMember(L.id, u.handle)) return { ok:false, error:'You are not in that league.' };
+  var mak = parseNames_(JSON.stringify(body.makuuchi || []));
+  var jur = parseNames_(JSON.stringify(body.juryo || []));
+  var auto = !!body.auto;
+  var when = new Date().toISOString();
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = boardSheet_(), v = sh.getDataRange().getValues(), key = u.handle.toLowerCase();
+    for (var r = 1; r < v.length; r++){
+      if (String(v[r][0]) !== String(L.id) || String(v[r][1] || '').toLowerCase() !== key) continue;
+      sh.getRange(r + 1, 1, 1, DBOARD_HEAD.length)
+        .setValues([[L.id, u.handle, JSON.stringify(mak), JSON.stringify(jur), auto, when]]);
+      return { ok:true, saved:mak.length + jur.length, auto:auto, updated:when };
+    }
+    sh.appendRow([L.id, u.handle, JSON.stringify(mak), JSON.stringify(jur), auto, when]);
+    return { ok:true, saved:mak.length + jur.length, auto:auto, updated:when };
+  } finally { lock.releaseLock(); }
 }
 
 function leagueByInvite(code){
@@ -1369,13 +1471,27 @@ function startDraft(body){
     var j = Math.floor(Math.random() * (i + 1));
     var t = order[i]; order[i] = order[j]; order[j] = t;
   }
+  /* The clock, and the banzuke as the client currently sees it. The server has
+     no idea what the banzuke is, so the page that starts the draft hands it
+     over once: it becomes the fallback board for anyone who never set one. */
+  var pickClock = Math.max(15, Math.min(28800, Number(body.pickClock) || PICK_CLOCK_DEFAULT));
+  var pool = body.pool || {};
+  var defaultOrder = { makuuchi: parseNames_(JSON.stringify(pool.makuuchi || [])),
+                       juryo:    parseNames_(JSON.stringify(pool.juryo || [])) };
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     sh_(SHEET_LEAGUES).getRange(L.row, 6, 1, 6).setValues([[
       'keepers', rosterSize, 'active', JSON.stringify(order), 0, 'makuuchi'
     ]]);
     sh_(SHEET_LEAGUES).getRange(L.row, 15, 1, 2).setValues([[benchSize, farmSize]]);
-    return { ok:true, order:order, rosterSize:rosterSize, benchSize:benchSize, farmSize:farmSize };
+    var L2 = leagueRow(L.id);
+    L2.pickClock = pickClock;      // the row is written below; the first deadline must use the NEW clock
+    var boards = draftBoardsOf(L.id);
+    var first = draftTurn(order, rosterPlan(L2), 0);
+    var deadline = deadlineFor_(L2, first.handle, boards);
+    sh_(SHEET_LEAGUES).getRange(L.row, 17, 1, 3).setValues([[pickClock, deadline, JSON.stringify(defaultOrder)]]);
+    return { ok:true, order:order, rosterSize:rosterSize, benchSize:benchSize, farmSize:farmSize,
+             pickClock:pickClock, deadline:deadline };
   } finally { lock.releaseLock(); }
 }
 
@@ -1390,13 +1506,122 @@ function draftPicksOf(id){
   return out;
 }
 
+/* =====================================================================
+   THE PICK CLOCK
+   ---------------------------------------------------------------------
+   Apps Script has no background timer, so the clock is a DEADLINE stored on
+   the league rather than a countdown running somewhere. Every read of the
+   draft (draftState) and every write to it (makePick) first calls
+   settleDraft_(), which awards any pick whose deadline has already passed —
+   as many in a row as are overdue, so a whole row of absentees resolves in
+   one poll and the draft can never stall.
+
+   Whose turn it is decides how long the wait was, not what gets picked:
+
+     auto-draft ON   -> DRAFT_GRACE (30s). He asked to be drafted for.
+     auto-draft OFF  -> the league's full pick clock.
+
+   Either way the pick is the top name still available on HIS board. A member
+   who never arranged one has no row in DraftBoards, so we fall back to the
+   league's defaultOrder — the banzuke as the client saw it when the draft
+   started — which is exactly what his board would have shown him anyway.
+   ===================================================================== */
+function clockFor_(L, handle, boards){
+  var b = boards[String(handle || '').toLowerCase()];
+  var full = Math.max(10, Number(L.pickClock) || PICK_CLOCK_DEFAULT);
+  return (b && b.auto) ? Math.min(DRAFT_GRACE, full) : full;
+}
+function deadlineFor_(L, handle, boards){
+  return new Date(Date.now() + clockFor_(L, handle, boards) * 1000).toISOString();
+}
+/* The order this member drafts by for one phase: his own board first, the
+   league's banzuke snapshot behind it. Concatenated rather than either/or, so
+   a board that has been exhausted (everyone on it taken) still resolves. */
+function orderFor_(L, handle, phase, boards){
+  var b = boards[String(handle || '').toLowerCase()];
+  var mine = (b && b[phase]) || [];
+  var def  = (L.defaultOrder && L.defaultOrder[phase]) || [];
+  var seen = {}, out = [];
+  mine.concat(def).forEach(function(n){
+    var k = String(n || '').toLowerCase();
+    if (!k || seen[k]) return;
+    seen[k] = 1; out.push(n);
+  });
+  return out;
+}
+/* Award every overdue pick. Call inside the caller's lock. Returns the league
+   row as it now stands (re-read if anything was written). */
+function settleDraft_(L){
+  if (!L || L.draftStatus !== 'active') return L;
+  if (!L.pickDeadline) return L;                 // no clock on this draft
+  var boards = draftBoardsOf(L.id);
+  var picks = draftPicksOf(L.id);
+  var taken = {};
+  picks.forEach(function(p){ taken[String(p.rikishi).toLowerCase()] = 1; });
+  var plan = rosterPlan(L);
+  var counts = {};   // handle -> makuuchi picks so far, for the active/bench slot
+  picks.forEach(function(p){
+    if (p.phase === 'juryo') return;
+    var k = String(p.handle).toLowerCase(); counts[k] = (counts[k] || 0) + 1;
+  });
+  var idx = L.draftPickIdx, deadline = L.pickDeadline, wrote = 0;
+  var pickRows = [], rosterRows = [];
+  /* Bounded: one pass can only ever settle as many picks as the draft has. */
+  for (var guard = 0; guard < 400; guard++){
+    if (new Date(deadline).getTime() > Date.now()) break;    // the man on the clock still has time
+    var turn = draftTurn(L.draftOrder, plan, idx);
+    if (turn.phase === 'done' || !turn.handle) break;
+    var order = orderFor_(L, turn.handle, turn.phase, boards);
+    var name = null;
+    for (var i = 0; i < order.length; i++){
+      if (!taken[String(order[i]).toLowerCase()]) { name = order[i]; break; }
+    }
+    if (!name) break;   // nothing to draft him — leave the clock stopped for a human
+    var key = String(turn.handle).toLowerCase(), when = new Date().toISOString();
+    var slot = 'bench';
+    if (turn.phase !== 'juryo') slot = (counts[key] || 0) < plan.active ? 'active' : 'bench';
+    if (turn.phase !== 'juryo') counts[key] = (counts[key] || 0) + 1;
+    pickRows.push([L.id, idx, turn.round, turn.phase, turn.handle, name, when]);
+    rosterRows.push([L.id, turn.handle, name, turn.phase, 'auto', when, slot]);
+    taken[String(name).toLowerCase()] = 1;
+    idx++; wrote++;
+    var next = draftTurn(L.draftOrder, plan, idx);
+    deadline = (next.phase === 'done') ? '' : deadlineFor_(L, next.handle, boards);
+  }
+  if (!wrote) return L;
+  if (pickRows.length)   sh_(SHEET_PICKS).getRange(sh_(SHEET_PICKS).getLastRow() + 1, 1, pickRows.length, 7).setValues(pickRows);
+  if (rosterRows.length) sh_(SHEET_ROSTERS).getRange(sh_(SHEET_ROSTERS).getLastRow() + 1, 1, rosterRows.length, 7).setValues(rosterRows);
+  var nextTurn = draftTurn(L.draftOrder, plan, idx);
+  var status = nextTurn.phase === 'done' ? 'complete' : 'active';
+  sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue(status);
+  sh_(SHEET_LEAGUES).getRange(L.row, 10, 1, 2).setValues([[idx, nextTurn.phase]]);
+  sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue(deadline);
+  return leagueRow(L.id);
+}
+
 function draftState(id){
   var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
+  /* Anyone polling advances the clock. Only take the lock when there is
+     actually something overdue, so the common poll stays a plain read. */
+  if (L.draftStatus === 'active' && L.pickDeadline && new Date(L.pickDeadline).getTime() <= Date.now()){
+    var lock = LockService.getScriptLock();
+    if (lock.tryLock(15000)){
+      try { L = settleDraft_(leagueRow(id)); } finally { lock.releaseLock(); }
+    }
+  }
   var picks = draftPicksOf(L.id);
   var turn = L.draftStatus === 'active' ? draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx) : { phase:L.draftStatus==='complete'?'done':'none' };
+  var boards = L.mode === 'keepers' ? draftBoardsOf(L.id) : {};
+  var onClock = boards[String(turn.handle || '').toLowerCase()];
   return { ok:true, league:{ id:L.id, mode:L.mode, rosterSize:L.rosterSize, benchSize:L.benchSize, farmSize:L.farmSize,
-                             draftStatus:L.draftStatus, draftOrder:L.draftOrder },
-    picks:picks, turn:turn, pickedNames:picks.map(function(p){ return p.rikishi; }) };
+                             draftStatus:L.draftStatus, draftOrder:L.draftOrder, pickClock:L.pickClock },
+    picks:picks, turn:turn, pickedNames:picks.map(function(p){ return p.rikishi; }),
+    /* the clock, as the client needs to draw it: when this pick expires, how
+       long the man on the clock was given, and whether he asked to be auto-drafted */
+    deadline: L.pickDeadline || '',
+    clockSeconds: turn.handle ? clockFor_(L, turn.handle, boards) : 0,
+    onClockAuto: !!(onClock && onClock.auto),
+    serverNow: new Date().toISOString() };
 }
 
 function makePick(body){
@@ -1410,6 +1635,11 @@ function makePick(body){
   try {
     // re-read fresh inside the lock — another pick may have landed since the client last polled
     L = leagueRow(body.id);
+    /* Settle first: if his clock ran out while the click was in flight, the
+       board has already picked for him and this click must not win a turn he
+       no longer owns. */
+    L = settleDraft_(L);
+    if (L.draftStatus !== 'active') return { ok:false, error:'The draft is already complete.' };
     var turn = draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx);
     if (turn.phase === 'done') return { ok:false, error:'The draft is already complete.' };
     if (!turn.handle || turn.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'It\u2019s not your turn.' };
@@ -1435,7 +1665,11 @@ function makePick(body){
     var status = nextTurn.phase === 'done' ? 'complete' : 'active';
     sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue(status);                                 // draftStatus (col 8)
     sh_(SHEET_LEAGUES).getRange(L.row, 10, 1, 2).setValues([[nextIdx, nextTurn.phase]]);     // draftPickIdx (10) + draftPhase (11); leave draftOrder (col 9) intact
-    return { ok:true, nextTurn:nextTurn, draftStatus:status };
+    // the next man's clock starts the moment this pick lands, not when he polls
+    var boardsNow = draftBoardsOf(L.id);
+    var nextDeadline = (nextTurn.phase === 'done') ? '' : deadlineFor_(L, nextTurn.handle, boardsNow);
+    sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue(nextDeadline);
+    return { ok:true, nextTurn:nextTurn, draftStatus:status, deadline:nextDeadline };
   } finally { lock.releaseLock(); }
 }
 

@@ -482,11 +482,49 @@
         padding:8px; text-align:center; font-size:.8rem; color:var(--dim); transition:border-color .12s,color .12s }
   .lg-draft-pick:hover{ border-color:var(--sun); color:var(--ink) }
   .lg-draft-pick.disabled{ opacity:.45; cursor:not-allowed }
+  /* the top name still available on your own board, on your own turn */
+  .lg-draft-pick.top{ border-color:var(--sun); color:var(--sun) }
   .lg-draft-board{ display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto; font-size:.8rem }
   .lg-draft-board div{ display:flex; justify-content:space-between; gap:8px; padding:4px 8px; border-radius:6px }
   .lg-draft-board div.me{ background:rgba(var(--sun-rgb),.1) }
   .lg-draft-board .h{ color:var(--faint); font-family:"WDXL Lubrifont TC",monospace; font-size:0.85rem }
   .lg-waiting{ text-align:center; padding:30px 10px; color:var(--dim) }
+  .lg-clock{ display:inline-flex; align-items:center; gap:8px; font-size:.84rem; color:var(--dim); margin:0 0 4px }
+  .lg-clock select{ background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--ink);
+        font:inherit; font-size:.82rem; padding:6px 9px }
+  /* the pick clock, in the live draft */
+  .lg-tick{ font-family:"WDXL Lubrifont TC",monospace; font-size:1.05rem; color:var(--sun); margin-left:8px }
+  .lg-tick.warn{ color:var(--red) }
+  .lg-tick.auto{ color:var(--dim) }
+
+  /* ---- my draft board: the auto-draft order, set before draft day ---- */
+  .lg-bd{ border:1px solid var(--line); border-radius:12px; padding:12px 14px 14px; margin-top:14px }
+  .lg-bd__hd{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:4px }
+  .lg-bd__hd h4{ margin:0 }
+  .lg-bd__cnt{ font-size:.74rem; color:var(--faint); font-weight:400 }
+  .lg-bd__sp{ flex:1 1 auto }
+  .lg-bd__auto{ display:flex; align-items:center; gap:6px; font-size:.8rem; color:var(--dim); cursor:pointer;
+        border:1px solid var(--line2); border-radius:999px; padding:5px 11px }
+  .lg-bd__auto input{ accent-color:var(--sun) }
+  .lg-bd__tabs{ display:flex; gap:6px; margin:8px 0 }
+  .lg-bd__tabs button{ background:var(--surface-2); border:1px solid var(--line2); color:var(--dim);
+        border-radius:999px; padding:5px 13px; font:inherit; font-size:.78rem; cursor:pointer }
+  .lg-bd__tabs button.on{ border-color:var(--sun); color:var(--sun) }
+  .lg-bd__list{ max-height:330px; overflow-y:auto; display:flex; flex-direction:column; gap:3px; padding-right:2px }
+  .lg-bd__row{ display:grid; grid-template-columns:30px 1fr auto auto 16px; align-items:center; gap:8px;
+        border:1px solid var(--line2); border-radius:8px; background:var(--surface-2); padding:5px 9px;
+        font-size:.82rem; cursor:grab }
+  .lg-bd__row.drag{ opacity:.45 }
+  .lg-bd__row.over{ border-color:var(--sun) }
+  .lg-bd__row.kept{ opacity:.5 }          /* already on your keeper roster — undraftable */
+  .lg-bd__n{ font-family:"WDXL Lubrifont TC",monospace; color:var(--faint); font-size:.86rem; text-align:right }
+  .lg-bd__rk{ font-family:"WDXL Lubrifont TC",monospace; color:var(--faint); font-size:.76rem; white-space:nowrap }
+  .lg-bd__acts{ display:flex; gap:2px }
+  .lg-bd__acts button{ background:none; border:1px solid var(--line2); border-radius:6px; color:var(--dim);
+        width:22px; height:22px; line-height:1; font-size:.72rem; cursor:pointer; padding:0 }
+  .lg-bd__acts button:hover{ border-color:var(--sun); color:var(--sun) }
+  .lg-bd__grip{ color:var(--faint); cursor:grab; user-select:none }
+  .lg-bd__foot{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px }
   .lg-roster-block{ margin-bottom:10px }
   .lg-roster-block h5{ margin:0 0 6px; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--faint) }
   .lg-trade-row{ border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; font-size:.84rem }
@@ -2012,8 +2050,29 @@ function renderSchedPanel(lg, meCommish){
    KEEPERS: draft room, rosters, trades, waivers (client)
    ============================================================ */
 let draftPollTimer = null;
+/* The countdown is drawn from the server's deadline, not from a local timer:
+   the server is the only clock that decides anything, and a browser whose
+   clock is minutes off would otherwise show a number nobody else sees.
+   `draftSkew` is that correction, measured from serverNow on every poll. */
+let draftTick = null, draftSkew = 0, draftDeadline = "", draftAuto = false;
+function stopDraftTick(){ if (draftTick){ clearInterval(draftTick); draftTick=null; } }
+function fmtTick(sec){
+  if (sec <= 0) return "0:00";
+  const m = Math.floor(sec/60), r = sec%60;
+  return m + ":" + String(r).padStart(2,"0");
+}
+function paintTick(){
+  const el = $("lgTick"); if (!el) return;
+  if (!draftDeadline){ el.textContent = ""; return; }
+  const left = Math.max(0, Math.round((new Date(draftDeadline).getTime() - (Date.now() + draftSkew)) / 1000));
+  el.textContent = fmtTick(left);
+  el.className = "lg-tick" + (draftAuto ? " auto" : left <= 15 ? " warn" : "");
+  el.title = draftAuto
+    ? "Auto-draft is on for whoever is on the clock \u2014 the pick comes off their board"
+    : "When this reaches zero the pick is taken off their draft board";
+}
 let redraftPollTimer = null;
-function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } }
+function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } stopDraftTick(); }
 /* Mirrors rosterPlan() in sumo-fantasy.gs. rosterSize keeps its original
    meaning — the ACTIVE Makuuchi cap — so a league saved before benches existed
    reads back as bench 0 / farm = active, exactly as it behaved before. */
@@ -2030,10 +2089,152 @@ function planSummary(lg){
          ` Makuuchi` + (p.farm ? ` and <b>${p.farm}</b> J\u016bry\u014d (farm)` : " and no J\u016bry\u014d farm");
 }
 function rikDivision(name){ return (RK[name] && RK[name].code && RK[name].code[0]==="J") ? "juryo" : "makuuchi"; }
+
+/* =====================================================================
+   MY DRAFT BOARD — the auto-draft order, set on the league page at any
+   time before the draft rather than only once the room is open.
+
+   It is stored on the server per (league, member) as two ordered lists of
+   shikona, so it follows the member to draft day on whatever device they
+   turn up with, and the draft room reads it back instead of keeping its own
+   private copy in localStorage. Names rather than ranks: a banzuke can land
+   between setting the board and drafting off it, and an order of names can
+   be reconciled against the new one where an order of ranks could not.
+   ===================================================================== */
+let LGBOARD = { makuuchi:[], juryo:[], auto:false };
+let lgBdDiv = "makuuchi", lgBdDirty = false, lgBdLeague = null;
+
+function bdPool(div){
+  return Object.keys(RK).filter(n => onBanzuke(n) && rikDivision(n) === div).sort(rankSort);
+}
+/* Keep the saved order, drop anyone the banzuke no longer carries, append
+   newcomers where the banzuke puts them. Same contract as the draft room's
+   reconcile(), so both surfaces resolve a stale board identically. */
+function bdReconcile(saved, div){
+  const live = bdPool(div), set = new Set(live);
+  const kept = (saved || []).filter(n => set.has(n));
+  const have = new Set(kept);
+  return kept.concat(live.filter(n => !have.has(n)));
+}
+function bdSeed(lg){
+  const me = (lg.members || []).find(m => acct && m.handle.toLowerCase() === acct.handle.toLowerCase());
+  const saved = me && me.draftBoard;
+  LGBOARD.makuuchi = bdReconcile(saved && saved.makuuchi, "makuuchi");
+  LGBOARD.juryo    = bdReconcile(saved && saved.juryo,    "juryo");
+  LGBOARD.auto     = !!(saved && saved.auto);
+  lgBdDirty = false; lgBdLeague = lg.id;
+}
+function bdSetHTML(lg){
+  const total = (lg.members || []).length;
+  const set = (lg.members || []).filter(m => m.boardSet).length;
+  return total > 1
+    ? `<p class="lg-locked-note">${set} of ${total} members have set a board.</p>` : "";
+}
+function draftBoardPanelHTML(lg){
+  return `<div class="lg-bd" id="lgBd">
+    <div class="lg-bd__hd">
+      <h4>My draft board <span class="lg-bd__cnt" id="lgBdCnt"></span></h4>
+      <span class="lg-bd__sp"></span>
+      <label class="lg-bd__auto" title="Draft for me from the top of my board the moment I'm on the clock">
+        <input type="checkbox" id="lgBdAuto"${LGBOARD.auto ? " checked" : ""}><span>Auto-draft me</span></label>
+    </div>
+    <p class="lg-myteam__hint">Set the order now and it travels with you to draft day: the room drafts the
+      top name still available whenever your clock runs out, or on every pick if auto-draft is on.</p>
+    <div class="lg-bd__tabs" id="lgBdTabs">
+      <button data-div="makuuchi" class="${lgBdDiv === "makuuchi" ? "on" : ""}">Makuuchi</button>
+      <button data-div="juryo" class="${lgBdDiv === "juryo" ? "on" : ""}">J\u016bry\u014d</button>
+    </div>
+    <div class="lg-bd__list" id="lgBdList"></div>
+    <div class="lg-bd__foot">
+      <button class="btn" id="lgBdSave">Save board</button>
+      <button class="btn ghost sm" id="lgBdReset">Reset to banzuke order</button>
+      <span class="status" id="lgBdStatus"></span>
+    </div>
+    ${bdSetHTML(lg)}
+  </div>`;
+}
+function bdRender(lg){
+  const list = LGBOARD[lgBdDiv] || [];
+  const kept = new Set();   // keepers already on your roster can't be drafted again
+  const me = (lg.members || []).find(m => acct && m.handle.toLowerCase() === acct.handle.toLowerCase());
+  if (me && me.roster) ["makuuchi","juryo"].forEach(d => (me.roster[d] || []).forEach(x =>
+      kept.add(String(x && x.name != null ? x.name : x).toLowerCase())));
+  const cnt = $("lgBdCnt");
+  if (cnt) cnt.textContent = "\u2014 " + list.length + " " + (lgBdDiv === "juryo" ? "J\u016bry\u014d" : "Makuuchi")
+      + (lgBdDirty ? " \u00b7 unsaved changes" : "");
+  const el = $("lgBdList"); if (!el) return;
+  el.innerHTML = list.map((n, i) =>
+      `<div class="lg-bd__row${kept.has(n.toLowerCase()) ? " kept" : ""}" draggable="true" data-n="${esc(n)}">`
+    + `<span class="lg-bd__n">${i + 1}</span>`
+    + `<span>${esc(n)}</span>`
+    + `<span class="lg-bd__rk">${esc(rankLabel(n))}</span>`
+    + `<span class="lg-bd__acts"><button data-a="top" title="Move to top">\u21c8</button>`
+    + `<button data-a="up" title="Up">\u2191</button><button data-a="down" title="Down">\u2193</button></span>`
+    + `<span class="lg-bd__grip" aria-hidden="true">\u2237</span></div>`).join("")
+    || `<p class="lg-locked-note">No wrestlers in this division yet.</p>`;
+
+  const move = (name, to) => {
+    const a = LGBOARD[lgBdDiv], from = a.indexOf(name);
+    if (from < 0) return;
+    to = Math.max(0, Math.min(a.length - 1, to));
+    if (to === from) return;
+    a.splice(from, 1); a.splice(to, 0, name);
+    lgBdDirty = true; bdRender(lg);
+  };
+  let dragging = null;
+  el.querySelectorAll(".lg-bd__row").forEach(row => {
+    const name = row.dataset.n;
+    row.querySelectorAll("[data-a]").forEach(btn => btn.onclick = e => {
+      e.stopPropagation();
+      const at = LGBOARD[lgBdDiv].indexOf(name), a = btn.dataset.a;
+      move(name, a === "top" ? 0 : a === "up" ? at - 1 : at + 1);
+    });
+    row.ondragstart = e => { dragging = name; row.classList.add("drag"); e.dataTransfer.effectAllowed = "move"; };
+    row.ondragend   = () => { dragging = null; row.classList.remove("drag");
+                              el.querySelectorAll(".over").forEach(x => x.classList.remove("over")); };
+    row.ondragover  = e => { if (dragging && dragging !== name){ e.preventDefault(); row.classList.add("over"); } };
+    row.ondragleave = () => row.classList.remove("over");
+    row.ondrop      = e => { e.preventDefault(); row.classList.remove("over");
+                             if (dragging) move(dragging, LGBOARD[lgBdDiv].indexOf(name)); };
+  });
+}
+function wireDraftBoard(lg){
+  if (!$("lgBd")) return;
+  bdRender(lg);
+  const tabs = $("lgBdTabs");
+  if (tabs) tabs.querySelectorAll("button").forEach(b => b.onclick = () => {
+    lgBdDiv = b.dataset.div;
+    tabs.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    bdRender(lg);
+  });
+  const auto = $("lgBdAuto");
+  if (auto) auto.onchange = () => { LGBOARD.auto = auto.checked; lgBdDirty = true; bdRender(lg); };
+  const reset = $("lgBdReset");
+  if (reset) reset.onclick = () => {
+    LGBOARD.makuuchi = bdPool("makuuchi"); LGBOARD.juryo = bdPool("juryo");
+    lgBdDirty = true; bdRender(lg);
+  };
+  const save = $("lgBdSave");
+  if (save) save.onclick = async () => {
+    const st = $("lgBdStatus"); save.disabled = true;
+    st.textContent = "Saving\u2026"; st.className = "status";
+    const r = await GyojiGuide.saveDraftBoard(lg.id, LGBOARD.makuuchi, LGBOARD.juryo, LGBOARD.auto);
+    save.disabled = false;
+    if (r && r.ok){
+      lgBdDirty = false;
+      st.textContent = "Saved \u2014 this is the order the draft room will use."; st.className = "status ok";
+      bdRender(lg);
+    } else { st.textContent = (r && r.error) || "Couldn\u2019t save your board."; st.className = "status err"; }
+  };
+}
 function tournamentActiveClient(){ const m = scoreModel({ results:cache.results, meta:cache.meta }); return m.started && m.lastDay < 15; }
 
 async function renderKeepers(lg, meCommish){
   const el = $("lgKeepers");
+  /* Reseed only when the league changes or nothing is in hand — a re-render
+     mid-edit (the draft poll repaints every four seconds) must not throw away
+     an order the member is part-way through arranging. */
+  if (lgBdLeague !== lg.id || !LGBOARD.makuuchi.length) bdSeed(lg);
   if (!lg.draftStatus || lg.draftStatus === "none") {
     const agreed = lg.draftAgreedCount || 0, total = lg.draftMemberCount || (lg.members||[]).length;
     const dateInfo = lg.draftDate
@@ -2044,10 +2245,22 @@ async function renderKeepers(lg, meCommish){
       <p class="lg-myteam__hint">Each team drafts ${planSummary(lg)}, in a randomized snake draft, then keeps them basho after basho. Only active wrestlers score.</p>
       ${dateInfo}
       ${meCommish
-        ? `<button class="btn" id="lgStartDraft"${(lg.members||[]).length<2 ? ' disabled title="Need at least two members"' : ""}>Start snake draft</button><span class="status" id="lgDraftStartStatus"></span>`
+        ? `<label class="lg-clock">Pick clock
+             <select id="lgPickClock">
+               <option value="60">1 minute</option>
+               <option value="120" selected>2 minutes</option>
+               <option value="300">5 minutes</option>
+               <option value="900">15 minutes</option>
+               <option value="3600">1 hour</option>
+               <option value="28800">8 hours</option>
+             </select></label>
+           <p class="lg-myteam__hint">When a clock runs out the pick is taken off that member\u2019s draft board \u2014 banzuke order if he never arranged one. Anyone with <b>Auto-draft me</b> on is picked for after 30 seconds instead of waiting out the full clock.</p>
+           <button class="btn" id="lgStartDraft"${(lg.members||[]).length<2 ? ' disabled title="Need at least two members"' : ""}>Start snake draft</button><span class="status" id="lgDraftStartStatus"></span>`
         : `<p class="lg-waiting">Waiting for the commissioner to start the draft…</p>`}
       <div class="lg-mockrow" style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="btn ghost" id="lgMockDraft">Mock draft</button><span class="lg-myteam__hint" style="margin:0">Practice the snake draft against bot versions of your league &mdash; nothing here affects the real draft.</span></div>
-    </div>`;
+    </div>
+    ${draftBoardPanelHTML(lg)}`;
+    wireDraftBoard(lg);
     const startBtn = $("lgStartDraft");
     if (startBtn) startBtn.onclick = async ()=>{
       // if a date is set and not everyone has agreed, confirm before overriding
@@ -2055,7 +2268,9 @@ async function renderKeepers(lg, meCommish){
           !confirm(`Only ${agreed} of ${total} members have agreed to the draft date. Start the draft now anyway?`)) return;
       startBtn.disabled = true;
       const st = $("lgDraftStartStatus"); st.textContent="Starting…"; st.className="status";
-      const r = await GyojiGuide.startDraft(lg.id);
+      const clockSel = $("lgPickClock");
+      const r = await GyojiGuide.startDraft(lg.id, clockSel ? +clockSel.value : 120,
+        { makuuchi: bdPool("makuuchi"), juryo: bdPool("juryo") });
       if (r && r.ok) loadLeagues(lg.id);
       else { st.textContent=(r&&r.error)||"Couldn't start."; st.className="status err"; startBtn.disabled=false; }
     };
@@ -2066,7 +2281,10 @@ async function renderKeepers(lg, meCommish){
         leagueId: lg.id,      // the mock draft keys a saved board on this, so a rename can't orphan it
         you: acct ? { handle: acct.handle, name: acct.name } : { handle:"you", name:"You" },
         members: (lg.members||[]).map(m=>({ handle:m.handle, name:m.name })),
-        rosterSize: planOf(lg).active, benchSize: planOf(lg).bench, farmSize: planOf(lg).farm, pickClock: 120
+        rosterSize: planOf(lg).active, benchSize: planOf(lg).bench, farmSize: planOf(lg).farm, pickClock: 120,
+        /* the saved board travels with the handover, so the room opens on the
+           order you set here rather than on whatever that browser last held */
+        board: { makuuchi: LGBOARD.makuuchi, juryo: LGBOARD.juryo, auto: LGBOARD.auto }
       })); }catch(e){}
       location.href = "keepers-mock-draft.html";
     };
@@ -2080,9 +2298,12 @@ async function renderKeepers(lg, meCommish){
       <div class="lg-draft-grid" id="lgDraftGrid"></div>
       <h4 style="margin-top:14px">Picks so far</h4>
       <div class="lg-draft-board" id="lgDraftBoard"></div>
-    </div>`;
+    </div>
+    ${draftBoardPanelHTML(lg)}`;
+    wireDraftBoard(lg);
     await pollDraft(lg);
     draftPollTimer = setInterval(()=>pollDraft(lg), 4000);
+    draftPollTimer._ms = 4000;
     return;
   }
 
@@ -2217,16 +2438,46 @@ async function pollDraft(lg){
 
   const turn = res.turn || {};
   const meOnClock = acct && turn.handle && turn.handle.toLowerCase()===acct.handle.toLowerCase();
+  /* Re-measure the skew every poll rather than once: a laptop waking from
+     sleep can shift its clock mid-draft. */
+  if (res.serverNow) draftSkew = new Date(res.serverNow).getTime() - Date.now();
+  draftDeadline = res.deadline || "";
+  draftAuto = !!res.onClockAuto;
   const turnEl = $("lgDraftTurn");
-  if (turnEl) turnEl.innerHTML = meOnClock
+  if (turnEl) turnEl.innerHTML = (meOnClock
     ? `Your pick! <b>Round ${turn.round}</b> · ${turn.phase==="makuuchi"?"Makuuchi":"Jūryō"} phase`
-    : `<b>${esc(turn.handle||"—")}</b> is on the clock · Round ${turn.round} · ${turn.phase==="makuuchi"?"Makuuchi":"Jūryō"} phase`;
+    : `<b>${esc(turn.handle||"—")}</b> is on the clock · Round ${turn.round} · ${turn.phase==="makuuchi"?"Makuuchi":"Jūryō"} phase`)
+    + (draftDeadline ? `<span class="lg-tick" id="lgTick"></span>` : "")
+    + (draftAuto ? ` <span class="lg-locked-note" style="margin:0">auto-draft on</span>` : "");
+  paintTick();
+  if (!draftTick) draftTick = setInterval(paintTick, 1000);
+  /* Nothing settles until somebody asks, so once the deadline is close, ask
+     more often — otherwise an expired pick sits there for up to four seconds. */
+  if (draftDeadline && draftPollTimer){
+    const left = (new Date(draftDeadline).getTime() - (Date.now() + draftSkew)) / 1000;
+    const want = left <= 6 ? 1200 : 4000;
+    if (draftPollTimer._ms !== want){
+      clearInterval(draftPollTimer);
+      draftPollTimer = setInterval(()=>pollDraft(lg), want);
+      draftPollTimer._ms = want;
+    }
+  }
 
   const picked = new Set((res.pickedNames||[]).map(n=>n.toLowerCase()));
-  const pool = Object.keys(RK).filter(n=>onBanzuke(n) && rikDivision(n)===turn.phase && !picked.has(n.toLowerCase()));
+  let pool = Object.keys(RK).filter(n=>onBanzuke(n) && rikDivision(n)===turn.phase && !picked.has(n.toLowerCase()));
+  /* On your turn the grid is ordered by YOUR board, not the banzuke — the whole
+     point of setting one is that draft day starts with your man at the front.
+     Anyone you never ranked falls in behind, still in banzuke order. */
+  const myOrder = (LGBOARD[turn.phase] || []);
+  if (meOnClock && myOrder.length){
+    const at = {}; myOrder.forEach((n,i)=>{ at[n.toLowerCase()] = i; });
+    pool = pool.slice().sort((a,b)=>
+      (at[a.toLowerCase()] ?? 1e6) - (at[b.toLowerCase()] ?? 1e6));
+  }
+  const topOfBoard = meOnClock ? pool[0] : null;
   const gridEl = $("lgDraftGrid");
   if (gridEl) {
-    gridEl.innerHTML = pool.map(n=>`<div class="lg-draft-pick${meOnClock?"":" disabled"}" data-pick="${esc(n)}">${esc(n)}</div>`).join("")
+    gridEl.innerHTML = pool.map((n,i)=>`<div class="lg-draft-pick${meOnClock?"":" disabled"}${meOnClock&&i===0&&myOrder.length?" top":""}" data-pick="${esc(n)}">${esc(n)}</div>`).join("")
       || `<p class="lg-locked-note">No wrestlers left in this phase.</p>`;
     if (meOnClock) gridEl.querySelectorAll("[data-pick]").forEach(c=>{
       c.onclick = async ()=>{

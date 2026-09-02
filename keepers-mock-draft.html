@@ -332,6 +332,10 @@
 .mslot{position:relative;aspect-ratio:5/7;border-radius:var(--radius);border:1px dashed var(--line-2);display:grid;place-items:center;text-align:center;color:var(--faint);font-family:"IBM Plex Mono",monospace;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase}
 
 </style>
+<!-- The room is otherwise self-contained; these two are here only so a board
+     reordered mid-draft can be saved back to the league, not just to this
+     browser. Neither touches the DOM. -->
+<script src="gg-config.js"></script><script src="gg-account.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -660,7 +664,9 @@ function applyCtx(){
   }
   var np=$("numPlayers"); if(np){ var fld=np.closest(".fld"); if(fld) fld.style.display="none"; }
   members = buildRoom();
-  var ph=$("phaseSub"); if(ph) ph.textContent = "Practice run \u2014 draft against bot versions of your league. Nothing here affects the real draft.";
+  var ph=$("phaseSub"); if(ph) ph.textContent = CTX.board
+    ? "Practice run \u2014 draft against bot versions of your league. No pick here counts, but this IS your league draft board: reorder it and the change is saved for draft day."
+    : "Practice run \u2014 draft against bot versions of your league. Nothing here affects the real draft.";
 }
 let tick = null;
 
@@ -725,15 +731,38 @@ function reconcile(saved, div){
   const have = new Set(kept);
   return kept.concat(live.filter(n => !have.has(n)));
 }
+/* The board the league page saved for me, handed over with the rest of the
+   context. It is the authority: it is the order I set deliberately, on
+   whatever device I set it on, and it is what draft day is supposed to honour.
+   The localStorage copy is only the fallback for a standalone room and for a
+   handover that predates boards. */
 function loadBoard(){
   let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(boardKey()) || "null"); } catch(e){}
+  const fromLeague = CTX && CTX.board && (CTX.board.makuuchi || CTX.board.juryo) ? CTX.board : null;
+  if (fromLeague) saved = fromLeague;
+  else { try { saved = JSON.parse(localStorage.getItem(boardKey()) || "null"); } catch(e){} }
   BOARD.makuuchi = reconcile(saved && saved.makuuchi, "makuuchi");
   BOARD.juryo    = reconcile(saved && saved.juryo,    "juryo");
   if (saved && typeof saved.auto === "boolean") AUTODRAFT = saved.auto;
+  /* The toggle is also synced at draft start, but the board can arrive from the
+     league before then and the checkbox must not sit there contradicting it. */
+  const cb = document.getElementById("autoDraft"); if (cb) cb.checked = AUTODRAFT;
 }
+/* Save locally always, and back to the league when we know which one and who —
+   so an order changed in the room is the order the room opens on next time,
+   from any device, and the league page shows the same list. */
+let boardPush = null;
 function saveBoard(){
-  try { localStorage.setItem(boardKey(), JSON.stringify({ makuuchi:BOARD.makuuchi, juryo:BOARD.juryo, auto:AUTODRAFT })); } catch(e){}
+  const payload = { makuuchi:BOARD.makuuchi, juryo:BOARD.juryo, auto:AUTODRAFT };
+  try { localStorage.setItem(boardKey(), JSON.stringify(payload)); } catch(e){}
+  if (!(CTX && CTX.leagueId && window.GyojiGuide && GyojiGuide.saveDraftBoard)) return;
+  const acct = GyojiGuide.account && GyojiGuide.account.get();
+  if (!acct) return;
+  /* Debounced: a drag can fire several moves a second and each one is a write. */
+  clearTimeout(boardPush);
+  boardPush = setTimeout(function(){
+    try { GyojiGuide.saveDraftBoard(CTX.leagueId, payload.makuuchi, payload.juryo, payload.auto); } catch(e){}
+  }, 1200);
 }
 function resetBoard(){
   BOARD.makuuchi = defaultBoard("makuuchi");
