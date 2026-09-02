@@ -573,8 +573,10 @@ return '<span class="kk even">incomplete</span>';
 function lowCells(d){
 /* The rank tag beside it already reads Ms/Sd and the recap names the division
    in full \u2014 a grey "Makushita" in the fourth column just repeats both. */
-if(d.w==null)return '<b class="dim2">'+d.div+'</b><span></span>';
-return '<b>'+d.w+'\u2013'+d.l+(d.a?'\u2013'+d.a:'')+'</b><span></span>';
+/* No filler cell after the record: an extra child would push .kkc out of the
+   fourth grid column and drop the pills onto a line of their own. */
+if(d.w==null)return '<b class="dim2">'+d.div+'</b>';
+return '<b>'+d.w+'\u2013'+d.l+(d.a?'\u2013'+d.a:'')+'</b>';
 }
 function lowText(d,tail){
 tail=tail||"";
