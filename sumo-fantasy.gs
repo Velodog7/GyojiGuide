@@ -115,7 +115,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-02-draftclock';
+var BACKEND_VERSION = '2026-09-02-bashoroll';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -320,6 +320,7 @@ function doPost(e) {
     // not the URL. adminGated() runs the gate and only calls the reader on pass.
     if (body.action === 'adminStats')     return json(adminGated(body.adminKey, adminStats));
     if (body.action === 'adminResetAnalytics') return json(adminGated(body.adminKey, adminResetAnalytics));
+    if (body.action === 'adminResetBasho')     return json(adminResetBasho(body));
     if (body.action === 'adminUsers')     return json(adminGated(body.adminKey, adminUsers));
     if (body.action === 'adminMessages')  return json(adminGated(body.adminKey, adminMessages));
     if (body.action === 'adminFeedback')  return json(adminGated(body.adminKey, adminFeedback));
@@ -857,10 +858,23 @@ function joinLeague(body){
   } finally { lock.releaseLock(); }
 }
 
+/* A live draft holds a SNAPSHOT of the member list in draftOrder. Letting
+   someone out of the league mid-draft leaves a ghost on the clock: he can no
+   longer pick (makePick checks membership) but the clock keeps coming round to
+   him and the auto-drafter keeps taking picks on his behalf, so the draft ends
+   with a full roster owned by somebody who isn't in the league. Both doors are
+   shut until the draft is done. */
+function draftBusy_(L){
+  if (L.draftStatus === 'active')  return { ok:false, error:'The draft is underway \u2014 wait for it to finish.' };
+  if (L.draftStatus === 'redraft') return { ok:false, error:'The supplemental re-draft is underway \u2014 wait for it to finish.' };
+  return null;
+}
+
 function leaveLeague(body){
   var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
   var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
   if (L.commissioner.toLowerCase()===u.handle.toLowerCase()) return { ok:false, error:'The commissioner can\u2019t leave — delete the league or hand it off.' };
+  var busy = draftBusy_(L); if (busy) return busy;
   return removeMemberRow(L.id, u.handle);
 }
 
@@ -870,6 +884,7 @@ function removeMember(body){
   if (L.commissioner.toLowerCase()!==u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can remove members.' };
   var target = cleanHandle(body.member);
   if (target.toLowerCase()===L.commissioner.toLowerCase()) return { ok:false, error:'The commissioner can\u2019t be removed.' };
+  var busy = draftBusy_(L); if (busy) return busy;
   return removeMemberRow(L.id, target);
 }
 
@@ -907,6 +922,7 @@ function deleteLeague(body){
     deleteRowsWhere_(SHEET_ROSTERS,  0, id);
     deleteRowsWhere_(SHEET_PICKS,    0, id);
     deleteRowsWhere_(SHEET_TRADES,   1, id);
+    deleteRowsWhere_(SHEET_BOARDS,   0, id);
     // the league row itself last — re-read its row in case earlier deletes shifted nothing here (different sheet), but be safe
     var ls = sh_(SHEET_LEAGUES), lv = ls.getDataRange().getValues();
     for (var r=lv.length-1;r>=1;r--) if (String(lv[r][0])===id) ls.deleteRow(r+1);
@@ -1802,8 +1818,21 @@ function addDrop(body){
     var owned = whoOwns(L.id, drop);
     if (!owned || owned.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'You don\u2019t own ' + drop + '.' };
     if (whoOwns(L.id, add)) return { ok:false, error: add + ' is already owned in this league.' };
+    /* A waiver is a swap, not a promotion: the man coming in inherits the slot
+       of the man going out. Writing the slot explicitly matters \u2014 keeperRostersOf()
+       reads a BLANK slot on a Makuuchi row as active, so an unslotted add would
+       quietly start over the league's cap and score alongside the full lineup. */
+    var slot = String(sh_(SHEET_ROSTERS).getRange(owned.row, 7).getValue() || '').toLowerCase();
+    if (slot !== 'active' && slot !== 'bench'){
+      /* a legacy row with no slot at all: fall back to the draft's own rule */
+      if (String(owned.division).toLowerCase() === 'juryo') slot = 'bench';
+      else {
+        var mineNow = (keeperRostersOf(L.id)[u.handle.toLowerCase()] || { active:[] }).active.length;
+        slot = (mineNow - 1) < rosterPlan(L).active ? 'active' : 'bench';
+      }
+    }
     sh_(SHEET_ROSTERS).deleteRow(owned.row);
-    sh_(SHEET_ROSTERS).appendRow([L.id, u.handle, add, owned.division, 'waiver', new Date().toISOString()]);
+    sh_(SHEET_ROSTERS).appendRow([L.id, u.handle, add, owned.division, 'waiver', new Date().toISOString(), slot]);
     return { ok:true };
   } finally { lock.releaseLock(); }
 }
@@ -2192,6 +2221,36 @@ function adminStats() {
 /* Wipes all recorded pageviews (keeps the sheet + header row) so the
    analytics dashboard goes back to 0. Gated behind the admin key like every
    other adminX action — this is destructive and not undoable. */
+/* ---- roll the Sheet over to a new basho ----
+   Results carries no basho column and every score on the site is summed
+   straight off it, so a leftover tournament is not just stale points:
+     · refreshResults() keys bouts on day|division|east|west, so the new
+       basho's matching pairings look "already imported" and never land;
+     · tournamentActive() is (any results && lastDay < 15), so with lastDay
+       still on 15 it stays false and lineups, trades and waivers never lock.
+   One button, pressed once, between tournaments. It refuses to run until the
+   basho being cleared has been ranked — clearing Results first would leave
+   players unable to archive their final scores — unless it's forced. */
+function adminResetBasho(body){
+  var bad = adminGate(body && body.adminKey); if (bad) return bad;
+  var meta = readMeta();
+  var was = String(meta.basho || '').trim();
+  var label = String((body && body.basho) || BASHO_LABEL).trim().slice(0, 60) || BASHO_LABEL;
+  if (!(body && body.force) && was && String(meta.rankedBasho || '') !== was)
+    return { ok:false, needsRanking:true, basho:was,
+             error:'Rank ' + was + ' first \u2014 its champions and banzuke moves haven\u2019t been applied yet.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try {
+    var sh = sh_(SHEET_RESULTS), last = sh.getLastRow(), cleared = Math.max(0, last - 1);
+    if (cleared > 0) sh.deleteRows(2, cleared);
+    setMeta_('basho',   label);
+    setMeta_('lastDay', 0);
+    setMeta_('yusho',   '');
+    setMeta_('sansho',  '');
+    return { ok:true, basho:label, previous:was, clearedRows:cleared };
+  } finally { lock.releaseLock(); }
+}
+
 function adminResetAnalytics() {
   var sh = sh_(SHEET_PAGEVIEWS);
   var last = sh.getLastRow();

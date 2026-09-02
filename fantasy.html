@@ -565,6 +565,8 @@
   .lg-team-row__name{ font-weight:700; font-size:.9rem }
   .lg-team-row__you{ font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; color:var(--sun); margin-left:6px }
   .lg-team-row__h{ color:var(--faint); font-family:"WDXL Lubrifont TC",monospace; font-size:0.85rem; margin-left:6px }
+  .lg-kp-pos{ min-width:1.6em; text-align:center; font-family:"WDXL Lubrifont TC",monospace; font-weight:700; color:var(--faint) }
+  .lg-kpstand .lg-kp-lead .lg-kp-pos{ color:#e8b04b }
   .lg-team-row__score{ margin-left:auto; font-family:"WDXL Lubrifont TC",monospace; font-weight:700; color:var(--ink) }
   .lg-team-row__empty{ color:var(--faint); font-size:.82rem; font-style:italic }
   .lg-team-expand{ margin-top:10px }
@@ -2229,6 +2231,61 @@ function wireDraftBoard(lg){
 }
 function tournamentActiveClient(){ const m = scoreModel({ results:cache.results, meta:cache.meta }); return m.started && m.lastDay < 15; }
 
+/* ============================================================
+   KEEPERS STANDINGS
+   Only the active lineup scores \u2014 the bench and the Juryo farm are held,
+   not played \u2014 so this scores roster.active under the league's own
+   scoring rules, using the same model the public leaderboard uses.
+   ============================================================ */
+function kpCardsWithPts(names, scoreRows){
+  const byName = {}; (scoreRows||[]).forEach(x => byName[x.name] = x);
+  if (!names.length) return `<p class="lg-locked-note">No active wrestlers set.</p>`;
+  return `<div class="expand-cards is-team">` + names.map(n=>{
+    const sc = byName[n];
+    const line = sc ? `${sc.w}W${sc.bonus?" +"+sc.bonus:""}${sc.sansho?" \u00b7 \u8cde":""}${sc.yusho?" \u00b7 \u512a":""} \u00b7 <b>${sc.pts}</b> pts` : "\u2014";
+    return `<div class="ecard"><div class="pcard filled r-${RK[n]?RK[n].code[0]:"M"}">${pcardInner(n, rikDivision(n)==="juryo"?"J\u016bry\u014d":"Makuuchi", false)}</div>`
+         + `<div class="ec-pts">${line}</div></div>`;
+  }).join("") + `</div>`;
+}
+function keeperStandingsHTML(lg, members){
+  const model = scoreModel({ results: cache.results, meta: cache.meta }, lg.scoring);
+  const phase = !model.started ? "not started"
+              : model.lastDay >= 15 ? "final"
+              : "Day " + model.lastDay + " of 15";
+  const ranked = members.map(m=>{
+    const r = m.roster || { makuuchi:[], juryo:[], active:[] };
+    const aset = new Set((r.active||[]).map(x=>String(x).toLowerCase()));
+    /* whatever the member actually has starting, capped by the league's plan so a
+       stale lineup can't out-score a legal one */
+    const active = (r.makuuchi||[]).filter(n=>aset.has(String(n).toLowerCase())).slice(0, planOf(lg).active);
+    const team = {}; active.forEach((n,i)=>{ team["a"+i] = n; });
+    const s = teamScore(team, model);
+    return { ...m, active, pts:s.pts, rows:s.rows };
+  }).sort((a,b)=> b.pts - a.pts || String(a.name).localeCompare(String(b.name)));
+
+  const rowsHTML = ranked.map((m,i)=>{
+    const you = acct && m.handle.toLowerCase()===acct.handle.toLowerCase();
+    const lead = (i===0 && model.started && m.pts>0);
+    return `<div class="lg-team-row${lead?" lg-kp-lead":""}" data-h="${esc(m.handle)}">
+      <div class="lg-team-row__top">
+        <span class="lg-kp-pos">${i+1}</span>
+        <span class="lg-team-row__ava">${esc(initials(m.name))}</span>
+        <span class="lg-team-row__name">${esc(m.name)}${you?`<span class="lg-team-row__you">You</span>`:""}<span class="lg-team-row__h">@${esc(m.handle)}</span></span>
+        <span class="lg-team-row__score">${m.pts} pts</span>
+      </div>
+      <div class="lg-team-expand" hidden>${kpCardsWithPts(m.active, m.rows)}</div>
+    </div>`;
+  }).join("") || `<p class="lg-locked-note">No members yet.</p>`;
+
+  const sc = scoringOf(lg);
+  return `<div class="lg-teams lg-kpstand">
+    <div class="lg-rm-head"><h4>Standings</h4><span class="lg-rm-window ${model.started && model.lastDay<15 ? "open":"closed"}">${esc(model.basho)} \u00b7 ${phase}</span></div>
+    <p class="lg-myteam__hint" style="margin-top:0">Only the active lineup scores. ${sc.winPoint} pt${sc.winPoint===1?"":"s"} per win${sc.sanyakuBonus?`, +${sc.sanyakuBonus} per rank step on a sanyaku upset`:""}${sc.sansho?`, ${sc.sansho} per sansh\u014d`:""}${sc.yusho?`, ${sc.yusho} for the y\u016bsh\u014d`:""}. Tap a team to see the breakdown.</p>
+    ${!model.started ? `<p class="lg-locked-note">No results yet \u2014 scores start on day 1.</p>` : ""}
+    ${rowsHTML}
+  </div>`;
+}
+
 async function renderKeepers(lg, meCommish){
   const el = $("lgKeepers");
   /* Reseed only when the league changes or nothing is in hand — a re-render
@@ -2352,6 +2409,7 @@ async function renderKeepers(lg, meCommish){
   }).join("");
 
   el.innerHTML = `
+    ${keeperStandingsHTML(lg, members)}
     <div class="lg-rostermoves">
       <div class="lg-rm-head"><h4>Roster moves</h4><span class="lg-rm-window ${locked ? "closed" : "open"}">${locked ? "Locked — tournament underway" : "Open — between tournaments"}</span></div>
       <p class="lg-myteam__hint" style="margin-top:0">${locked

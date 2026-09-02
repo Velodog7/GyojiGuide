@@ -289,6 +289,15 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
         <div class="kv"><span class="lab">Sheet totals</span><b id="sheetTotals">—</b></div>
       </div>
       <div class="card" style="max-width:480px">
+        <h3>New basho</h3>
+        <p class="v-sub" style="margin:0 0 12px">Clears the results sheet and resets the tournament meta &#8212; day counter, y&#363;sh&#333; and sansh&#333; &#8212; so the next basho scores from zero. Results carry no basho of their own, so leaving the last one in place would keep paying out its points, block the new bouts from importing, and hold the roster window open all fortnight. Run this once, after the ranking below has been applied.</p>
+        <label class="lab" for="newBashoName" style="display:block;margin-bottom:6px">Basho label</label>
+        <input id="newBashoName" type="text" placeholder="Aki 2026" autocomplete="off"
+               style="width:100%;padding:8px 10px;margin-bottom:12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.25);color:inherit;font:inherit">
+        <button class="btn" id="newBashoBtn">Start a new basho</button>
+        <div id="newBashoMsg" style="margin-top:10px;font-size:.9rem"></div>
+      </div>
+      <div class="card" style="max-width:480px">
         <h3>Long-term ranking</h3>
         <p class="v-sub" style="margin:0 0 12px">Grades every player&#8217;s win rate for the basho on the curve, updates the banzuke ranks on the public leaderboard, and crowns the basho&#8217;s champions &#8212; the Sumo Slap Down title plus one per private league. Run this once, after all results for the basho are archived.</p>
         <button class="btn gold" id="applyRankBtn">Apply ranking for this basho</button>
@@ -585,6 +594,28 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     var res = await aPost("adminStats");
     if (res && res.ok) { renderConnectivity(res); loadAnalytics(res); }
     $("recheckBtn").disabled = false; $("recheckBtn").textContent = "Recheck now";
+  };
+  $("newBashoBtn").onclick = async function(){
+    var btn = $("newBashoBtn"), msg = $("newBashoMsg"), name = ($("newBashoName").value || "").trim();
+    if (!name){ msg.style.color = "#e0736a"; msg.textContent = "Name the basho first \u2014 e.g. \u201cAki 2026\u201d."; return; }
+    if (!confirm("Start " + name + "?\n\nThis deletes every row in the results sheet and resets the day counter, y\u016bsh\u014d and sansh\u014d. Do it only between tournaments, after the ranking has been applied \u2014 it can\u2019t be undone.")) return;
+    btn.disabled = true; msg.style.color = ""; msg.textContent = "Clearing\u2026";
+    var res = await aPost("adminResetBasho", { basho: name });
+    /* the backend refuses to clear a basho that was never ranked, because the
+       archives players score from are written off these very rows */
+    if (res && !res.ok && res.needsRanking){
+      if (confirm(res.error + "\n\nClear it anyway?")) res = await aPost("adminResetBasho", { basho: name, force: true });
+    }
+    btn.disabled = false;
+    if (res && res.ok){
+      msg.style.color = "#5fd08a";
+      msg.textContent = "Ready for " + res.basho + " \u2014 cleared " + (res.clearedRows || 0) + " result row" + (res.clearedRows === 1 ? "" : "s") +
+        (res.previous ? " from " + res.previous + "." : ".");
+      var rc = $("recheckBtn"); if (rc) rc.click();
+    } else {
+      msg.style.color = "#e0736a";
+      msg.textContent = (res && res.error) || "Couldn\u2019t start a new basho \u2014 is the backend deployed?";
+    }
   };
   $("applyRankBtn").onclick = async function(){
     var btn = $("applyRankBtn"), msg = $("applyRankMsg");
