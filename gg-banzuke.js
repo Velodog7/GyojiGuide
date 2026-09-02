@@ -38,7 +38,14 @@
   var RANK_ORDER = { Y:0, O:1, S:2, K:3, M:4, J:5 };
 
   function tier(n){ return RIK[n].c[0]; }
-  function num(n){ var m = RIK[n].c.slice(1,-1); return parseInt(m,10) || 0; }
+  /* Sanyaku codes carry no number — "Oe", not "O1e" — so two ōzeki on the same
+     side used to tie and fall back to whatever order RIK happens to list them
+     in. The live banzuke DOES know (“Ōzeki 2 East”), so the sync stores it as
+     `.n` and it wins where present. Offline the tie remains, as it always did. */
+  function num(n){
+    var e = RIK[n]; if (e && e.n != null) return e.n;
+    var m = e.c.slice(1,-1); return parseInt(m,10) || 0;
+  }
   function side(n){ return RIK[n].c.slice(-1) === "e" ? "E" : "W"; }
   function bySortKey(a,b){
     var ta=RANK_ORDER[tier(a)], tb=RANK_ORDER[tier(b)];
@@ -53,14 +60,22 @@
      place: the sheet re-sorts itself onto the new banzuke without a reload.
      `off` marks a man the current banzuke no longer carries — his entry stays
      (the art and kanji are worth keeping) but he is not drawn. */
-  var sanW, sanE, westFile, eastFile;
+  var sanW, sanE, sanWRank, sanERank, westFile, eastFile;
+  /* A phone gets ONE list per side, sanyaku included, because that is what a
+     printed banzuke is: each side in rank order from Yokozuna down. The wide
+     sanyaku band cannot fit 390px beside the officials, and splitting the
+     ranking across two different layouts is what made the old sheet need a
+     sideways swipe. */
+  function narrowMode(){ return !!(window.matchMedia && matchMedia("(max-width:640px)").matches); }
   function computeGroups(){
     var names = Object.keys(RIK).filter(function(n){ return !RIK[n].off; });
     var sanyaku  = names.filter(function(n){ return "YOSK".indexOf(tier(n))>=0; });
     var rankfile = names.filter(function(n){ return "MJ".indexOf(tier(n))>=0; });
     // sanyaku: West group (highest rank nearest the centre) | East group
-    sanW = group(sanyaku,"W").reverse();   // so Yokozuna sits next to the centre column
-    sanE = group(sanyaku,"E");
+    sanWRank = group(sanyaku,"W");         // plain rank order, for the phone's single list
+    sanERank = group(sanyaku,"E");
+    sanW = sanWRank.slice().reverse();      // so Yokozuna sits next to the centre column
+    sanE = sanERank.slice();
     westFile = group(rankfile,"W");   // rendered in the left column, which is mirrored (direction:rtl) so its top rank sits nearest the centre
     eastFile = group(rankfile,"E");
   }
@@ -128,22 +143,27 @@
     var host = document.getElementById("ggBanzuke");
     if (!host) return;
     computeGroups();
+    var narrow = narrowMode();
+    builtNarrow = narrow;
+    var colW = narrow ? sanWRank.concat(westFile) : westFile;
+    var colE = narrow ? sanERank.concat(eastFile) : eastFile;
     host.innerHTML =
       '<div class="ggb">'
       + '<div class="ggb-water" aria-hidden="true"></div>'
       + '<div class="ggb-top">'
       +   '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
-      +   '<div class="ggb-sanyaku">'
+      +   (narrow ? '' :
+          '<div class="ggb-sanyaku">'
       +     '<div class="ggb-san ggb-sanW">'+sanW.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
       +     officials()
       +     '<div class="ggb-san ggb-sanE">'+sanE.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
-      +   '</div>'
+      +   '</div>')
       +   '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
       + '</div>'
       + '<div class="ggb-body">'
-      +   '<div class="ggb-col ggb-colW">'+westFile.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
-      +   '<div class="ggb-center"></div>'
-      +   '<div class="ggb-col ggb-colE">'+eastFile.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
+      +   '<div class="ggb-col ggb-colW">'+colW.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
+      +   (narrow ? '' : '<div class="ggb-center"></div>')
+      +   '<div class="ggb-col ggb-colE">'+colE.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
       + '</div>'
       + '<div class="ggb-texfx" aria-hidden="true" style="background-image:url('+TEX_TOP+')"></div>'
       + '</div>';
@@ -157,16 +177,18 @@
      lives here rather than in the page because this file's CSS is injected at
      runtime and would otherwise override the page's own mobile rule. */
   +'@media(max-width:640px){'
+    /* Phones read the sheet as a LIST, not a picture. Sixteen columns of
+       rikishi will never fit 390px, and the sideways swipe this used to do hid
+       most of the banzuke behind a gesture nobody knew to make. So the sheet
+       becomes what a printed banzuke already is: two columns, West and East,
+       each descending in rank. No horizontal scroll — the page scrolls down
+       through it. */
     +'#ggBanzuke{position:static;inset:auto;order:2;z-index:auto;width:100%;margin-top:10px;'
-      +'overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;'
+      +'overflow:visible;'
       +'border-top:1px solid rgba(216,178,90,.28);border-bottom:1px solid rgba(216,178,90,.28)}'
-    +'#ggBanzuke .ggb{position:relative;inset:auto;width:1200px;height:auto;flex:none}'
-    /* let the columns run to their natural height: the page scrolls down
-       through the crowd, the sheet swipes sideways. Clipping here would hide
-       most of the banzuke. */
+    +'#ggBanzuke .ggb{position:relative;inset:auto;width:100%;height:auto;flex:none}'
     +'#ggBanzuke .ggb-col{overflow:visible}'
     +'#ggBanzuke .ggb-body{min-height:0}'
-    +'#ggBanzuke::-webkit-scrollbar{height:0}'
   +'}'
   +'.ggb{position:absolute;inset:0;display:flex;flex-direction:column;'
     +'background:#e9e1d0 url('+PAPER+') center/cover no-repeat;'
@@ -249,17 +271,33 @@
   +'@media(max-width:640px){'
     +'.ggb{position:static;inset:auto;min-height:0;padding-bottom:10px}'
     +'.ggb-water,.ggb-texfx{display:none}'
-    +'.ggb-top{padding:10px 10px 0}'
-    +'.ggb-sanyaku{gap:10px;align-items:flex-end}'
-    +'.ggb-sancenter{display:flex;gap:10px}'
-    +'.ggb-off{width:74px}'
-    +'.ggb-san{justify-content:space-around}'
-    +'.ggb-san .ggb-fig{--fw:100px;width:100px;aspect-ratio:1/2}'
-    +'.ggb-body{grid-template-columns:1fr auto 1fr;gap:2px 6px;margin-top:8px}'
-    +'.ggb-center{display:flex}'
-    +'.ggb-col{overflow:visible;grid-template-columns:repeat(8,minmax(0,1fr));padding:0 4px;gap:3px 2px}'
-    +'.ggb-col .ggb-fig{--fw:auto;width:auto;aspect-ratio:3/5}'
-    +'.ggb-col .ggb-fig figcaption{display:none}'
+    /* ── the sanyaku band keeps its headline treatment: still West | officials |
+         East, just scaled to the screen ── */
+    /* the sanyaku band is gone on a phone — those men are at the head of their
+       own column — so the top row is just the two side headers, one over each */
+    +'.ggb-top{grid-template-columns:1fr 1fr;gap:0 8px;padding:10px 8px 0;align-items:center}'
+    +'.ggb-sanyaku{display:none}'
+    /* ── the crowd: two columns, West then East, each one figure wide and in
+         rank order. The centre gutter goes; the card it used to hold sits above
+         the sheet on a phone. ── */
+    +'.ggb-body{grid-template-columns:1fr 1fr;gap:0 8px;margin-top:8px;padding:0 8px}'
+    +'.ggb-center{display:none}'
+    /* one figure per row. direction:rtl on the West column is a desktop trick
+       for mirroring the fill order — with a single column it would only flip
+       the caption, so it is reset. */
+    +'.ggb-col{overflow:visible;grid-template-columns:1fr;direction:ltr;padding:0;gap:6px 0}'
+    +'.ggb-col .ggb-fig{--fw:auto;width:100%;aspect-ratio:auto;'
+      +'display:grid;grid-template-columns:34px 1fr;align-items:center;gap:8px;'
+      +'padding:3px 5px;border-radius:6px;background:rgba(120,92,40,.07)}'
+    +'.ggb-col .ggb-fig img{width:34px;height:56px;object-fit:contain;object-position:bottom center}'
+    /* the name earns its place back now there is a row to put it on */
+    /* the base sheet writes every name vertically, like the printed original.
+       In a row that collapses it to a 0-height sliver, so it goes horizontal —
+       and the tier colour moves off the tiny label onto the whole row. */
+    +'.ggb-col .ggb-fig figcaption{display:block;position:static;writing-mode:horizontal-tb;'
+      +'transform:none;font-size:12px;line-height:1.2;text-align:left;background:none;'
+      +'border-radius:0;padding:0;color:#2b1f0d;white-space:nowrap;text-shadow:none;'
+      +'overflow:hidden;text-overflow:ellipsis;min-width:0}'
     +'.ggb-side-h{align-self:flex-start;font-size:18px}'
   +'}'
   /* ── click-to-spotlight: the figure lifts forward onto a card revealed behind it ── */
@@ -441,7 +479,18 @@
     setTimeout(fitAll, 500);   // safety net in case some load events never fire
   }
   var fitTimer;
-  function onResize(){ clearTimeout(fitTimer); fitTimer = setTimeout(fitAll, 150); }
+  /* Crossing 640px swaps between two different DOMs — the wide sheet with its
+     sanyaku band, and the phone's two plain rank-order lists — so a rebuild is
+     needed, not just a refit. Rebuild only on an actual crossing; every other
+     resize is the cheap refit it always was. */
+  var builtNarrow = null;
+  function onResize(){
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(function(){
+      if (narrowMode() !== builtNarrow){ build(); scheduleFit(); return; }
+      fitAll();
+    }, 150);
+  }
 
   /* ---- click a rikishi: lift the banzuke figure forward onto a card that
           reveals behind it (the same figure animates — no duplicate) ---- */
@@ -537,6 +586,7 @@
         var w = res.ranks[n], wasOff = !!RIK[n].off;
         if (w){
           if (RIK[n].c !== w.code){ RIK[n].c = w.code; changed = true; }
+        if (w.num != null && RIK[n].n !== w.num){ RIK[n].n = w.num; changed = true; }
           if (wasOff){ delete RIK[n].off; changed = true; }
         } else if (!wasOff){ RIK[n].off = true; changed = true; }
       }

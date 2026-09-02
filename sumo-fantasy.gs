@@ -748,7 +748,14 @@ function leagueDetail(id, handle){
    appending newcomers in banzuke order.
    ===================================================================== */
 var DBOARD_HEAD = ['leagueId', 'handle', 'makuuchi', 'juryo', 'auto', 'updated'];
+/* Creating the sheet is a WRITE, and it belongs only on the write path.
+   draftBoardsOf() runs on every leagueDetail and on every draftState poll —
+   four seconds apart during a live draft — and routing those through
+   ensureSheet() meant the first request after a deploy paid for an
+   insertSheet + appendRow before it could answer. Reads now get the
+   read-only accessor and treat a missing sheet as "no boards yet". */
 function boardSheet_(){ return ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_BOARDS, DBOARD_HEAD); }
+function boardSheetIfAny_(){ return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_BOARDS); }
 
 function parseNames_(cell){
   var out = [];
@@ -768,7 +775,8 @@ function parseNames_(cell){
    league's boards ride along with leagueDetail so the page can show who has
    set one — a commissioner chasing people before draft day needs to see it. */
 function draftBoardsOf(id){
-  var v = boardSheet_().getDataRange().getValues(), out = {};
+  var sh = boardSheetIfAny_(); if (!sh) return {};
+  var v = sh.getDataRange().getValues(), out = {};
   for (var r = 1; r < v.length; r++){
     if (String(v[r][0]) !== String(id)) continue;
     var h = String(v[r][1] || ''); if (!h) continue;
