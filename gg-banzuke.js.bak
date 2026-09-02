@@ -46,25 +46,17 @@
     return num(a)-num(b);
   }
 
+  var names = Object.keys(RIK);
+  var sanyaku = names.filter(function(n){ return "YOSK".indexOf(tier(n))>=0; });
+  var rankfile = names.filter(function(n){ return "MJ".indexOf(tier(n))>=0; });
+
   function group(list, sd){ return list.filter(function(n){ return side(n)===sd; }).sort(bySortKey); }
 
-  /* The four columns are recomputed from RIK's rank codes rather than fixed at
-     load, because the live sumo-api refresh below rewrites those codes in
-     place: the sheet re-sorts itself onto the new banzuke without a reload.
-     `off` marks a man the current banzuke no longer carries — his entry stays
-     (the art and kanji are worth keeping) but he is not drawn. */
-  var sanW, sanE, westFile, eastFile;
-  function computeGroups(){
-    var names = Object.keys(RIK).filter(function(n){ return !RIK[n].off; });
-    var sanyaku  = names.filter(function(n){ return "YOSK".indexOf(tier(n))>=0; });
-    var rankfile = names.filter(function(n){ return "MJ".indexOf(tier(n))>=0; });
-    // sanyaku: West group (highest rank nearest the centre) | East group
-    sanW = group(sanyaku,"W").reverse();   // so Yokozuna sits next to the centre column
-    sanE = group(sanyaku,"E");
-    westFile = group(rankfile,"W");   // rendered in the left column, which is mirrored (direction:rtl) so its top rank sits nearest the centre
-    eastFile = group(rankfile,"E");
-  }
-  computeGroups();
+  // sanyaku: West group (highest rank nearest the centre) | East group
+  var sanW = group(sanyaku,"W").reverse();   // so Yokozuna sits next to the centre column
+  var sanE = group(sanyaku,"E");
+  var westFile = group(rankfile,"W");   // rendered in the left column, which is mirrored (direction:rtl) so its top rank sits nearest the centre
+  var eastFile = group(rankfile,"E");
 
   /* ---- figure tile ---- */
   function fig(n, big, style, cap){
@@ -127,7 +119,6 @@
   function build(){
     var host = document.getElementById("ggBanzuke");
     if (!host) return;
-    computeGroups();
     host.innerHTML =
       '<div class="ggb">'
       + '<div class="ggb-water" aria-hidden="true"></div>'
@@ -519,34 +510,6 @@
     window.addEventListener("scroll", function(){ if (_spot) closeSpot(); }, { passive:true });
     window.addEventListener("resize", function(){ if (_spot) closeSpot(); });
   }
-  /* ---------- live banzuke refresh (gg-roster.js) ----------
-     RIK is a bundled snapshot: kanji, portrait and the rank code it was
-     written with. Only the code goes stale, and only the code is refreshed —
-     from sumo-api, so the sheet re-sorts itself the moment a new banzuke is
-     published. Nobody is invented: a newcomer with no portrait is skipped,
-     and a man who has left the banzuke is flagged `off` rather than deleted,
-     so he returns whole if he is ranked again. Offline, the bundled codes
-     stand and the sheet still draws. */
-  function syncLive(){
-    if (!window.GGRoster) return;
-    GGRoster.load().then(function(res){
-      if (!res || !res.ok || !res.ranks) return;
-      var changed = false, n;
-      for (n in RIK){
-        if (!Object.prototype.hasOwnProperty.call(RIK,n)) continue;
-        var w = res.ranks[n], wasOff = !!RIK[n].off;
-        if (w){
-          if (RIK[n].c !== w.code){ RIK[n].c = w.code; changed = true; }
-          if (wasOff){ delete RIK[n].off; changed = true; }
-        } else if (!wasOff){ RIK[n].off = true; changed = true; }
-      }
-      if (!changed) return;
-      build();
-      scheduleFit();
-    }).catch(function(){});
-  }
-
-  function start(){ mount(); syncLive(); }
-  if (document.readyState==="loading") document.addEventListener("DOMContentLoaded", start);
-  else start();
+  if (document.readyState==="loading") document.addEventListener("DOMContentLoaded", mount);
+  else mount();
 })();
