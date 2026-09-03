@@ -60,7 +60,6 @@
   /* banzuke is the backdrop; a single card sits integrated over it */
   .bz-stage{ position:relative; width:100%; flex:1 1 auto; height:auto; min-height:860px; margin-top:0 }
   #ggBanzuke{ position:absolute; inset:0 }
-  .bz-swipe{ display:none }
 
   /* the always-present card, centred over the brush stroke */
   .bz-card{ position:absolute; z-index:5; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -73,9 +72,6 @@
     .bz-card{ position:static; order:1; left:auto; top:auto; transform:none; width:calc(100% - 20px);
           margin:12px auto 0; max-height:none; overflow:visible; padding:20px 16px 24px }
     #ggBanzuke{ position:static; order:2; inset:auto; width:100%; margin-top:8px }
-    .bz-swipe{ display:block; order:2; margin:14px 0 0; text-align:center;
-      font-family:"WDXL Lubrifont TC",monospace; font-size:.72rem; letter-spacing:.16em;
-      text-transform:uppercase; color:var(--muted) }
   }
   .bz-mv{ display:none }
   .bz-mv.on{ display:block; animation:bzswap .2s ease }
@@ -269,7 +265,6 @@
 
 <!-- the banzuke crowd is always the backdrop -->
 <div class="bz-stage">
-  <p class="bz-swipe" aria-hidden="true">◂ swipe across the banzuke ▸</p>
   <div id="ggBanzuke" aria-hidden="true"></div>
 
   <!-- a single card sits integrated over the banzuke; tabs swap its contents -->

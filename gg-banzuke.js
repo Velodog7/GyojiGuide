@@ -277,27 +277,44 @@
        own column — so the top row is just the two side headers, one over each */
     +'.ggb-top{grid-template-columns:1fr 1fr;gap:0 8px;padding:10px 8px 0;align-items:center}'
     +'.ggb-sanyaku{display:none}'
-    /* ── the crowd: two columns, West then East, each one figure wide and in
-         rank order. The centre gutter goes; the card it used to hold sits above
-         the sheet on a phone. ── */
-    +'.ggb-body{grid-template-columns:1fr 1fr;gap:0 8px;margin-top:8px;padding:0 8px}'
+    /* ── the crowd: West and East side by side, each descending in rank, two
+         figures across per side. The centre gutter goes; the card it used to
+         hold sits above the sheet on a phone. ── */
+    /* the centre gutter earns a rule of its own: with two figures a side the
+       sheet is four columns across, and without a divide down the middle the
+       East and West halves read as one undifferentiated grid. */
+    +'.ggb-body{grid-template-columns:1fr 1fr;gap:0 13px;margin-top:8px;padding:0 6px;position:relative}'
+    +'.ggb-body::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;'
+      +'transform:translateX(-50%);background:linear-gradient(180deg,'
+      +'rgba(70,50,22,0),rgba(70,50,22,.42) 4%,rgba(70,50,22,.42) 96%,rgba(70,50,22,0));z-index:5}'
     +'.ggb-center{display:none}'
-    /* one figure per row. direction:rtl on the West column is a desktop trick
-       for mirroring the fill order — with a single column it would only flip
-       the caption, so it is reset. */
-    +'.ggb-col{overflow:visible;grid-template-columns:1fr;direction:ltr;padding:0;gap:6px 0}'
-    +'.ggb-col .ggb-fig{--fw:auto;width:100%;aspect-ratio:auto;'
-      +'display:grid;grid-template-columns:34px 1fr;align-items:center;gap:8px;'
-      +'padding:3px 5px;border-radius:6px;background:rgba(120,92,40,.07)}'
-    +'.ggb-col .ggb-fig img{width:34px;height:56px;object-fit:contain;object-position:bottom center}'
-    /* the name earns its place back now there is a row to put it on */
-    /* the base sheet writes every name vertically, like the printed original.
-       In a row that collapses it to a 0-height sliver, so it goes horizontal —
-       and the tier colour moves off the tiny label onto the whole row. */
-    +'.ggb-col .ggb-fig figcaption{display:block;position:static;writing-mode:horizontal-tb;'
-      +'transform:none;font-size:12px;line-height:1.2;text-align:left;background:none;'
-      +'border-radius:0;padding:0;color:#2b1f0d;white-space:nowrap;text-shadow:none;'
-      +'overflow:hidden;text-overflow:ellipsis;min-width:0}'
+    /* Two figures across per side, and otherwise the SAME figure the wide sheet
+       draws: a uniform box, the rikishi standing on its floor, his kanji name
+       down a top corner on the tinted label his rank earns. The rows-with-a-
+       thumbnail version this replaced put the layout first and the men second;
+       at two columns each figure is about 88px on a 390px phone -- two and a
+       half times that thumbnail -- and the sheet still reads as one banzuke
+       rather than a phone list wearing paper. */
+    +'.ggb-col{overflow:visible;grid-template-columns:repeat(2,minmax(0,1fr));direction:ltr;'
+      +'padding:0 2px;gap:2px 3px;align-content:start}'
+    +'.ggb-col .ggb-fig{--fw:auto;width:100%;aspect-ratio:3/5;display:block;margin:0;'
+      +'padding:0;border-radius:0;background:none}'
+    +'.ggb-col .ggb-fig img{width:100%;height:100%;object-fit:contain;object-position:center bottom}'
+    /* The corner label. The wide sheet writes these vertically, like the
+       printed original, but a vertical run of kanji collapses to a sliver in
+       this box, so on a phone it lies flat -- the same tinted chip in the same
+       corner, just readable. The tint comes from the shared .ggb-tY/.ggb-tO
+       rules, so rank still reads by colour exactly as it does on paper. */
+    +'.ggb-col .ggb-fig figcaption{position:absolute;top:2px;bottom:auto;'
+      +'writing-mode:horizontal-tb;transform:none;font-size:10px;line-height:1.25;'
+      +'padding:1px 3px;border-radius:2px;z-index:4;max-width:calc(100% - 4px);'
+      +'overflow:hidden;text-overflow:ellipsis}'
+    +'.ggb-colE .ggb-fig figcaption{right:2px;left:auto}'
+    +'.ggb-colW .ggb-fig figcaption{left:2px;right:auto}'
+    /* The wide sheet drops every name once its cells get small (the 520px rule
+       above, and .ggb-nonames from the fitter). A phone cell is small by nature
+       but has room for a column of kanji, so here the names stay. */
+    +'.ggb-col .ggb-fig figcaption,.ggb-nonames .ggb-col .ggb-fig figcaption{display:block}'
     +'.ggb-side-h{align-self:flex-start;font-size:18px}'
   +'}'
   /* ── click-to-spotlight: the figure lifts forward onto a card revealed behind it ── */
