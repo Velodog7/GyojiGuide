@@ -100,9 +100,37 @@
     return { pts: pts, rows: rows };
   };
 
+  /* One "data" fetch per page load, shared between callers.
+     analysis.html wants the payload twice over — once for the leader strip and
+     once to restore the signed-in player's saved team into the Mock Draft — and
+     /exec shares a daily execution quota with the hourly results import, so the
+     second caller gets the first one's promise instead of a second round trip.
+     A rejected fetch clears the cache so the next caller may retry.
+     Pass true to force a refetch (after a save, say). */
+  var dataOnce = null;
+  GG.dataOnce = function (force) {
+    if (force) dataOnce = null;
+    if (!dataOnce) dataOnce = GG.apiGet("data").catch(function (e) { dataOnce = null; throw e; });
+    return dataOnce;
+  };
+
+  /* The signed-in player's team AS THE SERVER HOLDS IT, with the timestamp of
+     the last write. `updated` is what lets a page tell "changed on another
+     device" apart from "never saved from here". Returns null when signed out,
+     offline, or the account has no row yet. */
+  GG.myTeam = async function () {
+    var a = GG.account.get(); if (!a) return null;
+    var data = null;
+    try { data = await GG.dataOnce(); } catch (e) { return null; }
+    var key = String(a.handle).toLowerCase();
+    var me = ((data && data.users) || []).filter(function (u) {
+      return String(u.handle).toLowerCase() === key; })[0];
+    return me ? { team: me.team || {}, updated: String(me.updated || "") } : null;
+  };
+
   GG.standings = async function () {
     var data = null;
-    try { data = await GG.apiGet("data"); } catch (e) {}
+    try { data = await GG.dataOnce(); } catch (e) {}
     var users = (data && data.users) || [];
     var model = GG.scoreModel(data || {});
     var rows = users.map(function (u) {
@@ -179,7 +207,10 @@
   GG.saveTeam = async function (team) {
     var a = GG.account.get();
     if (!a) return { ok: false, error: "Sign in first." };
-    return GG.apiPost({ action: "save", handle: a.handle, name: a.name, auth: a.auth, team: team || {} });
+    var res = await GG.apiPost({ action: "save", handle: a.handle, name: a.name, auth: a.auth, team: team || {} });
+    // the cached payload now describes the team we just replaced
+    if (res && res.ok) dataOnce = null;
+    return res;
   };
   GG.saveAvatar = async function (design) {
     var a = GG.account.get();
