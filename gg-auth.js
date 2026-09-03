@@ -271,13 +271,41 @@
   }
 
   /* nav chip unread badge: poll the cheap dmUnread endpoint on a light loop
-     while signed in, so a reply shows up without needing a page reload. */
-  var navUnreadTimer = null;
+     while signed in, so a reply shows up without needing a page reload.
+
+     Only while the tab is actually being LOOKED AT. A backgrounded tab left
+     open overnight was firing an Apps Script invocation every 45 seconds —
+     ~1,900 a night, per tab, to update a badge nobody can see, against a
+     backend with a daily execution quota. Hidden means no fetch and no timer;
+     the visibility listener below restarts the loop (with one immediate
+     check, so the badge is right the instant you look back). */
+  var navUnreadTimer = null, navVisWired = false, navPollSeq = 0;
+  function tabHidden(){
+    return typeof document !== "undefined" && document.visibilityState === "hidden";
+  }
+  function wireNavVisibility(){
+    if (navVisWired || typeof document === "undefined" || !document.addEventListener) return;
+    navVisWired = true;
+    document.addEventListener("visibilitychange", function(){
+      if (!tabHidden() && acct()) pollNavUnread();
+    });
+  }
+  /* One loop, not several. Clearing navUnreadTimer isn't enough on its own:
+     two calls landing while a request is in flight both get past it, both
+     await, and both then schedule — the second overwriting the first's handle,
+     so the orphan chain polls forever alongside it. (renderNav() and the
+     auth-change hook do exactly that on load, which had the badge polling at
+     twice the intended rate.) A sequence number retires every chain but the
+     newest, and also stops a slow response from painting over a fresher one. */
   async function pollNavUnread(){
+    var mine = ++navPollSeq;
     if (navUnreadTimer){ clearTimeout(navUnreadTimer); navUnreadTimer = null; }
     if (!acct() || !GG.dmUnread) return;
+    wireNavVisibility();
+    if (tabHidden()) return;                 // parked until the tab comes back
     try {
       var res = await GG.dmUnread();
+      if (mine !== navPollSeq) return;       // a newer poll started while this was away
       var b = slot && slot.querySelector("#ggaChipDm");
       if (b){
         var n = (res && res.ok) ? (res.unread || 0) : 0;
@@ -285,7 +313,8 @@
         else b.hidden = true;
       }
     } catch (e){}
-    if (acct()) navUnreadTimer = setTimeout(pollNavUnread, 45000);   // re-check every 45s
+    if (mine !== navPollSeq) return;
+    if (acct() && !tabHidden()) navUnreadTimer = setTimeout(pollNavUnread, 45000);   // re-check every 45s
   }
 
   function mountNav(tries){
