@@ -201,7 +201,17 @@
   }
 
   var CSS =
-  '#ggBanzuke{position:absolute;inset:0;z-index:1;overflow:hidden}'
+  /* The sheet's textures, published as custom properties. A host page that wants
+     to carry the paper past the edges of the sheet — index.html does, so that on
+     a phone it runs up behind the welcome card to the sub-nav — dresses its own
+     elements with var(--ggb-paper). This file then styles nothing it does not
+     own, and if the page ever drops the variables the declarations using them go
+     invalid and it falls back to the flat paper colour. Doubles as a saving:
+     these are data: URIs, and they were being inlined into four separate rules. */
+  ':root{--ggb-paper:url('+PAPER+');--ggb-grunge:url('+AI+');'
+    +'--ggb-paper-tint:#e9e1d0;'
+    +'--ggb-paper-filter:sepia(.14) saturate(1.02) contrast(.98) brightness(1.05)}'
+  +'#ggBanzuke{position:absolute;inset:0;z-index:1;overflow:hidden}'
   /* Phones: the sheet stops being a backdrop and becomes a thing you scroll.
      Sixteen columns of rikishi squeezed into 390px is unreadable, so the sheet
      keeps a legible width and you swipe across it like a real banzuke. This
@@ -222,12 +232,12 @@
     +'#ggBanzuke .ggb-body{min-height:0}'
   +'}'
   +'.ggb{position:absolute;inset:0;display:flex;flex-direction:column;'
-    +'background:#e9e1d0 url('+PAPER+') center/cover no-repeat;'
-    +'filter:sepia(.14) saturate(1.02) contrast(.98) brightness(1.05);'   /* gently aged, not washed out */
+    +'background:var(--ggb-paper-tint) var(--ggb-paper) center/cover no-repeat;'
+    +'filter:var(--ggb-paper-filter);'   /* gently aged, not washed out */
     +'font-family:"Potta One","Hiragino Kaku Gothic ProN",system-ui,sans-serif}'
   /* paper + illustrator grunge, multiplied in so the photos read as printed on the sheet */
   +'.ggb::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:7;'
-    +'background:url('+PAPER+') center/cover no-repeat,url('+AI+') center/cover no-repeat;mix-blend-mode:multiply;opacity:.7}'
+    +'background:var(--ggb-paper) center/cover no-repeat,var(--ggb-grunge) center/cover no-repeat;mix-blend-mode:multiply;opacity:.7}'
   /* aged wash: warm foxing at the corners + bottom, kept LIGHT across the top so the sanyaku faces stay clear */
   +'.ggb::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:8;mix-blend-mode:multiply;'
     +'background:'
@@ -307,23 +317,6 @@
   +'@media(max-width:640px){'
     +'.ggb{position:static;inset:auto;min-height:0;padding-bottom:10px}'
     +'.ggb-water,.ggb-texfx{display:none}'
-    /* On a phone the sheet is stacked BELOW the welcome card rather than lying
-       behind it, so the paper began at the card's bottom edge and the strip from
-       there up to the sub-nav was bare page. Lay the same paper across the whole
-       stage, behind everything, and let the sheet's own background sit on top of
-       it wherever it reaches. Reaching into the host page for .bz-stage is not
-       lovely, but the paper is a data: URI defined in this file and the page has
-       no way to name it. */
-    +'.bz-stage{position:relative;background:#e9e1d0}'
-    +'.bz-stage::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;'
-      +'background:#e9e1d0 url('+PAPER+') center/cover no-repeat;'
-      +'filter:sepia(.14) saturate(1.02) contrast(.98) brightness(1.05)}'
-    /* the aged wash the sheet carries, so the backdrop reads as the same sheet
-       of paper rather than a clean patch above it */
-    +'.bz-stage::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;'
-      +'mix-blend-mode:multiply;opacity:.7;'
-      +'background:url('+PAPER+') center/cover no-repeat,url('+AI+') center/cover no-repeat}'
-    +'.bz-stage>.bz-card,.bz-stage>#ggBanzuke{position:relative;z-index:1}'
     /* ── the sanyaku band keeps its headline treatment: still West | officials |
          East, just scaled to the screen ── */
     /* the sanyaku band is gone on a phone -- those men are at the head of their
@@ -400,6 +393,17 @@
   // Recomputed after images load and on resize.
   var CROWD_MINCOLS = 3, CROWD_MAXCOLS = 14, CROWD_MINW = 18, crowdCellW = 0;
   function colsArr(host){ return Array.prototype.slice.call(host.querySelectorAll(".ggb-col")); }
+  /* Whatever the host page has floating over the middle of the sheet, which the
+     fitters have to lay the rikishi around. The page names it on the container
+     (data-gg-avoid="..."); a page with nothing in the way simply omits it and
+     both fitters treat the centre as clear. This used to be a hard-coded
+     ".bz-card", which is the host page's class, not this file's. */
+  function avoidEl(){
+    var host = document.getElementById("ggBanzuke");
+    var sel = host && host.getAttribute("data-gg-avoid");
+    if (!sel) return null;
+    try { return document.querySelector(sel); } catch (e) { return null; }
+  }
   function overflowsV(cols){
     for (var i = 0; i < cols.length; i++){ if (cols[i].scrollHeight - cols[i].clientHeight > 1.5) return true; }
     return false;
@@ -442,7 +446,7 @@
     // (2) keep two fewer columns, size them as large as fit BOTH the clear width
     //     (outer edge → card edge) and the height.
     var T = Math.max(1, fill - 2);
-    var card = document.querySelector(".bz-card");
+    var card = avoidEl();
     var cardR = card ? card.getBoundingClientRect() : null;
     var MARGIN = 12, GAP = 1, BASEPAD = 4;
     var minClear = Infinity, minH = Infinity, pads = [];
@@ -510,7 +514,7 @@
        edge, and the innermost figure on each side is the Yokozuna, so the one
        man guaranteed to be clipped was the most important on the sheet. Full
        card width plus a margin, and the flanks take what is left. */
-    var card = document.querySelector(".bz-card");
+    var card = avoidEl();
     var wantC = card ? Math.round(card.getBoundingClientRect().width + 2 * SAN_MARGIN) : 320;
     var centerW = Math.min(wantC, Math.max(0, containerW - 2 * SAN_MINFLANK));
     if (center) center.style.width = centerW + "px";
