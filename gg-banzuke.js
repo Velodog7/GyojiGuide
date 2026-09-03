@@ -134,17 +134,18 @@
   }
 
   /* ---- gyōji (either side) & yobidashi (middle) — sits on the sanyaku row ---- */
-  /* The centre of the band, above the card: gyōji · 東 · yobidashi · 西 · gyōji.
-     The two side headers sit here rather than out in the flanks — every pixel
-     they took beside a Yokozuna was a pixel the sanyaku could not have, and the
-     centre block is already sized to clear the card, so they cost nothing here. */
+  /* The centre of the band, above the card: 東 · gyōji · yobidashi · gyōji · 西,
+     the headers outside the officials rather than in among them. They sit here
+     rather than out in the flanks — every pixel they took beside a Yokozuna was
+     a pixel the sanyaku could not have, and the centre block is already sized to
+     clear the card, so they cost nothing here. */
   function officials(){
     return '<div class="ggb-sancenter">'
-      + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI_IMG+'" alt="Gyōji" decoding="async"></figure>'
       + '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
+      + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI_IMG+'" alt="Gyōji" decoding="async"></figure>'
       + '<figure class="ggb-off ggb-yobi"><img src="'+YOBI_IMG+'" alt="Yobidashi" decoding="async"></figure>'
-      + '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
       + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI2_IMG+'" alt="Gyōji" decoding="async"></figure>'
+      + '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
       + '</div>';
   }
 
@@ -246,7 +247,7 @@
   +'.ggb-san .ggb-fig{margin-left:0;aspect-ratio:1/2}'   /* taller uniform box: fuller figures, tops (names) and feet aligned */
   +'.ggb-san .ggb-fig img{height:100%;object-fit:contain;object-position:center bottom}'
   +'.ggb-sancenter{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:center;gap:clamp(2px,1vw,12px);min-width:0}'
-  /* The side headers stand with the officials, either side of the yobidashi.
+  /* The side headers stand at the outer ends of the officials block.
      Aligned to the TOP of that block, not its baseline: the officials are as
      tall as the card is deep, so anything sitting at their feet is behind it —
      only the head of the block clears the card's top edge. */
