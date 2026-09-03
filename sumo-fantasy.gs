@@ -1947,11 +1947,27 @@ function accountSummary(handle) {
   var mine = allHistory.filter(function (h) { return h.handle.toLowerCase() === handle.toLowerCase(); })
     .sort(function (a, b) { return new Date(b.savedAt) - new Date(a.savedAt); });
   var leaguesRes = myLeagues(handle);
+
+  /* Where each of those scores placed him on the public board that basho.
+     A raw points line is hard to read on its own — 47 is a runaway in a thin
+     field and mid-table in a strong one — and every number needed is already
+     in allHistory, so the placing costs one pass and no extra sheet read.
+     Ties share the better place, as a competition ranking should. */
+  var fieldByBasho = {};
+  allHistory.forEach(function (h) {
+    (fieldByBasho[h.basho] = fieldByBasho[h.basho] || []).push(h.score);
+  });
+
   return {
     ok: true,
     titles: championsOf_(handle),                 // championships — the trophy case proper
     badges: computeBadges_(handle, allHistory),   // minor accolades, shown beneath
-    history: mine.map(function (h) { return { basho: h.basho, score: h.score, wins: h.wins, savedAt: h.savedAt }; }),
+    history: mine.map(function (h) {
+      var field = (fieldByBasho[h.basho] || []).slice().sort(function (a, b) { return b - a; });
+      var place = field.indexOf(h.score) + 1;
+      return { basho: h.basho, score: h.score, wins: h.wins, savedAt: h.savedAt,
+               place: place || null, of: field.length };
+    }),
     allTime: allTimeRank_(allHistory, handle),
     leagues: (leaguesRes && leaguesRes.ok) ? leaguesRes.leagues : []
   };

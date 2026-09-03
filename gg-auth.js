@@ -101,7 +101,10 @@
     ".gga-acctrow__ava svg{display:block;width:100%;height:100%}"+
     ".gga-acctrow__initials{color:#e0a23a;font-weight:700;font-size:2.6rem}"+
     ".gga-acctrow__id{flex:1;min-width:0}"+
-    ".gga-acctrow b{display:block;color:#f1f2f6;font-size:1rem}"+
+    /* scoped to the id block on purpose \u2014 as ".gga-acctrow b" this also caught
+       every <b> in the stats summary nested inside the row, so "All-time rank:
+       #4 of 22" broke across three lines */
+    ".gga-acctrow__id b{display:block;color:#f1f2f6;font-size:1rem}"+
     ".gga-acctrow small{color:#878da0;font-family:'WDXL Lubrifont TC',monospace;font-size:0.885rem}"+
     ".gga-editbtn{flex:none;width:30px;height:30px;border-radius:8px;border:1px solid #2a2d38;background:#1b1e27;"+
       "color:#878da0;font-size:.85rem;cursor:pointer;display:grid;place-items:center}"+
@@ -143,10 +146,25 @@
     ".gga-badges{display:flex;flex-wrap:wrap;gap:7px}"+
     ".gga-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(224,162,58,.12);border:1px solid rgba(224,162,58,.35);"+
       "color:#e0a23a;border-radius:999px;padding:5px 11px;font-size:.78rem;font-weight:600;white-space:nowrap}"+
+    /* ---- score-over-time chart ----
+       One basho is a dot, not a trend, so the chart only appears from the
+       second onwards; the list below it is always the fallback and is what
+       carries the exact numbers. */
+    ".gga-chart{border:1px solid #2a2d38;border-radius:10px;background:#1b1e27;padding:10px 8px 4px;margin-bottom:8px}"+
+    ".gga-chart svg{display:block;width:100%;height:auto;overflow:visible}"+
+    ".gga-chart__cap{display:flex;justify-content:space-between;gap:10px;margin:2px 4px 0;"+
+      "font-size:.72rem;color:#878da0}"+
+    ".gga-chart__cap span{white-space:nowrap}"+
+    ".gga-chart__cap b{color:#e0a23a;font-weight:700}"+
     ".gga-hist{display:flex;flex-direction:column;gap:1px;border:1px solid #2a2d38;border-radius:10px;overflow:hidden}"+
-    ".gga-hist__row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;"+
-      "background:#1b1e27;font-size:.84rem;color:#c7cbd9}"+
+    /* the two halves each stay whole: adding the placing pushed these past a
+       narrow modal's width, and letting the sentence break mid-phrase gave
+       every row a ragged second line. It drops to its own line instead. */
+    ".gga-hist__row{display:flex;align-items:center;justify-content:space-between;gap:4px 10px;"+
+      "flex-wrap:wrap;padding:8px 12px;background:#1b1e27;font-size:.84rem;color:#c7cbd9}"+
+    ".gga-hist__row span{white-space:nowrap}"+
     ".gga-hist__row span:first-child{font-weight:600;color:#e9eaf0}"+
+    ".gga-hist__row span:last-child{font-size:.8rem}"+
     ".gga-rank{margin:9px 0 0;font-size:.82rem;color:#878da0}"+
     ".gga-rank b{color:#e0a23a}"+
     ".gga-leagues{display:flex;flex-wrap:wrap;gap:7px}"+
@@ -450,6 +468,76 @@
     '</div>';
   }
 
+  /* "Aki 2026" -> "Aki '26". The name is left whole \u2014 truncating it to five
+     characters turned Ky\u016bsh\u016b into "Kyush", which reads as a typo. Labels
+     that don't fit are dropped instead, below. */
+  function shortBasho(b){
+    var m = String(b || "").match(/^(\S+)\s+\d{2}(\d{2})$/);
+    return m ? m[1] + " \u2019" + m[2] : String(b || "").slice(0, 10);
+  }
+
+  /* Points per basho, drawn as inline SVG.
+     No chart library: everything it needs is already in the payload, and any
+     library would outweigh this whole file. One fixed viewBox scaled to 100%
+     width keeps it crisp at every modal size and needs no resize handler.
+     Flat fills and currentColor only — same reason as the trophy emblems, a
+     <defs> gradient would need a unique id per injection. */
+  function chartHTML(hist){
+    var pts = hist.slice().reverse();                 // payload is newest-first; read left to right
+    if (pts.length < 2) return "";
+    var W = 320, H = 128, L = 30, R = 20, T = 10, B = 22;
+    var iw = W - L - R, ih = H - T - B;
+    var best = 0, total = 0;
+    pts.forEach(function(p){ if (p.score > best) best = p.score; total += p.score; });
+    var top = Math.max(10, Math.ceil(best / 10) * 10);      // a round ceiling, never zero-height
+    var x = function(i){ return L + iw * i / (pts.length - 1); };
+    var y = function(v){ return T + ih - ih * (v / top); };
+
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Score by basho">';
+    [0, top / 2, top].forEach(function(v){
+      svg += '<line x1="' + L + '" y1="' + y(v).toFixed(1) + '" x2="' + (W - R) + '" y2="' + y(v).toFixed(1) + '" '+
+             'stroke="#2a2d38" stroke-width="1"/>'+
+             '<text x="' + (L - 5) + '" y="' + (y(v) + 3).toFixed(1) + '" text-anchor="end" '+
+             'font-size="8" fill="#5f6373">' + Math.round(v) + '</text>';
+    });
+
+    var line = pts.map(function(p, i){ return x(i).toFixed(1) + ',' + y(p.score).toFixed(1); }).join(" ");
+    svg += '<polygon points="' + L + ',' + y(0).toFixed(1) + ' ' + line + ' ' + (W - R) + ',' + y(0).toFixed(1) + '" '+
+           'fill="#e0a23a" fill-opacity=".12"/>';
+    svg += '<polyline points="' + line + '" fill="none" stroke="#e0a23a" stroke-width="2" '+
+           'stroke-linejoin="round" stroke-linecap="round"/>';
+
+    /* Which basho get a label. Every point is worth naming, but at six or more
+       they run into each other, so: estimate the widest label, work out how
+       many gaps it needs, and step back from the RIGHT \u2014 counting from the
+       newest basho guarantees it's always named and keeps the gaps even.
+       (Stepping forward from the left and then forcing the last label on is
+       what produces two names on top of each other at the end.) */
+    var FS = 7.5;
+    var widest = 0;
+    pts.forEach(function(p){ widest = Math.max(widest, shortBasho(p.basho).length * FS * 0.56); });
+    var gap = iw / (pts.length - 1);
+    var step = Math.max(1, Math.ceil((widest + 4) / gap));
+    var labelled = {};
+    for (var k = pts.length - 1; k >= 0; k -= step) labelled[k] = true;
+
+    pts.forEach(function(p, i){
+      var px = x(i), py = y(p.score);
+      var suffix = p.place === 1 ? "st" : p.place === 2 ? "nd" : p.place === 3 ? "rd" : "th";
+      var where = p.place ? " \u00b7 " + p.place + suffix + " of " + p.of : "";
+      svg += '<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="3" fill="#161923" stroke="#e0a23a" stroke-width="2">'+
+             '<title>' + esc(p.basho) + ": " + p.score + " pts \u00b7 " + p.wins + " wins" + esc(where) + '</title></circle>';
+      if (labelled[i])
+        svg += '<text x="' + px.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle" '+
+               'font-size="' + FS + '" fill="#878da0">' + esc(shortBasho(p.basho)) + '</text>';
+    });
+    svg += '</svg>';
+
+    return '<div class="gga-chart">' + svg +
+      '<p class="gga-chart__cap"><span>Best <b>' + best + '</b></span>'+
+      '<span>Avg <b>' + Math.round(total / pts.length) + '</b> \u00b7 ' + pts.length + ' basho</span></p></div>';
+  }
+
   function summaryHTML(res){
     var titles = res.titles || [], badges = res.badges || [];
     var trophyHTML = "";
@@ -463,7 +551,9 @@
       trophyHTML = '<p class="gga-empty">No titles yet \u2014 win a basho and one lands here.</p>';
     var hist = res.history || [];
     var histHTML = hist.length
-      ? '<div class="gga-hist">'+hist.map(function(h){ return '<div class="gga-hist__row"><span>'+esc(h.basho)+'</span><span>'+h.score+' pts \u00b7 '+h.wins+' wins</span></div>'; }).join("")+'</div>'
+      ? chartHTML(hist)+'<div class="gga-hist">'+hist.map(function(h){
+          var place = h.place ? ' \u00b7 #'+h.place+' of '+h.of : '';
+          return '<div class="gga-hist__row"><span>'+esc(h.basho)+'</span><span>'+h.score+' pts \u00b7 '+h.wins+' wins'+place+'</span></div>'; }).join("")+'</div>'
       : '<p class="gga-empty">No past basho on record yet.</p>';
     var at = res.allTime || {};
     var rankLine = at.rank ? ('<p class="gga-rank">All-time rank: <b>#'+at.rank+'</b> of '+at.of+' \u00b7 '+at.total+' total pts</p>') : '';
