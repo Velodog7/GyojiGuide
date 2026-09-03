@@ -139,6 +139,18 @@
       + '</div>';
   }
 
+  /* Phone layout only: each side is two figures wide and fills middle-out, so
+     the higher rank of every pair must land in the cell nearest the centre
+     rule. On the West side (right half) that is the first cell, which plain
+     source order already fills. On the East side (left half) it is the SECOND
+     cell, so East's list is emitted with each pair swapped: ranks 1,2,3,4 go
+     out as 2,1,4,3 and land as 1 inner / 2 outer, 3 inner / 4 outer. A lone
+     last man keeps the outer cell. */
+  function pairSwap(list){
+    var o = list.slice();
+    for (var i = 0; i + 1 < o.length; i += 2){ var t = o[i]; o[i] = o[i+1]; o[i+1] = t; }
+    return o;
+  }
   function build(){
     var host = document.getElementById("ggBanzuke");
     if (!host) return;
@@ -146,24 +158,32 @@
     var narrow = narrowMode();
     builtNarrow = narrow;
     var colW = narrow ? sanWRank.concat(westFile) : westFile;
-    var colE = narrow ? sanERank.concat(eastFile) : eastFile;
+    var colE = narrow ? pairSwap(sanERank.concat(eastFile)) : eastFile;
     host.innerHTML =
       '<div class="ggb">'
       + '<div class="ggb-water" aria-hidden="true"></div>'
       + '<div class="ggb-top">'
-      +   '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
+      +   (narrow ? '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
+                  : '<div class="ggb-side-h ggb-west">西<em>West</em></div>')
       +   (narrow ? '' :
           '<div class="ggb-sanyaku">'
       +     '<div class="ggb-san ggb-sanW">'+sanW.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
       +     officials()
       +     '<div class="ggb-san ggb-sanE">'+sanE.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
       +   '</div>')
-      +   '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
+      +   (narrow ? '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
+                  : '<div class="ggb-side-h ggb-east">東<em>East</em></div>')
       + '</div>'
       + '<div class="ggb-body">'
-      +   '<div class="ggb-col ggb-colW">'+colW.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
-      +   (narrow ? '' : '<div class="ggb-center"></div>')
-      +   '<div class="ggb-col ggb-colE">'+colE.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
+      /* On a phone East leads on the left, so the two halves are emitted in the
+         other order — placing them with grid-column instead left the East side
+         laid out correctly but unpainted in Chromium. */
+      +   (narrow
+          ? '<div class="ggb-col ggb-colE">'+colE.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
+          + '<div class="ggb-col ggb-colW">'+colW.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
+          : '<div class="ggb-col ggb-colW">'+colW.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
+          + '<div class="ggb-center"></div>'
+          + '<div class="ggb-col ggb-colE">'+colE.map(function(n){return fig(n,false,null,null);}).join("")+'</div>')
       + '</div>'
       + '<div class="ggb-texfx" aria-hidden="true" style="background-image:url('+TEX_TOP+')"></div>'
       + '</div>';
@@ -273,48 +293,49 @@
     +'.ggb-water,.ggb-texfx{display:none}'
     /* ── the sanyaku band keeps its headline treatment: still West | officials |
          East, just scaled to the screen ── */
-    /* the sanyaku band is gone on a phone — those men are at the head of their
-       own column — so the top row is just the two side headers, one over each */
+    /* the sanyaku band is gone on a phone -- those men are at the head of their
+       own column -- so the top row is just the two side headers, one over each.
+       East leads on the left here, as it does on a printed banzuke read from
+       the middle out, so the headers swap with the columns below. */
     +'.ggb-top{grid-template-columns:1fr 1fr;gap:0 8px;padding:10px 8px 0;align-items:center}'
     +'.ggb-sanyaku{display:none}'
-    /* ── the crowd: West and East side by side, each descending in rank, two
-         figures across per side. The centre gutter goes; the card it used to
-         hold sits above the sheet on a phone. ── */
+    /* ── the crowd: East on the left, West on the right, each descending in
+         rank, two figures across per side. The centre gutter goes; the card it
+         used to hold sits above the sheet on a phone. ── */
     /* the centre gutter earns a rule of its own: with two figures a side the
        sheet is four columns across, and without a divide down the middle the
-       East and West halves read as one undifferentiated grid. */
+       two halves read as one undifferentiated grid. */
     +'.ggb-body{grid-template-columns:1fr 1fr;gap:0 13px;margin-top:8px;padding:0 6px;position:relative}'
     +'.ggb-body::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;'
       +'transform:translateX(-50%);background:linear-gradient(180deg,'
       +'rgba(70,50,22,0),rgba(70,50,22,.42) 4%,rgba(70,50,22,.42) 96%,rgba(70,50,22,0));z-index:5}'
     +'.ggb-center{display:none}'
     /* Two figures across per side, and otherwise the SAME figure the wide sheet
-       draws: a uniform box, the rikishi standing on its floor, his kanji name
-       down a top corner on the tinted label his rank earns. The rows-with-a-
-       thumbnail version this replaced put the layout first and the men second;
-       at two columns each figure is about 88px on a 390px phone -- two and a
-       half times that thumbnail -- and the sheet still reads as one banzuke
-       rather than a phone list wearing paper. */
-    +'.ggb-col{overflow:visible;grid-template-columns:repeat(2,minmax(0,1fr));direction:ltr;'
+       draws: a uniform box, the rikishi standing on its floor, no card chrome
+       behind him. The rows-with-a-thumbnail version this replaced put the
+       layout first and the men second; at two columns each figure is about
+       88px on a 390px phone -- two and a half times that thumbnail -- and the
+       sheet still reads as one banzuke rather than a phone list on paper. */
+    +'.ggb-col{overflow:visible;grid-template-columns:repeat(2,minmax(0,1fr));'
       +'padding:0 2px;gap:2px 3px;align-content:start}'
+    /* Each side fills MIDDLE-OUT, top to bottom: the higher rank of a pair sits
+       against the centre rule and his junior beside him on the outside, then
+       the next row. West sits on the right, so its inner cell comes first in
+       source order and fills naturally. East sits on the left, where the inner
+       cell is the second one -- the wide sheet mirrors a column with
+       direction:rtl, but Chromium simply refuses to PAINT a column this tall
+       under rtl (the figures measure and hit-test correctly and never draw), so
+       East is mirrored by swapping each pair in the source instead. See
+       pairSwap() in build(). */
+    +'.ggb-colE,.ggb-colW{direction:ltr}'
     +'.ggb-col .ggb-fig{--fw:auto;width:100%;aspect-ratio:3/5;display:block;margin:0;'
       +'padding:0;border-radius:0;background:none}'
     +'.ggb-col .ggb-fig img{width:100%;height:100%;object-fit:contain;object-position:center bottom}'
-    /* The corner label. The wide sheet writes these vertically, like the
-       printed original, but a vertical run of kanji collapses to a sliver in
-       this box, so on a phone it lies flat -- the same tinted chip in the same
-       corner, just readable. The tint comes from the shared .ggb-tY/.ggb-tO
-       rules, so rank still reads by colour exactly as it does on paper. */
-    +'.ggb-col .ggb-fig figcaption{position:absolute;top:2px;bottom:auto;'
-      +'writing-mode:horizontal-tb;transform:none;font-size:10px;line-height:1.25;'
-      +'padding:1px 3px;border-radius:2px;z-index:4;max-width:calc(100% - 4px);'
-      +'overflow:hidden;text-overflow:ellipsis}'
-    +'.ggb-colE .ggb-fig figcaption{right:2px;left:auto}'
-    +'.ggb-colW .ggb-fig figcaption{left:2px;right:auto}'
-    /* The wide sheet drops every name once its cells get small (the 520px rule
-       above, and .ggb-nonames from the fitter). A phone cell is small by nature
-       but has room for a column of kanji, so here the names stay. */
-    +'.ggb-col .ggb-fig figcaption,.ggb-nonames .ggb-col .ggb-fig figcaption{display:block}'
+    /* No names on a phone. The wide sheet already drops them once its cells get
+       small, and here they sat as chips over the rikishi's head -- the one
+       thing this layout exists to show. Tap a figure and the spotlight card
+       still gives the shikona and the rank. */
+    +'.ggb-col .ggb-fig figcaption{display:none}'
     +'.ggb-side-h{align-self:flex-start;font-size:18px}'
   +'}'
   /* ── click-to-spotlight: the figure lifts forward onto a card revealed behind it ── */
