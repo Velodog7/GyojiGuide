@@ -63,7 +63,12 @@
 
   /* the always-present card, centred over the brush stroke */
   .bz-card{ position:absolute; z-index:5; left:50%; top:50%; transform:translate(-50%,-50%);
-        width:min(560px,90%); max-height:calc(100% - 40px); overflow:hidden auto;
+        /* The banzuke's sanyaku band has to clear this card outright — the
+           Yokozuna stand at the inner end of each flank, so anything the card
+           covers, it covers them first. At 560px on a 900px-wide window there
+           was nothing left for them to stand in, so the card yields a little
+           between the phone breakpoint and a full desktop. */
+        width:clamp(360px,48%,560px); max-height:calc(100% - 40px); overflow:hidden auto;
         background:rgba(15,17,22,.9); -webkit-backdrop-filter:blur(10px) saturate(1.1); backdrop-filter:blur(10px) saturate(1.1);
         border:1px solid rgba(216,178,90,.35); border-radius:16px; padding:22px 24px 26px;
         box-shadow:0 20px 50px rgba(0,0,0,.55) }

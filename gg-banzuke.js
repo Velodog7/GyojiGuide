@@ -74,9 +74,12 @@
     // sanyaku: West group (highest rank nearest the centre) | East group
     sanWRank = group(sanyaku,"W");         // plain rank order, for the phone's single list
     sanERank = group(sanyaku,"E");
-    sanW = sanWRank.slice().reverse();      // so Yokozuna sits next to the centre column
-    sanE = sanERank.slice();
-    westFile = group(rankfile,"W");   // rendered in the left column, which is mirrored (direction:rtl) so its top rank sits nearest the centre
+    /* East leads on the LEFT of the sheet now, so it is East that runs
+       outward-to-inward and ends on its Yokozuna beside the centre; West, on
+       the right, runs in plain rank order out from the centre. */
+    sanW = sanWRank.slice();
+    sanE = sanERank.slice().reverse();
+    westFile = group(rankfile,"W");   // right-hand column: plain order already runs centre → outward
     eastFile = group(rankfile,"E");
   }
   computeGroups();
@@ -163,27 +166,29 @@
       '<div class="ggb">'
       + '<div class="ggb-water" aria-hidden="true"></div>'
       + '<div class="ggb-top">'
-      +   (narrow ? '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
-                  : '<div class="ggb-side-h ggb-west">西<em>West</em></div>')
-      +   (narrow ? '' :
-          '<div class="ggb-sanyaku">'
-      +     '<div class="ggb-san ggb-sanW">'+sanW.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
-      +     officials()
-      +     '<div class="ggb-san ggb-sanE">'+sanE.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
-      +   '</div>')
-      +   (narrow ? '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
-                  : '<div class="ggb-side-h ggb-east">東<em>East</em></div>')
+      +   (narrow
+          /* phone: no sanyaku band, so the two headers sit one over each half */
+          ? '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
+          + '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
+          /* wide: East group | 東 | officials | 西 | West group — each header
+             tucked just inside its own side's Yokozuna rather than stranded
+             out at the edge of the sheet */
+          : '<div class="ggb-sanyaku">'
+          +   '<div class="ggb-san ggb-sanE">'+sanE.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
+          +   '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
+          +   officials()
+          +   '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
+          +   '<div class="ggb-san ggb-sanW">'+sanW.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
+          + '</div>')
       + '</div>'
       + '<div class="ggb-body">'
       /* On a phone East leads on the left, so the two halves are emitted in the
          other order — placing them with grid-column instead left the East side
          laid out correctly but unpainted in Chromium. */
-      +   (narrow
-          ? '<div class="ggb-col ggb-colE">'+colE.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
-          + '<div class="ggb-col ggb-colW">'+colW.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
-          : '<div class="ggb-col ggb-colW">'+colW.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
-          + '<div class="ggb-center"></div>'
-          + '<div class="ggb-col ggb-colE">'+colE.map(function(n){return fig(n,false,null,null);}).join("")+'</div>')
+      /* East on the left, West on the right, at every width */
+      +   '<div class="ggb-col ggb-colE">'+colE.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
+      +   (narrow ? '' : '<div class="ggb-center"></div>')
+      +   '<div class="ggb-col ggb-colW">'+colW.map(function(n){return fig(n,false,null,null);}).join("")+'</div>'
       + '</div>'
       + '<div class="ggb-texfx" aria-hidden="true" style="background-image:url('+TEX_TOP+')"></div>'
       + '</div>';
@@ -228,25 +233,28 @@
   +'.ggb-water{position:absolute;top:-30%;left:-30%;width:160%;height:160%;pointer-events:none;z-index:9;'
     +'background:url('+WATER+') center/cover no-repeat;transform:rotate(-8deg);'
     +'mix-blend-mode:color-burn;opacity:.34}'
-  +'.ggb-top{display:grid;grid-template-columns:auto 1fr auto;align-items:flex-end;gap:6px;padding:2px 12px 0;position:relative;z-index:6;max-width:100%}'
+  +'.ggb-top{display:grid;grid-template-columns:1fr;align-items:flex-end;gap:6px;padding:2px 12px 0;position:relative;z-index:6;max-width:100%}'
   +'.ggb-side-h{align-self:center;font-size:20px;font-weight:900;color:#2a2018;text-shadow:0 1px 0 rgba(255,255,255,.35);line-height:1;text-align:center}'
   +'.ggb-side-h em{display:block;font-style:normal;font-family:"WDXL Lubrifont TC",monospace;font-size:9px;letter-spacing:.16em;color:#7a6a4a;margin-top:2px}'
   +'.ggb-sanyaku{display:flex;align-items:flex-end;justify-content:center;gap:0;min-width:0;flex-wrap:nowrap}'  /* centre element (set by JS) holds the officials and clears the card */
   +'.ggb-san{display:flex;align-items:flex-end;justify-content:space-between;flex:1 1 0;min-width:0}'  /* spread from the outer edge to the card edge, like the grid below */
   +'.ggb-san .ggb-fig{margin-left:0;aspect-ratio:1/2}'   /* taller uniform box: fuller figures, tops (names) and feet aligned */
   +'.ggb-san .ggb-fig img{height:100%;object-fit:contain;object-position:center bottom}'
-  +'.ggb-sancenter{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:center;gap:clamp(2px,1vw,12px);min-width:0}'  /* gyōji · yobidashi · gyōji, peeking above the card */
+  +'.ggb-sancenter{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:center;gap:clamp(2px,1vw,12px);min-width:0}'
+  /* the side headers ride inside the band, tucked against the centre just past
+     each side's Yokozuna, rather than out at the far edges of the sheet */
+  +'.ggb-sanyaku>.ggb-side-h{flex:0 0 auto;align-self:flex-end;margin:0 4px 6px;white-space:nowrap}'  /* gyōji · yobidashi · gyōji, peeking above the card */
   +'.ggb-sancenter .ggb-off{margin:0;flex:0 0 auto}'
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));'
     +'gap:2px 1px;align-content:start;justify-items:stretch;padding:4px 4px 0}'
-  +'.ggb-colW{direction:rtl}'   /* mirror the left column: top rank nearest the centre, reading in→out — a reflection of the East side, not a copy */
-  +'.ggb-colW .ggb-fig{direction:ltr}'  /* keep each figure/caption itself upright */
+  +'.ggb-colE{direction:rtl}'   /* mirror the LEFT column (East): top rank nearest the centre, reading in→out — a reflection of the West side, not a copy */
+  +'.ggb-colE .ggb-fig{direction:ltr}'  /* keep each figure/caption itself upright */
   +'.ggb-fig{position:relative;width:var(--fw,46px);flex:0 0 auto;text-align:center;margin:0}'
   +'.ggb-col .ggb-fig{position:relative;width:100%;--fw:auto;aspect-ratio:3/5}'  /* uniform box: same size for every rikishi in the crowd */
   +'.ggb-col .ggb-fig figcaption{display:block;top:1px;bottom:auto;left:auto;right:auto;transform:none;font-size:8px;padding:1px;z-index:4}'  /* label in a top corner, off the faces */
-  +'.ggb-colE .ggb-fig figcaption{right:1px;left:auto}'   /* right side → top-right corner */
-  +'.ggb-colW .ggb-fig figcaption{left:1px;right:auto}'   /* left side  → top-left corner */
+  +'.ggb-colW .ggb-fig figcaption{right:1px;left:auto}'   /* West is the right side → top-right corner */
+  +'.ggb-colE .ggb-fig figcaption{left:1px;right:auto}'   /* East is the left side  → top-left corner */
   +'.ggb-fig img{width:100%;height:auto;display:block}'
   +'.ggb-col .ggb-fig img{height:100%;object-fit:contain;object-position:center bottom}'  /* stand every rikishi on the box floor — feet align across each row */
   /* names: vertical, alternating above / below the figure so neighbours never collide */
@@ -257,8 +265,8 @@
   +'.ggb-cap-down figcaption{top:100%;margin-top:1px}'
   +'.ggb-big{--fw:clamp(46px,8vw,78px)}.ggb-big figcaption{font-size:10px}'    /* sanyaku scale down on narrow screens so none get cropped */
   +'.ggb-san .ggb-fig figcaption{top:1px;bottom:auto;left:auto;right:auto;transform:none}'  /* sanyaku names in a top corner, same logic as the crowd */
-  +'.ggb-sanE .ggb-fig figcaption{right:1px;left:auto}'   /* East (right) → top-right */
-  +'.ggb-sanW .ggb-fig figcaption{left:1px;right:auto}'   /* West (left) → top-left */
+  +'.ggb-sanW .ggb-fig figcaption{right:1px;left:auto}'   /* West (right) → top-right */
+  +'.ggb-sanE .ggb-fig figcaption{left:1px;right:auto}'   /* East (left)  → top-left */
   +'.ggb-tY figcaption{background:#e7d38f}.ggb-tO figcaption{background:#e9c98c}'
   +'.ggb-tS figcaption{background:#e6b8a2}.ggb-tK figcaption{background:#e6c2b0}'
   +'.ggb-center{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;'
@@ -414,11 +422,16 @@
     var MARGIN = 12, GAP = 1, BASEPAD = 4;
     var minClear = Infinity, minH = Infinity, pads = [];
     for (var i = 0; i < cols.length; i++){
-      var r = cols[i].getBoundingClientRect(), west = cols[i].classList.contains("ggb-colW");
+      /* which flank this column is on is a question of geometry, not of which
+         side it belongs to — the two swapped once and would silently pad the
+         wrong edge if this went on trusting the class name */
+      var r = cols[i].getBoundingClientRect();
+      var onLeft = cardR ? (r.left + r.width / 2 < (cardR.left + cardR.right) / 2)
+                         : cols[i].classList.contains("ggb-colE");
       var padL = BASEPAD, padR = BASEPAD;
       if (cardR){
-        if (west){ var ce = cardR.left - MARGIN; if (ce < r.right - BASEPAD) padR = Math.max(BASEPAD, Math.round(r.right - ce)); }
-        else     { var cs = cardR.right + MARGIN; if (cs > r.left + BASEPAD) padL = Math.max(BASEPAD, Math.round(cs - r.left)); }
+        if (onLeft){ var ce = cardR.left - MARGIN; if (ce < r.right - BASEPAD) padR = Math.max(BASEPAD, Math.round(r.right - ce)); }
+        else       { var cs = cardR.right + MARGIN; if (cs > r.left + BASEPAD) padL = Math.max(BASEPAD, Math.round(cs - r.left)); }
       }
       pads.push([padL, padR]);
       var contentW = r.width - padL - padR;
@@ -466,14 +479,24 @@
     if (!containerW) return;
     var stageH = host.clientHeight || 0;
 
-    // centre element clears the card so the yokozuna aren't hidden. It can be a
-    // touch narrower than the card (the sanyaku peek above the card's top edge),
-    // which buys wider flanks and therefore bigger sanyaku.
+    /* The centre block has to clear the card OUTRIGHT. It used to be sized at
+       0.82x the card on the theory that the sanyaku peek above the card's top
+       edge and so could overlap it — they don't: the band runs well below that
+       edge, and the innermost figure on each side is the Yokozuna, so the one
+       man guaranteed to be clipped was the most important on the sheet. Full
+       card width plus a margin, and the flanks take what is left. */
     var card = document.querySelector(".bz-card");
-    var wantC = card ? Math.round(card.getBoundingClientRect().width * 0.82 + 2 * SAN_MARGIN) : 320;
+    var wantC = card ? Math.round(card.getBoundingClientRect().width + 2 * SAN_MARGIN) : 320;
     var centerW = Math.min(wantC, Math.max(0, containerW - 2 * SAN_MINFLANK));
     if (center) center.style.width = centerW + "px";
-    var flankW = (containerW - centerW) / 2;
+    /* the side headers ride inside the band now, between each Yokozuna and the
+       centre, so their width comes off the flanks too */
+    var heads = host.querySelectorAll(".ggb-sanyaku > .ggb-side-h"), headW = 0;
+    for (var hh = 0; hh < heads.length; hh++){
+      var hr = heads[hh].getBoundingClientRect();
+      headW = Math.max(headW, Math.ceil(hr.width) + 8);
+    }
+    var flankW = (containerW - centerW) / 2 - headW;
 
     // fill the flank, capped by a generous height budget (taller box = fw*SAN_BOX)
     var heightBudget = Math.max(140, stageH * 0.42);
