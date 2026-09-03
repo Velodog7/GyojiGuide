@@ -33,9 +33,9 @@
   var SAMPLE_BASE = (THIS && THIS.dataset && THIS.dataset.samples) || "samples/";
 
   // a fresh, silly title for whichever song is currently playing — one is
-  // picked at random each time a NEW song starts, and carried along with
-  // the saved progress so a song keeps its name if it continues onto the
-  // next page (see PROG_KEY below).
+  // dealt off the shuffled bag below each time a NEW song starts, and carried
+  // along with the saved progress so a song keeps its name if it continues
+  // onto the next page (see PROG_KEY below).
   var SONG_TITLES = [
     "There Shikos", "Nodowa bites the dust", "Dohyo inferno", "Chanko Boogie", "Heya Jude",
     "Don't Worry, Be Abi", "Tsupari all the time", "Hotel Kotozakura", "Shishi's a Lady",
@@ -48,7 +48,64 @@
     "Oops!… I Henka'd Again", "Gyoji in a Bottle", "Dock of the Beya", "Harite Tonight",
     "We Are The Shinpans", "Easy Like Sandanme Morning", "Welcome To The Chanko"
   ];
-  function randomTitle(){ return SONG_TITLES[Math.floor(Math.random() * SONG_TITLES.length)]; }
+  /* Titles are DEALT, not drawn: the list is shuffled into a bag and handed out
+     one at a time, so every name is heard once before any of them comes round
+     again. The bag — the shuffled order and how far through it we are — lives in
+     localStorage, so it survives a page navigation and a return visit rather
+     than restarting the deal on every page load. A fingerprint of the list is
+     stored alongside it: edit SONG_TITLES and the old deal is simply discarded
+     instead of dealing indices that no longer mean what they did. */
+  var TITLE_KEY = "taiko.radio.titles";
+  var TITLE_SIG = (function () {
+    var h = SONG_TITLES.length >>> 0;
+    for (var i = 0; i < SONG_TITLES.length; i++) {
+      var t = SONG_TITLES[i];
+      for (var j = 0; j < t.length; j++) h = (Math.imul(h, 31) + t.charCodeAt(j)) >>> 0;
+    }
+    return h;
+  })();
+  var titleBag = null;                       // in-memory copy, and the fallback when storage is unavailable
+  function dealTitles(prev) {
+    var N = SONG_TITLES.length, o = [], i, j, t;
+    for (i = 0; i < N; i++) o.push(i);
+    for (i = N - 1; i > 0; i--) { j = (Math.random() * (i + 1)) | 0; t = o[i]; o[i] = o[j]; o[j] = t; }
+    if (!prev || prev.length !== N || N < 4) return o;
+    /* Dealing the whole list before repeating is only half the job: the names
+       that CLOSED the last deal are still fresh in the ear, and a plain reshuffle
+       could put one of them two songs later. So the back half of the old deal is
+       barred from the front half of the new one — which means no name comes back
+       inside half a list, however the cycles line up. There is always room: the
+       front half needs N/2 names and exactly N/2 are not cooling off. */
+    var g = N >> 1, cooling = {}, spare = [], k;
+    for (i = N - g; i < N; i++) cooling[prev[i]] = 1;
+    for (k = g; k < N; k++) if (!cooling[o[k]]) spare.push(k);
+    for (i = spare.length - 1; i > 0; i--) { j = (Math.random() * (i + 1)) | 0; t = spare[i]; spare[i] = spare[j]; spare[j] = t; }
+    for (i = 0; i < g; i++) {
+      if (!cooling[o[i]] || !spare.length) continue;
+      k = spare.pop(); t = o[i]; o[i] = o[k]; o[k] = t;
+    }
+    return o;
+  }
+  function titleBagRead() {
+    if (titleBag) return titleBag;
+    var raw = null; try { raw = localStorage.getItem(TITLE_KEY); } catch (e) {}
+    if (raw) {
+      try {
+        var b = JSON.parse(raw);
+        if (b && b.sig === TITLE_SIG && b.order && b.order.length === SONG_TITLES.length && b.i >= 0)
+          return (titleBag = b);
+      } catch (e) {}
+    }
+    return (titleBag = { sig: TITLE_SIG, order: dealTitles(null), i: 0 });
+  }
+  function nextTitle() {
+    if (!SONG_TITLES.length) return "";
+    var b = titleBagRead();
+    if (b.i >= b.order.length) { b.order = dealTitles(b.order); b.i = 0; }
+    var name = SONG_TITLES[b.order[b.i++]];
+    try { localStorage.setItem(TITLE_KEY, JSON.stringify(b)); } catch (e) {}
+    return name;
+  }
 
   var SAMPLES = [{"name":"Deep Boom A","file":"samples/deep-boom-a.mp3"},{"name":"Deep Boom B","file":"samples/deep-boom-b.mp3"},{"name":"Deep Boom C","file":"samples/deep-boom-c.mp3"},{"name":"Deep Boom D","file":"samples/deep-boom-d.mp3"},{"name":"Big Hit A","file":"samples/big-hit-a.mp3"},{"name":"Big Hit B","file":"samples/big-hit-b.mp3"},{"name":"Big Hit C","file":"samples/big-hit-c.mp3"},{"name":"Big Hit D","file":"samples/big-hit-d.mp3"},{"name":"Big Hit E","file":"samples/big-hit-e.mp3"},{"name":"Big Hit F","file":"samples/big-hit-f.mp3"},{"name":"Big Hit G","file":"samples/big-hit-g.mp3"},{"name":"Big Hit H","file":"samples/big-hit-h.mp3"},{"name":"Big Hit I","file":"samples/big-hit-i.mp3"},{"name":"Mid Hit A","file":"samples/mid-hit-a.mp3"},{"name":"Mid Hit B","file":"samples/mid-hit-b.mp3"},{"name":"Mid Hit C","file":"samples/mid-hit-c.mp3"},{"name":"Mid Hit D","file":"samples/mid-hit-d.mp3"},{"name":"Mid Hit E","file":"samples/mid-hit-e.mp3"},{"name":"Mid Hit F","file":"samples/mid-hit-f.mp3"},{"name":"Mid Hit G","file":"samples/mid-hit-g.mp3"},{"name":"Mid Hit H","file":"samples/mid-hit-h.mp3"},{"name":"Drum 4a","file":"samples/drum-4a.mp3"},{"name":"Drum 4b","file":"samples/drum-4b.mp3"},{"name":"Drum 4c","file":"samples/drum-4c.mp3"},{"name":"Drum 4d","file":"samples/drum-4d.mp3"},{"name":"Drum 4e","file":"samples/drum-4e.mp3"},{"name":"Drum 5a","file":"samples/drum-5a.mp3"},{"name":"Drum 5b","file":"samples/drum-5b.mp3"},{"name":"Drum 5c","file":"samples/drum-5c.mp3"},{"name":"Drum 5d","file":"samples/drum-5d.mp3"},{"name":"Drum 6a","file":"samples/drum-6a.mp3"},{"name":"Drum 6b","file":"samples/drum-6b.mp3"},{"name":"Drum 6c","file":"samples/drum-6c.mp3"},{"name":"Drum 6d","file":"samples/drum-6d.mp3"},{"name":"Drum 6e","file":"samples/drum-6e.mp3"},{"name":"Taiko Forte 1","file":"samples/taiko-forte-1.mp3"},{"name":"Taiko Forte 2","file":"samples/taiko-forte-2.mp3"},{"name":"Taiko Mezzo","file":"samples/taiko-mezzo.mp3"},{"name":"Taiko Piano","file":"samples/taiko-piano.mp3"},{"name":"Taiko C5","file":"samples/taiko-c5.mp3"},{"name":"Quick Hit A","file":"samples/quick-hit-a.mp3"},{"name":"Quick Hit B","file":"samples/quick-hit-b.mp3"},{"name":"Quick Hit C","file":"samples/quick-hit-c.mp3"},{"name":"Crash A","file":"samples/crash-a.mp3"},{"name":"Crash B","file":"samples/crash-b.mp3"},{"name":"Crash C","file":"samples/crash-c.mp3"},{"name":"Crash D","file":"samples/crash-d.mp3"},{"name":"Crash E","file":"samples/crash-e.mp3"},{"name":"Sticks A","file":"samples/sticks-a.mp3"},{"name":"Sticks B","file":"samples/sticks-b.mp3"},{"name":"Sticks C","file":"samples/sticks-c.mp3"},{"name":"Sticks D","file":"samples/sticks-d.mp3"},{"name":"Sticks E","file":"samples/sticks-e.mp3"},{"name":"Sticks F","file":"samples/sticks-f.mp3"},{"name":"Sticks G","file":"samples/sticks-g.mp3"},{"name":"Lt Sticks A","file":"samples/lt-sticks-a.mp3"},{"name":"Lt Sticks B","file":"samples/lt-sticks-b.mp3"},{"name":"Lt Sticks C","file":"samples/lt-sticks-c.mp3"},{"name":"Lt Sticks D","file":"samples/lt-sticks-d.mp3"},{"name":"Lt Sticks E","file":"samples/lt-sticks-e.mp3"}];
   function sampleFile(idx) { return (SAMPLES[idx].file || "").replace(/^samples\//, SAMPLE_BASE); }
@@ -229,7 +286,7 @@
     if (!saved || !saved.song || !saved.song.sections || !saved.savedAt) return null;
     if (Date.now() - saved.savedAt > 30000) return null;          // stale — start fresh instead
     var carried = Date.now() - saved.savedAt;                     // keep the song moving through the gap itself
-    return { song: saved.song, radioIndex: saved.radioIndex || 0, resumeMs: Math.max(0, (saved.elapsedMs||0) + carried), songTitle: saved.songTitle || randomTitle() };
+    return { song: saved.song, radioIndex: saved.radioIndex || 0, resumeMs: Math.max(0, (saved.elapsedMs||0) + carried), songTitle: saved.songTitle || nextTitle() };
   }
   var curElapsedMs = 0;                                            // last known position, kept fresh even while paused
   var songTitle = "";                                              // this song's silly title, picked once when it starts
@@ -292,7 +349,7 @@
   }
   function resumeSong(saved) {
     ensureCtx();
-    song = saved.song; radioIndex = saved.radioIndex; songTitle = saved.songTitle || randomTitle();
+    song = saved.song; radioIndex = saved.radioIndex; songTitle = saved.songTitle || nextTitle();
     if (subEl) subEl.textContent = "loading…";
     var need = song.voices.map(function (v){ return v.idx; }).concat([song.crashIdx]);
     return loadBuffers(need).then(function () {
@@ -302,7 +359,7 @@
   }
   function nextSong() {
     ensureCtx();
-    song = generateSong(radioIndex++); songTitle = randomTitle();
+    song = generateSong(radioIndex++); songTitle = nextTitle();
     if (subEl) subEl.textContent = "loading…";
     var need = song.voices.map(function (v){ return v.idx; }).concat([song.crashIdx]);
     return loadBuffers(need).then(function () {
