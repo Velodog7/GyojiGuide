@@ -307,6 +307,23 @@
   +'@media(max-width:640px){'
     +'.ggb{position:static;inset:auto;min-height:0;padding-bottom:10px}'
     +'.ggb-water,.ggb-texfx{display:none}'
+    /* On a phone the sheet is stacked BELOW the welcome card rather than lying
+       behind it, so the paper began at the card's bottom edge and the strip from
+       there up to the sub-nav was bare page. Lay the same paper across the whole
+       stage, behind everything, and let the sheet's own background sit on top of
+       it wherever it reaches. Reaching into the host page for .bz-stage is not
+       lovely, but the paper is a data: URI defined in this file and the page has
+       no way to name it. */
+    +'.bz-stage{position:relative;background:#e9e1d0}'
+    +'.bz-stage::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;'
+      +'background:#e9e1d0 url('+PAPER+') center/cover no-repeat;'
+      +'filter:sepia(.14) saturate(1.02) contrast(.98) brightness(1.05)}'
+    /* the aged wash the sheet carries, so the backdrop reads as the same sheet
+       of paper rather than a clean patch above it */
+    +'.bz-stage::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;'
+      +'mix-blend-mode:multiply;opacity:.7;'
+      +'background:url('+PAPER+') center/cover no-repeat,url('+AI+') center/cover no-repeat}'
+    +'.bz-stage>.bz-card,.bz-stage>#ggBanzuke{position:relative;z-index:1}'
     /* ── the sanyaku band keeps its headline treatment: still West | officials |
          East, just scaled to the screen ── */
     /* the sanyaku band is gone on a phone -- those men are at the head of their
