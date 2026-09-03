@@ -558,14 +558,56 @@
     } catch (e) {}
   }
 
+  /* ---- site footer ----
+     Mounted here rather than pasted into eight files: only analysis.html and
+     banzuke.html had a <footer> at all, and theirs are page-specific notes (a
+     sources credit, a back-link) rather than a site footer. This adds the one
+     thing every page needs a route to — the terms — plus the attribution the
+     data sources are owed.
+
+     It waits for DOMContentLoaded, unlike the nav above: the nav script runs at
+     the TOP of <body>, so appending a footer at that moment would place it
+     above the page's own content instead of below it. */
+  var FOOT_CSS =
+    '.gg-foot{border-top:1px solid #2a2e3a;margin-top:auto;padding:20px 22px 26px;' +
+      'display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 16px;' +
+      'font-family:"WDXL Lubrifont TC",ui-monospace,monospace;font-size:.76rem;color:#878da0;' +
+      'text-align:center;line-height:1.5}' +
+    '.gg-foot a{color:#a6acbd;text-decoration:none;border-bottom:1px solid transparent}' +
+    '.gg-foot a:hover{color:#d8b25a;border-bottom-color:rgba(216,178,90,.5)}' +
+    '.gg-foot__mark{color:#d8b25a;letter-spacing:.14em;font-weight:600}' +
+    '.gg-foot__note{flex-basis:100%;color:#6b7180;font-size:.72rem}' +
+    '@media(max-width:520px){.gg-foot{gap:5px 12px;padding:16px 14px 22px}}';
+
+  function mountFooter() {
+    if (document.getElementById("gg-foot") || !document.body) return;
+    var f = document.createElement("footer");
+    f.id = "gg-foot";
+    f.className = "gg-foot";
+    // the current page links nowhere — a link to yourself is just a dead end
+    var terms = here === "terms.html"
+      ? '<span>Terms &amp; Privacy</span>'
+      : '<a href="terms.html">Terms &amp; Privacy</a>';
+    f.innerHTML =
+      '<span class="gg-foot__mark">SUMO SLAP DOWN</span>' +
+      terms +
+      '<a href="https://sumo-api.com" target="_blank" rel="noopener noreferrer">Data from sumo-api</a>' +
+      '<span class="gg-foot__note">Not affiliated with the Nihon Sumo Ky\u014dkai. ' +
+        'Grades, projections and simulations are one fan\u2019s model, not official.</span>';
+    document.body.appendChild(f);
+  }
+
   function mount() {
     ensureFont();
     var st = document.createElement("style");
     st.id = "gg-nav-css";
-    st.textContent = CSS;
+    st.textContent = CSS + FOOT_CSS;
     document.head.appendChild(st);
     build();
     trackPageview();
+    if (document.readyState === "loading")
+      document.addEventListener("DOMContentLoaded", mountFooter);
+    else mountFooter();
   }
   // Mount as soon as <body> exists rather than waiting for DOMContentLoaded.
   // The gg-nav script sits at the top of <body>, so building now inserts the

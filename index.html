@@ -105,6 +105,33 @@
   .bz-welcome{ display:flex; flex-direction:column; align-items:center; justify-content:flex-start; text-align:center; gap:14px; padding:6px 0 2px }
   .bz-welcome .view-sub{ margin:0 }
   .bz-logo{ width:min(200px,52%); height:auto; margin:0; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)) }
+  /* ── live basho strip ───────────────────────────────────
+     Sits at the top of the welcome card. The card scrolls internally
+     (max-height + overflow auto above), so this costs the banzuke behind it
+     nothing — it never widens the card or pushes it over the sanyaku. */
+  .bz-strip{ display:flex; align-items:center; gap:9px; width:100%; box-sizing:border-box;
+        margin:0 0 4px; padding:8px 12px; border-radius:999px; text-decoration:none;
+        border:1px solid rgba(216,178,90,.34); background:rgba(216,178,90,.08);
+        color:var(--ink); font-size:.86rem; line-height:1.25;
+        transition:border-color .14s, background .14s }
+  .bz-strip:hover{ border-color:rgba(216,178,90,.7); background:rgba(216,178,90,.14) }
+  .bz-strip[hidden]{ display:none }
+  .bz-strip__dot{ flex:none; width:7px; height:7px; border-radius:50%; background:var(--dim) }
+  /* only a tournament actually being fought gets the pulse */
+  .bz-strip.is-live .bz-strip__dot{ background:#e0554a; box-shadow:0 0 0 0 rgba(224,85,74,.6);
+        animation:bzPulse 2.2s ease-out infinite }
+  @keyframes bzPulse{ to{ box-shadow:0 0 0 9px rgba(224,85,74,0) } }
+  @media (prefers-reduced-motion:reduce){ .bz-strip.is-live .bz-strip__dot{ animation:none } }
+  .bz-strip__main{ font-weight:600; white-space:nowrap }
+  .bz-strip__meta{ color:var(--dim); font-family:"WDXL Lubrifont TC",monospace; font-size:.8rem;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0 }
+  .bz-strip__go{ margin-left:auto; flex:none; color:var(--gold,#d8b25a); font-weight:700 }
+  /* the clock is the point on a phone; the prose half is what gives way */
+  @media (max-width:430px){
+    .bz-strip{ font-size:.8rem; padding:7px 10px; gap:7px }
+    .bz-strip__main{ overflow:hidden; text-overflow:ellipsis; min-width:0 }
+    .bz-strip__meta{ flex:none }
+  }
   .bz-welcome .bz-intro{ width:100%; color:var(--dim); font-size:1rem; line-height:1.55 }
   .bz-intro b{ color:var(--ink) }
   .bz-features{ list-style:none; margin:0; padding:0; text-align:left; width:100%; display:flex; flex-direction:column; gap:8px }
@@ -263,7 +290,7 @@
   .ntr-missed span{background:rgba(226,86,74,.12);border:1px solid rgba(226,86,74,.4);border-radius:99px;
     padding:4px 11px;font-size:.79rem;color:#f0b3ac}
 </style>
-<script src="gg-config.js"></script><script src="gg-account.js"></script>
+<script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-basho.js"></script>
 </head>
 <body>
 <script src="gg-mawashi.js"></script><script src="gg-auth.js"></script><script src="gg-rikishi.js"></script><script src="gg-nav.js"></script>
@@ -293,6 +320,15 @@
   <div class="bz-card" id="bzCard">
     <div class="bz-mv on" id="mv-welcome">
       <div class="bz-welcome">
+        <!-- live basho strip: painted from the schedule in gg-basho.js with no
+             network at all; only a tournament actually in progress makes it
+             reach for the leaderboard. Hidden until it has something to say. -->
+        <a class="bz-strip" id="bzStrip" href="fantasy.html" hidden>
+          <span class="bz-strip__dot" aria-hidden="true"></span>
+          <span class="bz-strip__main" id="bzStripMain"></span>
+          <span class="bz-strip__meta" id="bzStripMeta"></span>
+          <span class="bz-strip__go" aria-hidden="true">&#8594;</span>
+        </a>
         <img class="bz-logo" src="SumoSlapdown-logoTall.svg" alt="Sumo Slapdown">
         <h1 class="sr-only">Sumo Slap Down — Fantasy Sumo: rikishi analysis, mock drafts, a basho simulator, and private fantasy leagues</h1>
 <p class="view-sub bz-intro">Welcome to <b>Sumo Slap Down</b>! I created this site because my family and friends who love sumo and fantasy sports wanted a single destination to analyze rikishi, mock draft your team, simulate upcoming basho, and customize private fantasy leagues. The site is still in beta so please reach out with any bug reports or suggestions on how to improve the site. Hakkeyoi!</p>
@@ -325,6 +361,106 @@
 
 <script src="gg-roster.js" defer></script><script src="gg-banzuke.js" defer></script>
 <script src="taiko-radio.js" defer></script>
+<script>
+/* ── live basho strip ────────────────────────────────────────────────
+   The landing page had no signal that a tournament was happening at all:
+   the countdown lives on fantasy.html and the leader strip on analysis.html,
+   so someone arriving at the front door saw neither.
+
+   Cost discipline, deliberately: the phase, the countdown, "Day 6 of 15" and
+   "final" all come from the schedule in gg-basho.js and the clock, so this
+   paints instantly and makes NO request for the ~275 days a year nothing is
+   being fought. Only a tournament actually in progress (plus a short
+   afterglow, so the champion is still up the following weekend) reaches for
+   the leaderboard — and then it caches the answer in sessionStorage for five
+   minutes, because /exec shares a daily quota with the hourly results import
+   and the home page is the busiest thing on the site.
+   ------------------------------------------------------------------- */
+(function(){
+  var GG = window.GyojiGuide;
+  var el = document.getElementById("bzStrip");
+  if (!el || !GG || !GG.basho) return;
+  var mainEl = document.getElementById("bzStripMain"),
+      metaEl = document.getElementById("bzStripMeta");
+  var CACHE_KEY = "gg.strip.v1", CACHE_MS = 5*60*1000;
+  var timer = null, live = null;          // `live` = whatever the fetch found
+
+  function pts(n){ return n + " pt" + (Number(n) === 1 ? "" : "s"); }
+
+  function paint(){
+    var st = GG.basho.state();
+    if (st.phase === "idle"){ el.hidden = true; return; }
+    var b = st.basho, main = "", meta = "", href = "fantasy.html", title = "";
+
+    if (st.phase === "live"){
+      /* The schedule says which day is being FOUGHT; Meta.lastDay says which
+         day has been SCORED, and they differ for most of any given day. Both
+         are true and both matter, but only one fits on the line — so the day
+         being fought is the headline and the day scored rides in the tooltip,
+         rather than being appended and then truncated to "(thru\u2026". */
+      main = b.name + " \u00b7 Day " + st.day + " of 15";
+      meta = live && live.leader
+        ? live.leader + " leads \u00b7 " + pts(live.pts)
+        : (live && live.count ? live.count + " team" + (live.count===1?"":"s") + " in"
+                              : "Live now");
+      if (live && live.lastDay)
+        title = "Standings through Day " + live.lastDay + " \u2014 Day " + st.day + " is being fought now";
+    } else if (st.phase === "final"){
+      main = b.name + " \u00b7 final";
+      meta = live && live.leader ? live.leader + " won \u00b7 " + pts(live.pts)
+                                 : "Results in";
+    } else if (!st.banzukeOut){
+      main = b.name + " \u00b7 " + b.venue;
+      meta = "Banzuke in " + GG.basho.countdown(st.msToBanzuke);
+    } else {
+      main = b.name + " \u00b7 " + b.venue;
+      meta = "Starts in " + GG.basho.countdown(st.msToStart);
+    }
+
+    el.className = "bz-strip" + (st.phase === "live" ? " is-live" : "");
+    el.href = href;
+    if (title) el.title = title; else el.removeAttribute("title");
+    mainEl.textContent = main;          // textContent, so a shikona never needs escaping
+    metaEl.textContent = meta;
+    el.hidden = false;
+  }
+
+  /* one cheap read of the shared leaderboard, only while it means something */
+  async function fetchLive(){
+    if (!GG.hasAPI || !GG.hasAPI() || !GG.standings) return;
+    try {
+      var hit = JSON.parse(sessionStorage.getItem(CACHE_KEY) || "null");
+      if (hit && (Date.now() - hit.at) < CACHE_MS){ live = hit.v; paint(); return; }
+    } catch (e) {}
+    try {
+      var s = await GG.standings();
+      var top = s && s.rows && s.rows[0];
+      live = { leader: top ? (top.name || "") : "", pts: top ? top.pts : 0,
+               count: (s && s.count) || 0,
+               lastDay: (s && s.model && Number(s.model.lastDay)) || 0 };
+      try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at:Date.now(), v:live })); } catch (e) {}
+      paint();
+    } catch (e) {}                          // a strip that can't load stays on the schedule
+  }
+
+  /* Tick only while someone is looking. Same discipline as the DM badge: a
+     backgrounded tab running a 1s interval forever is pure waste, and the
+     clock is repainted on return anyway. */
+  function start(){
+    stop();
+    paint();
+    if (document.visibilityState !== "hidden") timer = setInterval(paint, 1000);
+  }
+  function stop(){ if (timer){ clearInterval(timer); timer = null; } }
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState === "hidden") stop(); else start();
+  });
+
+  start();
+  var ph = GG.basho.state().phase;
+  if (ph === "live" || ph === "final") fetchLive();
+})();
+</script>
 <script>
 /* ============================================================
    Welcome-page subnav: Welcome (banzuke) · Learn · Resources

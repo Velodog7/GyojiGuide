@@ -641,7 +641,7 @@
   .lg-score-fld small{ color:var(--faint); font-size:.74rem; line-height:1.35 }
   .lg-score-btns{ display:flex; align-items:center; gap:8px; flex-wrap:wrap }
 </style>
-<script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-mawashi.js"></script></head>
+<script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-basho.js"></script><script src="gg-mawashi.js"></script></head>
 <body>
 <script src="gg-auth.js"></script><script src="gg-nav.js"></script>
 <nav class="tabs" role="tablist">
@@ -1407,16 +1407,11 @@ async function loadBoard(){
 }
 
 /* ---------- countdown to the next basho ---------- */
-// Honbasho run six times a year in a fixed rotation, but exact dates are announced
-// tournament-by-tournament — so this is a short, manually-updated table rather than
-// a "+6 weeks" guess. Add the next confirmed date here once the JSA announces it.
-const UPCOMING_BASHO = [
-  // banzuke: JSA publishes the ranking the Monday 13 days before Day 1 (~6am JST).
-  // These are that standard timing; adjust if the JSA confirms a different day.
-  // The draft stays LOCKED until this moment, since ranks aren't known before it.
-  { name: "Aki 2026",    venue: "Tokyo",   banzuke: "2026-08-31T06:00:00+09:00", start: "2026-09-13T00:00:00+09:00", end: "2026-09-27T23:59:59+09:00" },
-  { name: "Kyushu 2026", venue: "Fukuoka", banzuke: "2026-10-26T06:00:00+09:00", start: "2026-11-08T00:00:00+09:00", end: "2026-11-22T23:59:59+09:00" }
-];
+// The schedule itself now lives in gg-basho.js, so this page and the homepage
+// strip read the SAME dates — two copies meant two places to edit when the JSA
+// announces the next basho, and nothing to catch it if only one got done.
+// Edit the table there, not here.
+const UPCOMING_BASHO = (window.GyojiGuide && GyojiGuide.UPCOMING_BASHO) || [];
 let cdTimer = null;
 function nextBasho(){
   const now = Date.now();
