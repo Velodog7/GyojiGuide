@@ -134,10 +134,16 @@
   }
 
   /* ---- gyōji (either side) & yobidashi (middle) — sits on the sanyaku row ---- */
+  /* The centre of the band, above the card: gyōji · 東 · yobidashi · 西 · gyōji.
+     The two side headers sit here rather than out in the flanks — every pixel
+     they took beside a Yokozuna was a pixel the sanyaku could not have, and the
+     centre block is already sized to clear the card, so they cost nothing here. */
   function officials(){
     return '<div class="ggb-sancenter">'
       + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI_IMG+'" alt="Gyōji" decoding="async"></figure>'
+      + '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
       + '<figure class="ggb-off ggb-yobi"><img src="'+YOBI_IMG+'" alt="Yobidashi" decoding="async"></figure>'
+      + '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
       + '<figure class="ggb-off ggb-gyoji"><img src="'+GYOJI2_IMG+'" alt="Gyōji" decoding="async"></figure>'
       + '</div>';
   }
@@ -173,11 +179,10 @@
           /* wide: East group | 東 | officials | 西 | West group — each header
              tucked just inside its own side's Yokozuna rather than stranded
              out at the edge of the sheet */
+          /* wide: East group | officials (which carry the 東/西 headers) | West group */
           : '<div class="ggb-sanyaku">'
           +   '<div class="ggb-san ggb-sanE">'+sanE.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
-          +   '<div class="ggb-side-h ggb-east">東<em>East</em></div>'
           +   officials()
-          +   '<div class="ggb-side-h ggb-west">西<em>West</em></div>'
           +   '<div class="ggb-san ggb-sanW">'+sanW.map(function(n){return fig(n,true,null,null);}).join("")+'</div>'
           + '</div>')
       + '</div>'
@@ -241,9 +246,11 @@
   +'.ggb-san .ggb-fig{margin-left:0;aspect-ratio:1/2}'   /* taller uniform box: fuller figures, tops (names) and feet aligned */
   +'.ggb-san .ggb-fig img{height:100%;object-fit:contain;object-position:center bottom}'
   +'.ggb-sancenter{flex:0 0 auto;display:flex;align-items:flex-end;justify-content:center;gap:clamp(2px,1vw,12px);min-width:0}'
-  /* the side headers ride inside the band, tucked against the centre just past
-     each side's Yokozuna, rather than out at the far edges of the sheet */
-  +'.ggb-sanyaku>.ggb-side-h{flex:0 0 auto;align-self:flex-end;margin:0 4px 6px;white-space:nowrap}'  /* gyōji · yobidashi · gyōji, peeking above the card */
+  /* The side headers stand with the officials, either side of the yobidashi.
+     Aligned to the TOP of that block, not its baseline: the officials are as
+     tall as the card is deep, so anything sitting at their feet is behind it —
+     only the head of the block clears the card's top edge. */
+  +'.ggb-sancenter .ggb-side-h{flex:0 0 auto;align-self:flex-start;margin:6px 0 0;white-space:nowrap}'  /* gyōji · yobidashi · gyōji, peeking above the card */
   +'.ggb-sancenter .ggb-off{margin:0;flex:0 0 auto}'
   +'.ggb-body{flex:1;display:grid;grid-template-columns:1fr auto 1fr;min-height:0}'
   +'.ggb-col{position:relative;overflow:hidden;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));'
@@ -489,14 +496,9 @@
     var wantC = card ? Math.round(card.getBoundingClientRect().width + 2 * SAN_MARGIN) : 320;
     var centerW = Math.min(wantC, Math.max(0, containerW - 2 * SAN_MINFLANK));
     if (center) center.style.width = centerW + "px";
-    /* the side headers ride inside the band now, between each Yokozuna and the
-       centre, so their width comes off the flanks too */
-    var heads = host.querySelectorAll(".ggb-sanyaku > .ggb-side-h"), headW = 0;
-    for (var hh = 0; hh < heads.length; hh++){
-      var hr = heads[hh].getBoundingClientRect();
-      headW = Math.max(headW, Math.ceil(hr.width) + 8);
-    }
-    var flankW = (containerW - centerW) / 2 - headW;
+    /* the side headers ride with the officials inside the centre block, so the
+       flanks keep the whole of what is left */
+    var flankW = (containerW - centerW) / 2;
 
     // fill the flank, capped by a generous height budget (taller box = fw*SAN_BOX)
     var heightBudget = Math.max(140, stageH * 0.42);
