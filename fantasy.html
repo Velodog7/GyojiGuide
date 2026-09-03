@@ -1467,7 +1467,15 @@ function renderCountdown(model){
   cdTimer = setInterval(tick, 1000);
 }
 
-/* ---------- auto-archive a finished tournament's team ---------- */
+/* ---------- auto-archive a finished tournament's team ----------
+   A courtesy pass, not the record. The backend archives EVERY account at
+   basho close (archiveAllTeams_ in sumo-fantasy.gs, off the hourly results
+   job), which is what guarantees nobody loses a basho by not visiting; this
+   just lands the row the moment a player watches the last bout instead of on
+   the next hourly tick. It can therefore file a score taken before the yusho
+   and sansho reach Meta \u2014 the server pass overwrites it with the finished
+   numbers, upserting on (handle, basho), so the two can't duplicate or fight.
+   Don't make anything depend on this running. ---------- */
 function maybeArchive(model){
   if (!acct || !hasAPI() || !model.started || model.lastDay < 15) return;
   if (teamCount() !== 7) return;

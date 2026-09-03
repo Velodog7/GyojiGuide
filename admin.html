@@ -298,6 +298,12 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
         <div id="newBashoMsg" style="margin-top:10px;font-size:.9rem"></div>
       </div>
       <div class="card" style="max-width:480px">
+        <h3>Archive the basho</h3>
+        <p class="v-sub" style="margin:0 0 12px">Scores every account off the results sheet and files one row per player in the team history &#8212; the only record that survives the reset above. This runs by itself an hour after the last bout, so the button is a manual retry: press it if the hourly import was down at basho close, or if the y&#363;sh&#333; and sansh&#333; were typed in by hand afterwards. Safe to press twice.</p>
+        <button class="btn" id="archiveBtn">Archive this basho</button>
+        <div id="archiveMsg" style="margin-top:10px;font-size:.9rem"></div>
+      </div>
+      <div class="card" style="max-width:480px">
         <h3>Long-term ranking</h3>
         <p class="v-sub" style="margin:0 0 12px">Grades every player&#8217;s win rate for the basho on the curve, updates the banzuke ranks on the public leaderboard, and crowns the basho&#8217;s champions &#8212; the Sumo Slap Down title plus one per private league. Run this once, after all results for the basho are archived.</p>
         <button class="btn gold" id="applyRankBtn">Apply ranking for this basho</button>
@@ -615,6 +621,32 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     } else {
       msg.style.color = "#e0736a";
       msg.textContent = (res && res.error) || "Couldn\u2019t start a new basho \u2014 is the backend deployed?";
+    }
+  };
+  $("archiveBtn").onclick = async function(){
+    var btn = $("archiveBtn"), msg = $("archiveMsg");
+    btn.disabled = true; msg.style.color = ""; msg.textContent = "Scoring\u2026";
+    var res = await aPost("adminArchiveBasho", {});
+    /* "already" is the normal answer once the hourly job has done its work \u2014
+       re-running with force is how you fold in a late y\u016bsh\u014d or a hand
+       correction, so offer it rather than leaving the admin stuck. */
+    if (res && res.ok && res.already){
+      if (confirm("Already archived for " + (res.basho || "this basho") + ".\n\nRe-score and overwrite those rows?\n\nOnly do this before anyone drafts for the next basho \u2014 it archives the teams as they stand right now."))
+        res = await aPost("adminArchiveBasho", { force: true });
+    }
+    btn.disabled = false;
+    if (res && res.ok && res.already){
+      msg.style.color = "#5fd08a";
+      msg.textContent = "Already archived for " + (res.basho || "this basho") + " \u2014 left alone.";
+    } else if (res && res.ok){
+      msg.style.color = "#5fd08a";
+      msg.textContent = "Archived " + (res.archived || 0) + " player" + (res.archived === 1 ? "" : "s") +
+        " for " + res.basho + (res.skipped ? " (" + res.skipped + " never picked a team)" : "") + "." +
+        (res.yusho ? " Y\u016bsh\u014d: " + res.yusho + "." : " No y\u016bsh\u014d recorded \u2014 the +5 didn\u2019t pay out.");
+      var rc = $("recheckBtn"); if (rc) rc.click();
+    } else {
+      msg.style.color = res && res.waiting ? "#e8b04b" : "#e0736a";
+      msg.textContent = (res && res.error) || "Couldn\u2019t archive \u2014 is the backend deployed?";
     }
   };
   $("applyRankBtn").onclick = async function(){

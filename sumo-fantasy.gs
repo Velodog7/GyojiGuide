@@ -115,7 +115,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-02-bashoroll';
+var BACKEND_VERSION = '2026-09-03-autoarchive';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -321,6 +321,7 @@ function doPost(e) {
     if (body.action === 'adminStats')     return json(adminGated(body.adminKey, adminStats));
     if (body.action === 'adminResetAnalytics') return json(adminGated(body.adminKey, adminResetAnalytics));
     if (body.action === 'adminResetBasho')     return json(adminResetBasho(body));
+    if (body.action === 'adminArchiveBasho')   return json(adminArchiveBasho(body));
     if (body.action === 'adminUsers')     return json(adminGated(body.adminKey, adminUsers));
     if (body.action === 'adminMessages')  return json(adminGated(body.adminKey, adminMessages));
     if (body.action === 'adminFeedback')  return json(adminGated(body.adminKey, adminFeedback));
@@ -1839,12 +1840,22 @@ function addDrop(body){
 
 /* ============================================================
    TEAM HISTORY
-   A tournament runs every ~6 weeks; once one finishes, the client
-   snapshots the player's finished roster + final score here so it
-   survives them drafting a fresh team for the next basho. The score
-   and win count are computed client-side (scoring lives in
-   gg-account.js) and sent along with the snapshot — this just stores
-   it. Upserts on (handle, basho) so a repeated/auto call is harmless.
+   A tournament runs every ~6 weeks; once one finishes, each player's
+   finished roster + final score is snapshotted here so it survives them
+   drafting a fresh team for the next basho. Once the results sheet is
+   cleared for the next tournament the score CANNOT be recomputed, so a
+   missing row is a permanently lost basho.
+
+   Two writers, same rows, upserting on (handle, basho) so they can't
+   duplicate or fight:
+     · archiveAllTeams_() — the authority. Runs server-side at basho
+       close (refreshResults, once Meta.lastDay hits 15) and scores every
+       account off the sheet, whether or not its owner ever comes back.
+     · archiveTeam()  — the client's own snapshot, kept because it lands
+       the moment a player watches the last bout rather than on the next
+       hourly tick. It sends its own score, computed by gg-account.js.
+   The server pass is what makes the archive complete; the client one just
+   makes it prompt.
    ============================================================ */
 function archiveTeam(body){
   var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
@@ -1854,17 +1865,23 @@ function archiveTeam(body){
   var rowsJson = typeof body.rows === 'string' ? body.rows : JSON.stringify(body.rows || []);
   var score = Number(body.score || 0), wins = Number(body.wins || 0);
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
-  try {
-    var sh = sh_(SHEET_HISTORY), v = sh.getDataRange().getValues(), key = u.handle.toLowerCase();
-    for (var r=1;r<v.length;r++){
-      if (String(v[r][0]).toLowerCase()===key && String(v[r][1])===basho){
-        sh.getRange(r+1, 1, 1, 7).setValues([[u.handle, basho, teamJson, score, wins, rowsJson, new Date().toISOString()]]);
-        return { ok:true, updated:true };
-      }
+  try { return historyUpsert_(u.handle, basho, teamJson, score, wins, rowsJson); }
+  finally { lock.releaseLock(); }
+}
+
+/* One TeamHistory row, keyed on (handle, basho). Caller holds the script
+   lock — both writers above are inside one. */
+function historyUpsert_(handle, basho, teamJson, score, wins, rowsJson){
+  var sh = sh_(SHEET_HISTORY), v = sh.getDataRange().getValues(), key = String(handle).toLowerCase();
+  var vals = [handle, basho, teamJson, score, wins, rowsJson, new Date().toISOString()];
+  for (var r=1;r<v.length;r++){
+    if (String(v[r][0]).toLowerCase()===key && String(v[r][1])===basho){
+      sh.getRange(r+1, 1, 1, 7).setValues([vals]);
+      return { ok:true, updated:true };
     }
-    sh.appendRow([u.handle, basho, teamJson, score, wins, rowsJson, new Date().toISOString()]);
-    return { ok:true, created:true };
-  } finally { lock.releaseLock(); }
+  }
+  sh.appendRow(vals);
+  return { ok:true, created:true };
 }
 
 function myHistory(handle){
@@ -2703,6 +2720,127 @@ function serverTeamScore_(names, model){
   return pts;
 }
 
+/* The same score, itemised — the per-rikishi breakdown the archive stores and
+   the account page reads back. Mirrors GG.teamScore's `rows` field field for
+   field (name/tier/w/wins/bonus/sansho/yusho/pts, sorted by points), because
+   computeBadges_ and tierMapFor_ both read those keys out of archived rows.
+   `wins` on the returned object is the sum of the row `w` values, matching
+   what the client sends as its win count. */
+function serverTeamRows_(team, model, tiers){
+  var sc = model.scoring, pts = 0, wins = 0, rows = [];
+  Object.keys(team || {}).forEach(function(k){
+    var n = team[k]; if (!n) return;
+    var wgames = model.wins[n] || 0, bn = model.bonus[n] || 0;
+    var w  = wgames * sc.winPoint;
+    var sa = model.sansho[n] ? sc.sansho : 0;
+    var yu = (model.yusho && model.yusho === n) ? sc.yusho : 0;
+    var p  = w + bn + sa + yu;
+    pts += p; wins += w;
+    rows.push({ name:n, tier:String((tiers || {})[n] || 'M'), w:w, wins:wgames, bonus:bn,
+                sansho:!!sa, yusho:!!yu, pts:p });
+  });
+  rows.sort(function(a, b){ return b.pts - a.pts; });
+  return { pts:pts, wins:wins, rows:rows };
+}
+
+/* name -> banzuke tier, read straight off sumo-api's banzuke for the basho.
+   fetchBanzukeNames() above wants only the shikona; this wants the rank, so
+   the sanyaku bonus can be computed on the server without waiting for the
+   admin page to post gg-account.js's hand-maintained RANKS table. */
+function tierFromRank_(rank, div){
+  var r = String(rank || '').toLowerCase();
+  if (r.indexOf('yokozuna')   >= 0) return 'Y';
+  if (r.indexOf('ozeki')      >= 0) return 'O';
+  if (r.indexOf('sekiwake')   >= 0) return 'S';
+  if (r.indexOf('komusubi')   >= 0) return 'K';
+  if (r.indexOf('juryo')      >= 0) return 'J';
+  if (r.indexOf('maegashira') >= 0) return 'M';
+  return String(div || '').toLowerCase().indexOf('juryo') >= 0 ? 'J' : 'M';
+}
+function fetchBanzukeTiers_(bashoId){
+  bashoId = bashoId || BASHO_ID;
+  var out = {}, divs = ['Makuuchi', 'Juryo'];
+  for (var d = 0; d < divs.length; d++){
+    try {
+      var resp = UrlFetchApp.fetch('https://sumo-api.com/api/basho/' + bashoId + '/banzuke/' + divs[d], { muteHttpExceptions:true });
+      if (resp.getResponseCode() !== 200) continue;
+      var data = JSON.parse(resp.getContentText());
+      var rows = [].concat(data.east || [], data.west || []);
+      for (var i = 0; i < rows.length; i++){
+        var name = String(rows[i].shikonaEn || rows[i].shikona || '').trim();
+        if (name) out[name] = tierFromRank_(rows[i].rank || rows[i].Rank || '', divs[d]);
+      }
+    } catch (e) {}
+  }
+  return out;
+}
+
+/* ---- the basho-close archive ----------------------------------------------
+   Scores every account off the sheet and writes it to TeamHistory. This used
+   to be the client's job alone (maybeArchive() in fantasy.html), which meant a
+   player who didn't open the page between the last bout and the next "New
+   basho" simply lost that tournament — silently, and unrecoverably, because
+   the reset clears the very rows the score is computed from.
+
+   Guards, in order: the basho must have finished (Meta.lastDay >= 15), there
+   must be results to score, and it runs once per basho (Meta.archivedBasho).
+   Re-running it is safe while those hold — it upserts on (handle, basho) — but
+   the flag matters anyway: after the tournament, players start editing their
+   teams for the NEXT one, and a second pass would archive those instead.
+
+   CALLER MUST HOLD THE SCRIPT LOCK. Use archiveBasho_() if you don't.       */
+function archiveAllTeams_(opts){
+  opts = opts || {};
+  var meta = readMeta();
+  var basho = String(opts.basho || meta.basho || BASHO_LABEL).trim().slice(0, 60);
+  if (!basho) return { ok:false, error:'No basho label in Meta.', archived:0 };
+  var lastDay = Number(meta.lastDay || 0);
+  if (!opts.force && lastDay < 15)
+    return { ok:false, waiting:true, lastDay:lastDay, archived:0,
+             error:'Basho still running \u2014 day ' + lastDay + ' of 15.' };
+  if (!opts.force && String(meta.archivedBasho || '') === basho)
+    return { ok:true, already:true, basho:basho, archived:0 };
+
+  var tiers = {};
+  try { tiers = JSON.parse(meta['tiers:' + basho] || '{}'); } catch (e) { tiers = {}; }
+  if (!Object.keys(tiers).length) tiers = tierMapFor_(basho, fetchBanzukeTiers_(BASHO_ID));
+
+  var model = serverScoreModel_(defaultScoring(), tiers);
+  if (!Object.keys(model.wins).length)
+    return { ok:false, error:'No results in the sheet to score \u2014 nothing to archive.', archived:0 };
+
+  var users = readUsers();
+  var sh = sh_(SHEET_HISTORY), v = sh.getDataRange().getValues(), rowByHandle = {}, r;
+  for (r = 1; r < v.length; r++){
+    if (String(v[r][1]) !== basho) continue;
+    rowByHandle[String(v[r][0] || '').toLowerCase()] = r + 1;
+  }
+  var appends = [], updated = 0, skipped = 0;
+  users.forEach(function(u){
+    var team = u.team || {};
+    var s = serverTeamRows_(team, model, tiers);
+    if (!s.rows.length) { skipped++; return; }                 // registered but never picked
+    var vals = [u.handle, basho, JSON.stringify(team), s.pts, s.wins, JSON.stringify(s.rows), new Date().toISOString()];
+    var row = rowByHandle[u.handle.toLowerCase()];
+    if (row) { sh.getRange(row, 1, 1, 7).setValues([vals]); updated++; }
+    else appends.push(vals);
+  });
+  if (appends.length) sh.getRange(sh.getLastRow() + 1, 1, appends.length, 7).setValues(appends);
+  setMeta_('archivedBasho', basho);
+  setMeta_('archiveError', '');
+  return { ok:true, basho:basho, archived:updated + appends.length, created:appends.length,
+           updated:updated, skipped:skipped, yusho:model.yusho,
+           sansho:Object.keys(model.sansho).join(', ') };
+}
+function archiveBasho_(opts){
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try { return archiveAllTeams_(opts); } finally { lock.releaseLock(); }
+}
+function adminArchiveBasho(body){
+  var bad = adminGate(body && body.adminKey); if (bad) return bad;
+  return archiveBasho_({ basho: body && body.basho, force: !!(body && body.force) });
+}
+
 /* Given [{handle,score}], who takes the title?
    A title needs a contest, so: at least two scored teams, and a top score
    above zero. A tie crowns co-champions rather than nobody — sumo settles
@@ -2824,6 +2962,14 @@ function applyBashoRanking(basho, tiers){
   var lock = LockService.getScriptLock(); lock.waitLock(25000);
   try {
     if (String(readMeta().rankedBasho||'') === basho) return { ok:true, already:true, basho:basho };
+    /* Grade the archive, but make sure there IS one first. Pressing "Apply
+       ranking" used to fail with "no archived results" if the players hadn't
+       each opened the site since the last bout; now the button archives the
+       current basho itself. Same lock, and archiveAllTeams_ is the no-lock
+       core precisely so this call can't deadlock against it. */
+    if (basho === String(readMeta().basho || '').trim()) {
+      try { archiveAllTeams_({ basho: basho }); } catch (e) {}
+    }
     var hv = sh_(SHEET_HISTORY).getDataRange().getValues(), arr = [], r;
     for (r=1;r<hv.length;r++){
       if (String(hv[r][1]) !== basho) continue;
@@ -2892,7 +3038,7 @@ function refreshResults() {
     have[existing[r][0] + '|' + existing[r][1] + '|' + existing[r][2] + '|' + existing[r][3]] = true;
   }
 
-  var maxDay = 0;
+  var maxDay = 0, awards = { yusho:'', sansho:{} };
   for (var day = 1; day <= 15; day++) {
     for (var d = 0; d < divisions.length; d++) {
       var div = divisions[d];
@@ -2903,6 +3049,7 @@ function refreshResults() {
         if (resp.getResponseCode() !== 200) continue;
         var data = JSON.parse(resp.getContentText());
         bouts = data.torikumi || data.Torikumi || [];
+        captureAwards_(div, data, awards);
       } catch (e) { continue; }
       if (!bouts || !bouts.length) continue;
 
@@ -2930,5 +3077,41 @@ function refreshResults() {
         if (String(mv[r2][0]) === 'lastDay') { meta.getRange(r2 + 1, 2).setValue(Math.max(Number(mv[r2][1]) || 0, maxDay)); break; }
       }
     }
+  }
+
+  /* The tournament's honours \u2014 y\u016bsh\u014d and the three sansh\u014d \u2014 ride along on the
+     same payload as the bouts, and they're worth +5 each. Fill them in before
+     the archive below freezes anyone's score, or every prize silently fails to
+     pay out. We only ever fill a BLANK: a value typed onto the Meta tab by
+     hand is a deliberate correction and outranks the feed. */
+  var m = readMeta();
+  if (Number(m.lastDay || 0) >= 15) {
+    if (awards.yusho && !String(m.yusho || '').trim()) setMeta_('yusho', awards.yusho);
+    var prizes = Object.keys(awards.sansho);
+    if (prizes.length && !String(m.sansho || '').trim()) setMeta_('sansho', prizes.join(', '));
+  }
+
+  /* Basho over? Snapshot everyone. Self-guarding (day 15, once per basho), so
+     calling it on every tick costs one Meta read while the basho is running. */
+  try { archiveBasho_({}); }
+  catch (err) { try { setMeta_('archiveError', new Date().toISOString() + ' ' + String(err)); } catch (e2) {} }
+}
+
+/* Pull the y\u016bsh\u014d winner and the special prizes out of a torikumi payload.
+   Sansh\u014d are a Makuuchi award, and only the Makuuchi y\u016bsh\u014d scores, so both
+   are read from the Makuuchi fetch; the y\u016bsh\u014d list carries a division in
+   `type`, and we accept a lone unlabelled entry from the Makuuchi call. */
+function captureAwards_(div, data, into){
+  if (!data || !into || String(div).toLowerCase().indexOf('makuuchi') < 0) return;
+  var y = data.yusho || data.Yusho || [];
+  for (var i = 0; i < y.length; i++){
+    var name = String(y[i].shikonaEn || y[i].shikona || '').trim();
+    var type = String(y[i].type || y[i].Type || '');
+    if (name && (/makuuchi/i.test(type) || (!type && y.length === 1))) into.yusho = name;
+  }
+  var sp = data.specialPrizes || data.SpecialPrizes || [];
+  for (var j = 0; j < sp.length; j++){
+    var sn = String(sp[j].shikonaEn || sp[j].shikona || '').trim();
+    if (sn) into.sansho[sn] = 1;          // two prizes for one man still score once, as on the client
   }
 }
