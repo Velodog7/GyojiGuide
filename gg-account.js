@@ -274,6 +274,17 @@
     return GG.apiPost(authed({ action:"saveDraftBoard", id:id,
       makuuchi: makuuchi || [], juryo: juryo || [], auto: !!auto }));
   };
+  /* ---- the keeper roll-over ----
+     Limits are commissioner-set and, unlike roster sizes, stay editable after
+     the draft: they change nothing about a draft or a running basho, only what
+     survives the roll-over. Pass "" for a division to clear its limit. */
+  GG.setLeagueKeepers  = function (id, keepMk, keepJr){
+    return GG.apiPost(authed({ action:"setLeagueKeepers", id:id, keepMk:keepMk, keepJr:keepJr })); };
+  GG.openKeeperWindow  = function (id){ return GG.apiPost(authed({ action:"openKeeperWindow", id:id })); };
+  GG.declareKeepers    = function (id, keep){ return GG.apiPost(authed({ action:"declareKeepers", id:id, keep: keep || [] })); };
+  GG.closeKeeperWindow = function (id){ return GG.apiPost(authed({ action:"closeKeeperWindow", id:id })); };
+  GG.keeperState       = function (id){ return GG.apiGetQ("keeperState", { id:id, handle:(GG.account.get()||{}).handle || "" }); };
+
   GG.openRedraft    = function (id){ return GG.apiPost(authed({ action:"openRedraft", id:id })); };
   GG.redraftState   = function (id){ return GG.apiPost(authed({ action:"redraftState", id:id })); };
   GG.redraftPick    = function (id, rikishi){ return GG.apiPost(authed({ action:"redraftPick", id:id, rikishi:rikishi })); };

@@ -57,6 +57,7 @@ var SHEET_BOARD_VOTES = 'LeaderboardVotes';
 var SHEET_DMS = 'DirectMessages';
 var SHEET_CHAMPS = 'Champions';
 var SHEET_BOARDS = 'DraftBoards';
+var SHEET_KEEPS  = 'KeeperKeeps';   // who each member declared at the roll-over
 
 // Label for the current tournament (shown in the app).
 var BASHO_LABEL   = 'Aki 2026';
@@ -153,6 +154,7 @@ function setup() {
   ensureSheet(ss, SHEET_DMS, ['id', 'fromHandle', 'fromName', 'toHandle', 'body', 'created', 'readByRecipient']);
   ensureSheet(ss, SHEET_CHAMPS, CHAMP_HEAD);
   ensureSheet(ss, SHEET_BOARDS, DBOARD_HEAD);
+  ensureSheet(ss, SHEET_KEEPS, ['leagueId', 'handle', 'rikishi', 'declaredAt']);
   var meta = ensureSheet(ss, SHEET_META, ['key', 'value']);
   if (meta.getLastRow() < 2) {
     meta.appendRow(['basho', BASHO_LABEL]);
@@ -232,6 +234,15 @@ function migrateLeaguesV2(sh) {
   if (String(head[16] || '').toLowerCase() !== 'pickclock') {
     sh.getRange(1, 17, 1, 3).setValues([['pickClock', 'pickDeadline', 'defaultOrder']]);
   }
+  /* v6: how many wrestlers carry over to the next basho, per division. BLANK
+     means "keep everyone", which is exactly how every keeper league behaved
+     before this existed — so no league's rules change until its commissioner
+     sets a number. 0 is a real, different answer (keep nobody, redraft from
+     scratch), so these are tested for blank, never for falsy. */
+  head = sh.getRange(1, 1, 1, Math.max(19, sh.getLastColumn())).getValues()[0];
+  if (String(head[19] || '').toLowerCase() !== 'keepmk') {
+    sh.getRange(1, 20, 1, 2).setValues([['keepMk', 'keepJr']]);
+  }
 }
 
 // pre-regionality PageViews sheets had only [ts,page,visitorId]. Append the
@@ -258,6 +269,7 @@ function doGet(e) {
     if (action === 'invite')  return json(leagueByInvite(e.parameter.code));
     if (action === 'history') return json({ ok: true, history: myHistory(e.parameter.handle) });
     if (action === 'draftState') return json(draftState(e.parameter.id));
+    if (action === 'keeperState') return json(keeperState(e.parameter.id, e.parameter.handle));
     if (action === 'trades')  return json({ ok: true, trades: myTrades(e.parameter.id, e.parameter.handle) });
     if (action === 'board')   return json({ ok: true, messages: boardMessages(e.parameter.handle) });
     if (action === 'accountSummary') return json(accountSummary(e.parameter.handle));
@@ -296,6 +308,10 @@ function doPost(e) {
     if (body.action === 'postMessage')  return json(postMessage(body));
     if (body.action === 'setLeagueMode') return json(setLeagueMode(body));
     if (body.action === 'setLeagueRoster')  return json(setLeagueRoster(body));
+    if (body.action === 'setLeagueKeepers') return json(setLeagueKeepers(body));
+    if (body.action === 'openKeeperWindow') return json(openKeeperWindow(body));
+    if (body.action === 'declareKeepers')   return json(declareKeepers(body));
+    if (body.action === 'closeKeeperWindow') return json(closeKeeperWindow(body));
     if (body.action === 'setLeagueScoring') return json(setLeagueScoring(body));
     if (body.action === 'setDraftDate')  return json(setDraftDate(body));
     if (body.action === 'agreeDraftDate') return json(agreeDraftDate(body));
@@ -653,7 +669,11 @@ function leagueRow(id){
     /* The banzuke order as the client saw it when the draft started — the
        fallback board for a member who never saved one of his own. Snapshotted
        once so a mid-draft banzuke change can't reshuffle anyone's queue. */
-    defaultOrder: (function(){ try { return JSON.parse(v[r][18]||'null') || null; } catch(e){ return null; } })()
+    defaultOrder: (function(){ try { return JSON.parse(v[r][18]||'null') || null; } catch(e){ return null; } })(),
+    /* null = no keeper limit set = keep everyone (the pre-v6 behaviour).
+       Blank and 0 mean different things here, so don't collapse them. */
+    keepMk: (v[r][19] === '' || v[r][19] == null) ? null : (Number(v[r][19]) || 0),
+    keepJr: (v[r][20] === '' || v[r][20] == null) ? null : (Number(v[r][20]) || 0)
   };
   return null;
 }
@@ -727,6 +747,7 @@ function leagueDetail(id, handle){
   });
   return { ok:true, league:{ id:L.id, name:L.name, commissioner:L.commissioner, inviteCode:L.inviteCode,
     mode:L.mode, rosterSize:L.rosterSize, benchSize:L.benchSize, farmSize:L.farmSize, draftStatus:L.draftStatus,
+    keepMk:L.keepMk, keepJr:L.keepJr,
     scoring:L.scoring, draftDate:L.draftDate,
     draftAgreedCount:agreedCount, draftMemberCount:mem.length,
     isCommissioner: handle && L.commissioner.toLowerCase()===handle.toLowerCase(),
@@ -924,6 +945,7 @@ function deleteLeague(body){
     deleteRowsWhere_(SHEET_PICKS,    0, id);
     deleteRowsWhere_(SHEET_TRADES,   1, id);
     deleteRowsWhere_(SHEET_BOARDS,   0, id);
+    deleteRowsWhere_(SHEET_KEEPS,    0, id);
     // the league row itself last — re-read its row in case earlier deletes shifted nothing here (different sheet), but be safe
     var ls = sh_(SHEET_LEAGUES), lv = ls.getDataRange().getValues();
     for (var r=lv.length-1;r>=1;r--) if (String(lv[r][0])===id) ls.deleteRow(r+1);
@@ -1351,6 +1373,47 @@ function rosterPlan(L){
   var bench  = Math.max(0, Math.min(8,  Number(L && L.benchSize)  || 0));
   var farm   = (L && L.farmSize != null) ? Math.max(0, Math.min(10, Number(L.farmSize) || 0)) : active;
   return { active: active, bench: bench, farm: farm, mk: active + bench };
+}
+
+/* How many wrestlers survive the basho, per division.
+     null  — no limit set: everyone carries over, which is what keeper leagues
+             did before this setting existed
+     0..n  — that many are kept and the rest are released into the pool
+   Clamped against the roster plan, because keeping more than you can roster is
+   meaningless and keeping more than the pool allows would stall the re-draft. */
+function keeperPlan(L){
+  var plan = rosterPlan(L);
+  var mk = (L && L.keepMk != null) ? Math.max(0, Math.min(plan.mk,   Number(L.keepMk) || 0)) : null;
+  var jr = (L && L.keepJr != null) ? Math.max(0, Math.min(plan.farm, Number(L.keepJr) || 0)) : null;
+  return { mk: mk, jr: jr, limited: (mk != null || jr != null) };
+}
+
+/* Commissioner sets the keeper limits.
+   Unlike roster sizes, this stays editable AFTER the draft: it changes nothing
+   about a draft or a running basho, only what happens at the roll-over, and a
+   league that has already drafted is exactly the league most likely to want it.
+   Send null (or "") for a division to clear its limit back to "keep all". */
+function setLeagueKeepers(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can set keeper limits.' };
+  if (L.mode !== 'keepers') return { ok:false, error:'Only keeper leagues carry wrestlers over.' };
+  if (L.draftStatus === 'keepers' || L.draftStatus === 'redraft')
+    return { ok:false, error:'The roll-over is already under way \u2014 finish it before changing the limits.' };
+
+  var plan = rosterPlan(L);
+  function pick(v, cap){
+    if (v === null || v === undefined || v === '') return '';        // blank = keep all
+    return Math.max(0, Math.min(cap, Number(v) || 0));
+  }
+  var mk = pick(body.keepMk, plan.mk), jr = pick(body.keepJr, plan.farm);
+
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    sh_(SHEET_LEAGUES).getRange(L.row, 20, 1, 2).setValues([[mk, jr]]);
+    return { ok:true, keepMk: mk === '' ? null : mk, keepJr: jr === '' ? null : jr,
+             rosterMk: plan.mk, rosterJr: plan.farm };
+  } finally { lock.releaseLock(); }
 }
 
 // whose turn is it, given the draft order, the league's roster plan, and a
@@ -2448,6 +2511,174 @@ function adminDeleteFeedback(body) {
    fills rosters in worst-first (reverse-standings) order. All transient state
    lives in a Meta key ('redraft:<id>') so we only touch the unambiguous
    draftStatus column on the league row. */
+/* ================= the keeper roll-over =================
+   Between tournaments a keeper league cuts down to its keeper limits, and the
+   supplemental re-draft then refills everyone to a full roster. Before this
+   existed there was no cut at all: every league kept its whole roster forever,
+   so the "re-draft" only ever handed out wrestlers who had left the top two
+   divisions. A league with no limit set still behaves exactly that way.
+
+   The window is its own draftStatus ('keepers') sitting in front of 'redraft',
+   so the two phases can't overlap and the existing re-draft code is untouched.
+   ======================================================== */
+
+/* what each member has declared, { handle(lower): [names] } */
+function keepsOf(id){
+  var sh = sh_(SHEET_KEEPS); if (!sh) return {};
+  var v = sh.getDataRange().getValues(), out = {};
+  for (var r=1;r<v.length;r++){
+    if (String(v[r][0]) !== String(id)) continue;
+    var h = String(v[r][1]||'').toLowerCase(); if (!h) continue;
+    (out[h] = out[h] || []).push(String(v[r][2]||''));
+  }
+  return out;
+}
+
+/* wins per rikishi across whatever is in the Results sheet — i.e. the basho
+   just finished. Used to auto-keep for anyone who doesn't declare. */
+function rikishiWins_(){
+  var wins = {};
+  readResults().forEach(function(b){
+    var w = String(b.winner||'').toLowerCase(); if (w) wins[w] = (wins[w]||0) + 1;
+  });
+  return wins;
+}
+
+/* Commissioner opens declarations. */
+function openKeeperWindow(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can open keeper declarations.' };
+  if (L.mode !== 'keepers' || L.draftStatus !== 'complete') return { ok:false, error:'The keeper draft must be complete first.' };
+  if (tournamentActive()) return { ok:false, error:'Wait until the tournament is over to set keepers.' };
+  var kp = keeperPlan(L);
+  if (!kp.limited) return { ok:false, error:'Set a keeper limit first \u2014 with no limit every wrestler carries over anyway.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    deleteRowsWhere_(SHEET_KEEPS, 0, String(L.id));      // a fresh window starts clean
+    sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue('keepers');
+    return { ok:true, keepMk:kp.mk, keepJr:kp.jr };
+  } finally { lock.releaseLock(); }
+}
+
+/* A member declares who he is keeping. Re-declaring replaces the previous
+   answer outright, so there is no way to accumulate more than the limit. */
+function declareKeepers(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.draftStatus !== 'keepers') return { ok:false, error:'Keeper declarations aren\u2019t open.' };
+  if (!isMember(L.id, u.handle)) return { ok:false, error:'You\u2019re not in this league.' };
+
+  var kp = keeperPlan(L);
+  var mine = (keeperRostersOf(L.id)[u.handle.toLowerCase()]) || { makuuchi:[], juryo:[] };
+  var ownMk = {}, ownJr = {};
+  mine.makuuchi.forEach(function(n){ ownMk[n.toLowerCase()] = n; });
+  mine.juryo.forEach(function(n){ ownJr[n.toLowerCase()] = n; });
+
+  var want = [].concat(body.keep || []).map(function(n){ return String(n||'').toLowerCase(); });
+  var mk = [], jr = [], unknown = [];
+  want.forEach(function(k){
+    if (ownMk[k]) { if (mk.indexOf(ownMk[k]) < 0) mk.push(ownMk[k]); }
+    else if (ownJr[k]) { if (jr.indexOf(ownJr[k]) < 0) jr.push(ownJr[k]); }
+    else unknown.push(k);
+  });
+  if (unknown.length) return { ok:false, error:'You don\u2019t own ' + unknown.length + ' of those wrestlers \u2014 refresh and try again.' };
+  if (kp.mk != null && mk.length > kp.mk) return { ok:false, error:'Keep at most ' + kp.mk + ' in Makuuchi.' };
+  if (kp.jr != null && jr.length > kp.jr) return { ok:false, error:'Keep at most ' + kp.jr + ' in J\u016bry\u014d.' };
+
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = sh_(SHEET_KEEPS), v = sh.getDataRange().getValues(), key = u.handle.toLowerCase();
+    for (var r=v.length-1;r>=1;r--)
+      if (String(v[r][0])===String(L.id) && String(v[r][1]||'').toLowerCase()===key) sh.deleteRow(r+1);
+    var now = new Date().toISOString(), rows = mk.concat(jr).map(function(n){ return [L.id, u.handle, n, now]; });
+    if (rows.length) sh.getRange(sh.getLastRow()+1, 1, rows.length, 4).setValues(rows);
+    return { ok:true, kept:{ makuuchi:mk, juryo:jr } };
+  } finally { lock.releaseLock(); }
+}
+
+/* Everything the declaration screen needs. */
+function keeperState(id, handle){
+  var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
+  var kp = keeperPlan(L);
+  if (L.draftStatus !== 'keepers') return { ok:true, open:false, draftStatus:L.draftStatus, keepMk:kp.mk, keepJr:kp.jr };
+  var rosters = keeperRostersOf(L.id), declared = keepsOf(L.id), wins = rikishiWins_();
+  var members = membersOf(L.id).map(function(h){
+    return { handle:h, declared: !!declared[h.toLowerCase()] };
+  });
+  var key = String(handle||'').toLowerCase();
+  var mine = rosters[key] || { makuuchi:[], juryo:[] };
+  function withWins(list){ return list.map(function(n){ return { name:n, wins: wins[n.toLowerCase()] || 0 }; })
+                                      .sort(function(a,b){ return b.wins - a.wins; }); }
+  return { ok:true, open:true, keepMk:kp.mk, keepJr:kp.jr,
+           members: members,
+           waiting: members.filter(function(m){ return !m.declared; }).length,
+           mine: { makuuchi: withWins(mine.makuuchi), juryo: withWins(mine.juryo),
+                   declared: declared[key] || null } };
+}
+
+/* Apply the cuts and hand over to the supplemental re-draft.
+   Anyone who didn't declare keeps his best by last basho's wins — the same
+   principle as the draft clock picking off an absent member's board: the
+   league shouldn't stall between tournaments because one person is away. */
+function closeKeeperWindow(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can close declarations.' };
+  if (L.draftStatus !== 'keepers') return { ok:false, error:'Keeper declarations aren\u2019t open.' };
+
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try {
+    var cut = applyKeeperCuts_(L);
+    deleteRowsWhere_(SHEET_KEEPS, 0, String(L.id));
+    var res = startSupplementalDraft_(L);
+    if (!res.ok) return res;
+    res.released = cut.released; res.autoKept = cut.autoKept;
+    return res;
+  } finally { lock.releaseLock(); }
+}
+
+/* The cut itself. Caller holds the script lock. */
+function applyKeeperCuts_(L){
+  var kp = keeperPlan(L);
+  if (!kp.limited) return { released: [], autoKept: [] };
+  var rosters = keeperRostersOf(L.id), declared = keepsOf(L.id), wins = rikishiWins_();
+  var drop = {}, released = [], autoKept = [];
+
+  membersOf(L.id).forEach(function(h){
+    var key = h.toLowerCase(), ros = rosters[key] || { makuuchi:[], juryo:[] };
+    var want = declared[key] || null;
+    if (!want && (ros.makuuchi.length || ros.juryo.length)) autoKept.push(h);
+    [['makuuchi', kp.mk], ['juryo', kp.jr]].forEach(function(pair){
+      var div = pair[0], cap = pair[1];
+      if (cap == null) return;                       // no limit in this division
+      var list = (ros[div] || []).slice(), keep;
+      if (want){
+        var set = {}; want.forEach(function(n){ set[String(n).toLowerCase()] = 1; });
+        keep = list.filter(function(n){ return set[n.toLowerCase()]; }).slice(0, cap);
+      } else {
+        keep = list.sort(function(a, b){ return (wins[b.toLowerCase()]||0) - (wins[a.toLowerCase()]||0); }).slice(0, cap);
+      }
+      var kept = {}; keep.forEach(function(n){ kept[n.toLowerCase()] = 1; });
+      (ros[div] || []).forEach(function(n){
+        if (kept[n.toLowerCase()]) return;
+        drop[key + '|' + n.toLowerCase()] = 1;
+        released.push({ handle: h, rikishi: n, division: div });
+      });
+    });
+  });
+
+  if (released.length){
+    var sh = sh_(SHEET_ROSTERS), v = sh.getDataRange().getValues();
+    for (var r = v.length - 1; r >= 1; r--){
+      if (String(v[r][0]) !== String(L.id)) continue;
+      var k = String(v[r][1]||'').toLowerCase() + '|' + String(v[r][2]||'').toLowerCase();
+      if (drop[k]) sh.deleteRow(r + 1);
+    }
+  }
+  return { released: released, autoKept: autoKept };
+}
+
 function fetchBanzukeNames(bashoId){
   bashoId = bashoId || BASHO_ID;
   var out = { makuuchi:[], juryo:[] }, divs = [['Makuuchi','makuuchi'],['Juryo','juryo']];
@@ -2505,11 +2736,25 @@ function openSupplementalDraft(body){
   if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can open the re-draft.' };
   if (L.mode !== 'keepers' || L.draftStatus !== 'complete') return { ok:false, error:'The keeper draft must be complete first.' };
   if (tournamentActive()) return { ok:false, error:'Wait until the tournament is over to re-draft.' };
+  /* With keeper limits set, the cut has to happen BEFORE the pool is built —
+     otherwise the wrestlers being released never reach it. Send the
+     commissioner through the declaration window instead of silently skipping
+     the limits he set. */
+  if (keeperPlan(L).limited)
+    return { ok:false, needsKeepers:true,
+             error:'Open keeper declarations first \u2014 the re-draft fills rosters back up after the cut.' };
+  var lock0 = LockService.getScriptLock(); lock0.waitLock(25000);
+  try { return startSupplementalDraft_(L); } finally { lock0.releaseLock(); }
+}
+
+/* The re-draft proper. Caller holds the script lock. Reached either straight
+   from the commissioner (no keeper limits) or from closeKeeperWindow once the
+   cut has been applied. */
+function startSupplementalDraft_(L){
   var banzuke = fetchBanzukeNames(BASHO_ID);
   if (!banzuke.makuuchi.length && !banzuke.juryo.length) return { ok:false, error:'Could not read the current banzuke from sumo-api. Try again shortly.' };
   var inB = {}; banzuke.makuuchi.forEach(function(n){ inB[n.toLowerCase()]='makuuchi'; }); banzuke.juryo.forEach(function(n){ inB[n.toLowerCase()]='juryo'; });
-  var lock = LockService.getScriptLock(); lock.waitLock(25000);
-  try {
+  {
     var sh = sh_(SHEET_ROSTERS), v = sh.getDataRange().getValues(), released=[], del=[];
     for (var r=1;r<v.length;r++){
       if (String(v[r][0]) !== String(L.id)) continue;
@@ -2522,7 +2767,7 @@ function openSupplementalDraft(body){
     setRedraft_(L.id, { order:order, cursor:0, banzuke:banzuke });
     sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue('redraft');
     return { ok:true, released:released, order:order, pool: redraftPool_(L.id).length };
-  } finally { lock.releaseLock(); }
+  }
 }
 function redraftState(id){
   var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };

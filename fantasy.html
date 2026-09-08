@@ -838,6 +838,10 @@
             <div class="lg-set-head"><h4>Roster sizes</h4><span class="lg-agree-count" id="lgRosterLock"></span></div>
             <div class="lg-set-body" id="lgRosterBody"></div>
           </div>
+          <div class="lg-roster-set" id="lgKeepSet" hidden>
+            <div class="lg-set-head"><h4>Keepers</h4><span class="lg-agree-count" id="lgKeepLock"></span></div>
+            <div class="lg-set-body" id="lgKeepBody"></div>
+          </div>
           <div class="lg-scoring">
             <div class="lg-set-head"><h4>Scoring rules</h4><button class="btn ghost sm" id="lgScoreEdit" hidden>Edit</button></div>
             <div class="lg-scoring-body" id="lgScoringBody"></div>
@@ -1841,6 +1845,7 @@ function renderLeagueSettings(lg, meCommish){
   const wrap = $("lgSettings"); if (!wrap) return;
   wrap.hidden = false;
   renderRosterPanel(lg, meCommish, false);
+  renderKeeperPanel(lg, meCommish, false);
   renderScoringPanel(lg, meCommish, false);
   renderSchedPanel(lg, meCommish);
 }
@@ -1853,6 +1858,82 @@ const ROSTER_FIELDS = [
   { key:"benchSize",  label:"Makuuchi \u2014 bench",  min:0, max:8,  hint:"Kept on your roster but they don\u2019t score. Set 0 for no bench." },
   { key:"farmSize",   label:"J\u016bry\u014d \u2014 farm",  min:0, max:10, hint:"Second-division wrestlers you hold for the future. Never score." }
 ];
+/* Keeper limits — how many carry over to the next basho, per division.
+   Deliberately NOT locked after the draft, unlike roster sizes: they change
+   nothing about a draft or a running basho, only what survives the roll-over,
+   and a league that has already drafted is the one most likely to want them.
+   Blank means "keep everyone", which is how keeper leagues worked before this
+   setting existed — so no league's rules change until someone sets a number. */
+function keepLabel(lg){
+  const p = planOf(lg);
+  const mk = lg.keepMk == null ? "all " + p.mk : lg.keepMk;
+  const jr = lg.keepJr == null ? "all " + p.farm : lg.keepJr;
+  return `${mk} Makuuchi \u00b7 ${jr} J\u016bry\u014d`;
+}
+function renderKeeperPanel(lg, meCommish, editing){
+  const box = $("lgKeepSet"), body = $("lgKeepBody");
+  if (!box) return;
+  if (lg.mode !== "keepers"){ box.hidden = true; return; }
+  box.hidden = false;
+  const p = planOf(lg);
+  const rolling = lg.draftStatus === "keepers" || lg.draftStatus === "redraft";
+  const none = lg.keepMk == null && lg.keepJr == null;
+
+  if (!editing){
+    body.innerHTML =
+      (none
+        ? `<p class="lg-set-sum">No limit — every wrestler carries over.</p>
+           <p class="lg-set-note">Set a limit and each team keeps that many at the end of a basho; the rest go back into the pool for the supplemental re-draft.</p>`
+        : `<p class="lg-set-sum">Each team keeps <b>${keepLabel(lg)}</b> into the next basho.</p>
+           <p class="lg-set-note">Everyone else is released to the pool and the re-draft fills rosters back up.</p>`) +
+      (rolling ? `<p class="lg-set-note">Locked — the roll-over is under way.</p>` : "") +
+      (meCommish && !rolling ? `<button class="btn sm" id="lgKeepEdit">${none ? "Set keeper limits" : "Edit keeper limits"}</button>` : "");
+    const b = $("lgKeepEdit");
+    if (b) b.onclick = () => renderKeeperPanel(lg, meCommish, true);
+    return;
+  }
+
+  body.innerHTML =
+    `<div class="lg-score-grid">
+      <label class="lg-score-fld"><span>Makuuchi kept</span>
+        <input type="number" id="kp_mk" min="0" max="${p.mk}" step="1" value="${lg.keepMk == null ? "" : lg.keepMk}" placeholder="all">
+        <small>Out of ${p.mk} on the roster. Leave blank to keep them all.</small></label>
+      <label class="lg-score-fld"><span>Jūryō kept</span>
+        <input type="number" id="kp_jr" min="0" max="${p.farm}" step="1" value="${lg.keepJr == null ? "" : lg.keepJr}" placeholder="all">
+        <small>Out of ${p.farm} in the farm. Leave blank to keep them all.</small></label>
+     </div>
+     <p class="lg-set-note" id="kpPreview"></p>
+     <div class="lg-score-btns"><button class="btn" id="kpSave">Save</button>
+       <button class="btn ghost" id="kpCancel">Cancel</button><span class="status" id="kpStatus"></span></div>`;
+
+  const readOne = (id, cap) => { const v = $(id).value.trim(); if (v === "") return ""; return Math.max(0, Math.min(cap, +v || 0)); };
+  const preview = () => {
+    const mk = readOne("kp_mk", p.mk), jr = readOne("kp_jr", p.farm);
+    const dropped = (mk === "" ? 0 : p.mk - mk) + (jr === "" ? 0 : p.farm - jr);
+    $("kpPreview").innerHTML = dropped
+      ? `Each team releases <b>${dropped}</b> wrestler${dropped===1?"":"s"} at the end of every basho.`
+      : `Nothing is released — every wrestler carries over.`;
+  };
+  ["kp_mk","kp_jr"].forEach(id => { const el = $(id); if (el) el.oninput = preview; });
+  preview();
+
+  $("kpCancel").onclick = () => renderKeeperPanel(lg, meCommish, false);
+  $("kpSave").onclick = async () => {
+    const st = $("kpStatus"); st.textContent = "Saving…"; st.className = "status";
+    const r = await GyojiGuide.setLeagueKeepers(lg.id, readOne("kp_mk", p.mk), readOne("kp_jr", p.farm));
+    if (r && r.ok){
+      lg.keepMk = r.keepMk; lg.keepJr = r.keepJr;
+      st.textContent = "Saved ✓"; st.className = "status ok";
+      renderKeeperPanel(lg, meCommish, false);
+      /* The roster-moves panel decides between "Open re-draft" and "Open keeper
+         declarations" from these very numbers, and it was rendered before this
+         save. Re-render the league or the commissioner is left looking at the
+         button for the path he just turned off. */
+      renderLeague();
+    } else { st.textContent = (r && r.error) || "Couldn’t save."; st.className = "status err"; }
+  };
+}
+
 function renderRosterPanel(lg, meCommish, editing){
   const box = $("lgRosterSet"), body = $("lgRosterBody"), lockNote = $("lgRosterLock");
   if (!box) return;
@@ -2077,6 +2158,9 @@ function paintTick(){
     : "When this reaches zero the pick is taken off their draft board";
 }
 let redraftPollTimer = null;
+let keepPollTimer = null;
+/* does this league cut anyone at the roll-over? null in BOTH divisions means no */
+function keepLimited(lg){ return !!lg && (lg.keepMk != null || lg.keepJr != null); }
 function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } stopDraftTick(); }
 /* Mirrors rosterPlan() in sumo-fantasy.gs. rosterSize keeps its original
    meaning — the ACTIVE Makuuchi cap — so a league saved before benches existed
@@ -2367,6 +2451,14 @@ async function renderKeepers(lg, meCommish){
     return;
   }
 
+  if (lg.draftStatus === "keepers") {
+    el.innerHTML = `<div class="lg-draftroom"><h4>Keeper declarations <span class="lg-rm-window open">end of basho</span></h4><div id="keepBody">${ggSpinner('Loading your roster','sm')}</div></div>`;
+    await renderKeeperWindow(lg);
+    if (keepPollTimer) clearInterval(keepPollTimer);
+    keepPollTimer = setInterval(()=>renderKeeperWindow(lg), 5000);
+    return;
+  }
+
   if (lg.draftStatus === "redraft") {
     el.innerHTML = `<div class="lg-draftroom"><h4>Supplemental re-draft <span class="lg-rm-window open">new banzuke</span></h4><div id="redraftBody">${ggSpinner('Loading the re-draft','sm')}</div></div>`;
     await renderRedraft(lg);
@@ -2428,7 +2520,9 @@ async function renderKeepers(lg, meCommish){
         ${locked ? '<p class="lg-locked-note">Adds/drops are closed while the tournament is underway.</p>' : waiverFormHTML()}
       </div>
       ${lineupHTML(myRoster)}
-      ${(isCommish && !locked) ? `<div class="lg-teams"><h5>New banzuke &middot; re-draft</h5><p class="lg-myteam__hint" style="margin-top:0">When the new banzuke is published, open a supplemental draft: anyone demoted out of the top two divisions is released, then every team fills its open slots worst-first.</p><button class="btn" id="lgOpenRedraft">Open re-draft</button><span id="lgRedraftStatus" class="status"></span></div>` : ""}
+      ${(isCommish && !locked) ? (keepLimited(lg)
+        ? `<div class="lg-teams"><h5>End of basho &middot; keepers</h5><p class="lg-myteam__hint" style="margin-top:0">Each team keeps <b>${keepLabel(lg)}</b>. Open declarations and everyone picks who to carry over; anyone still undecided when you close keeps their best by this basho&rsquo;s wins. The re-draft then fills the empty slots.</p><button class="btn" id="lgOpenKeepers">Open keeper declarations</button><span id="lgRedraftStatus" class="status"></span></div>`
+        : `<div class="lg-teams"><h5>New banzuke &middot; re-draft</h5><p class="lg-myteam__hint" style="margin-top:0">When the new banzuke is published, open a supplemental draft: anyone demoted out of the top two divisions is released, then every team fills its open slots worst-first.</p><button class="btn" id="lgOpenRedraft">Open re-draft</button><span id="lgRedraftStatus" class="status"></span></div>`) : ""}
     </div>`;
 
   el.querySelectorAll(".lg-team-row").forEach(row=>{
@@ -2450,6 +2544,14 @@ async function renderKeepers(lg, meCommish){
     if (r && r.ok){ st.textContent=" Saved."; st.className="status ok"; renderLeague(); }
     else { st.textContent=" "+((r&&r.error)||"Couldn\u2019t save."); st.className="status err"; }
   };
+  const okBtn = $("lgOpenKeepers");
+  if (okBtn) okBtn.onclick = async ()=>{
+    if (!confirm("Open keeper declarations?\n\nEveryone picks who to carry over. Anyone who hasn\u2019t decided when you close keeps their best by this basho\u2019s wins.")) return;
+    okBtn.disabled=true; const st=$("lgRedraftStatus"); st.textContent=" Opening\u2026"; st.className="status";
+    const r = await GyojiGuide.openKeeperWindow(lg.id);
+    if (r && r.ok){ lg.draftStatus="keepers"; renderLeague(); }
+    else { okBtn.disabled=false; st.textContent=" "+((r&&r.error)||"Couldn\u2019t open declarations."); st.className="status err"; }
+  };
   const orBtn = $("lgOpenRedraft");
   if (orBtn) orBtn.onclick = async ()=>{
     if (!confirm("Open the supplemental re-draft?\n\nThis releases anyone demoted out of the top two divisions and starts a worst-first draft to fill rosters.")) return;
@@ -2459,6 +2561,81 @@ async function renderKeepers(lg, meCommish){
     else { orBtn.disabled=false; st.textContent=" "+((r&&r.error)||"Couldn\u2019t open the re-draft."); st.className="status err"; }
   };
   loadTradesList(lg.id);
+}
+
+/* The declaration screen. Tick who you keep, per division, capped at the
+   league's limits. Wins from the basho just finished are shown beside each
+   name because that is what you are actually deciding on — and it is also the
+   order they'd be auto-kept in if you never got round to it. */
+async function renderKeeperWindow(lg){
+  const body = document.getElementById("keepBody"); if (!body) return;
+  let res=null; try { res = await GyojiGuide.keeperState(lg.id); } catch(e){}
+  if (!res || !res.ok){ body.innerHTML = `<p class="status err">Couldn\u2019t load the keeper window.</p>`; return; }
+  if (!res.open){                                        // closed -> back to the normal view
+    if (keepPollTimer) clearInterval(keepPollTimer);
+    lg.draftStatus = res.draftStatus; renderLeague(); return;
+  }
+  const isCommish = acct && lg.commissioner && acct.handle.toLowerCase()===String(lg.commissioner).toLowerCase();
+  const declared = new Set((res.mine.declared||[]).map(n=>String(n).toLowerCase()));
+  const cap = { makuuchi: res.keepMk, juryo: res.keepJr };
+
+  const group = (div, label, list) => {
+    const lim = cap[div];
+    if (!list.length) return "";
+    return `<div class="lg-teams"><h5>${label} <span class="lg-rm-window open" id="kwCount_${div}"></span></h5>
+      ${lim == null ? `<p class="lg-myteam__hint" style="margin-top:0">No limit — all of these carry over.</p>` : ""}
+      <div class="rd-pool">${list.map(r=>`<label class="lu-item"><input type="checkbox" class="kw-cb" data-div="${div}" value="${esc(r.name)}"
+        ${declared.has(r.name.toLowerCase())?"checked":""} ${lim==null?"disabled checked":""}> ${esc(r.name)}
+        <span class="lg-team-row__h">${r.wins} win${r.wins===1?"":"s"}</span></label>`).join("")}</div></div>`;
+  };
+
+  body.innerHTML =
+    `<p class="rd-turn">Keep <b>${res.keepMk==null?"all":res.keepMk}</b> in Makuuchi and <b>${res.keepJr==null?"all":res.keepJr}</b> in J\u016bry\u014d. Everyone else goes back into the pool.</p>` +
+    group("makuuchi","Makuuchi", res.mine.makuuchi) +
+    group("juryo","J\u016bry\u014d", res.mine.juryo) +
+    `<div style="margin-top:10px"><button class="btn" id="kwSave">${res.mine.declared?"Update my keepers":"Confirm my keepers"}</button>
+      <span id="kwStatus" class="status"></span></div>
+     <p class="lg-myteam__hint">${res.waiting} of ${res.members.length} still to decide${res.waiting?": "+res.members.filter(m=>!m.declared).map(m=>"@"+esc(m.handle)).join(", "):""}.</p>` +
+    (isCommish ? `<div class="lg-teams"><h5>Close and re-draft</h5>
+        <p class="lg-myteam__hint" style="margin-top:0">Applies every declaration, auto-keeps for anyone who hasn\u2019t decided, then opens the supplemental re-draft to refill rosters.</p>
+        <button class="btn" id="kwClose">Close declarations &amp; start re-draft</button><span id="kwCloseStatus" class="status"></span></div>` : "");
+
+  const sync = () => {
+    ["makuuchi","juryo"].forEach(div=>{
+      const lim = cap[div], el2 = document.getElementById("kwCount_"+div);
+      const n = [...body.querySelectorAll('.kw-cb[data-div="'+div+'"]')].filter(c=>c.checked).length;
+      if (el2) { el2.textContent = lim==null ? "all kept" : n+"/"+lim+" kept";
+                 el2.className = "lg-rm-window " + (lim!=null && n>lim ? "closed" : "open"); }
+    });
+  };
+  body.querySelectorAll(".kw-cb").forEach(c=>c.onchange = sync);
+  sync();
+
+  const sv = document.getElementById("kwSave");
+  if (sv) sv.onclick = async ()=>{
+    const st = document.getElementById("kwStatus");
+    const keep = [...body.querySelectorAll(".kw-cb")].filter(c=>c.checked && !c.disabled).map(c=>c.value);
+    for (const div of ["makuuchi","juryo"]){
+      const lim = cap[div]; if (lim == null) continue;
+      const n = [...body.querySelectorAll('.kw-cb[data-div="'+div+'"]')].filter(c=>c.checked && !c.disabled).length;
+      if (n > lim){ st.textContent = " Keep at most "+lim+" in "+(div==="juryo"?"J\u016bry\u014d":"Makuuchi")+"."; st.className="status err"; return; }
+    }
+    sv.disabled = true; st.textContent = " Saving\u2026"; st.className = "status";
+    const r = await GyojiGuide.declareKeepers(lg.id, keep);
+    sv.disabled = false;
+    if (r && r.ok){ st.textContent = " Saved \u2713"; st.className = "status ok"; renderKeeperWindow(lg); }
+    else { st.textContent = " "+((r&&r.error)||"Couldn\u2019t save."); st.className = "status err"; }
+  };
+
+  const cl = document.getElementById("kwClose");
+  if (cl) cl.onclick = async ()=>{
+    if (!confirm("Close declarations and start the re-draft?\n\nThis releases everyone not kept. Anyone who hasn\u2019t declared keeps their best by wins.")) return;
+    cl.disabled = true; const st = document.getElementById("kwCloseStatus");
+    st.textContent = " Applying\u2026"; st.className = "status";
+    const r = await GyojiGuide.closeKeeperWindow(lg.id);
+    if (r && r.ok){ if (keepPollTimer) clearInterval(keepPollTimer); lg.draftStatus = "redraft"; renderLeague(); }
+    else { cl.disabled = false; st.textContent = " "+((r&&r.error)||"Couldn\u2019t close."); st.className = "status err"; }
+  };
 }
 
 async function renderRedraft(lg){
