@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-09-flush-teamlock';
+var BACKEND_VERSION = '2026-09-09-dismiss-reset';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -354,6 +354,7 @@ function doPost(e) {
     if (body.action === 'adminPinResets')     return json(adminPinResets(body.adminKey));
     if (body.action === 'adminApplyRanking')  return json(adminApplyRanking(body));
     if (body.action === 'adminResetPin')      return json(adminResetPin(body));
+    if (body.action === 'adminDismissPinReset') return json(adminDismissPinReset(body));
     if (body.action === 'adminDeleteMessage') return json(adminDeleteMessageFn(body));
     if (body.action === 'adminSetFeedbackStatus') return json(adminSetFeedbackStatus(body));
     if (body.action === 'adminDeleteFeedback')    return json(adminDeleteFeedback(body));
@@ -2131,6 +2132,34 @@ function adminPinResets(key) {
    stored hash, which returns the account to "unclaimed". The user then opens
    Create account, enters the same handle, and picks a new PIN (that claims the
    row again via register()'s claim path). */
+/* Close a PIN reset request WITHOUT clearing the PIN.
+
+   The usual reason: the person remembered it and said so, and approving would
+   now lock them out of an account they can still get into. Also the way to
+   clear a request nobody made — requestPinReset takes no auth, so anyone can
+   file one against any handle.
+
+   Deliberately silent. Dismissing happens because a conversation is already
+   going on; a surprise DM to a user who never asked for a reset would raise a
+   question rather than answer one. */
+function adminDismissPinReset(body) {
+  var bad = adminGate(body.adminKey); if (bad) return bad;
+  var handle = cleanHandle(body.handle);
+  if (!handle) return { ok: false, error: 'Missing handle.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_RESETS,
+      ['id', 'handle', 'name', 'requested', 'status']);
+    var v = sh.getDataRange().getValues(), n = 0;
+    for (var i = 1; i < v.length; i++)
+      if (String(v[i][1]).toLowerCase() === handle.toLowerCase() && v[i][4] === 'pending') {
+        sh.getRange(i + 1, 5).setValue('dismissed'); n++;
+      }
+    if (!n) return { ok: false, error: 'No pending request for that handle.' };
+    return { ok: true, dismissed: n };
+  } finally { unlock_(lock); }
+}
+
 function adminResetPin(body) {
   var bad = adminGate(body.adminKey); if (bad) return bad;
   var handle = cleanHandle(body.handle);
