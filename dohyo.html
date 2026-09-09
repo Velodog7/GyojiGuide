@@ -245,18 +245,28 @@
     100%{ transform:scale(1.04); text-shadow:0 0 1.4cqw rgba(242,193,78,.5), 0 .2cqw 1.2cqw #000 }
   }
   .call__stack{ display:flex; flex-direction:column; align-items:center; gap:.35cqw }
-  /* The badge rail. Fixed height whatever it holds, so east and west stay level
-     with each other all the way down the stack. */
+  /* The badge rail: one badge per ROW, each centred on the stack.
+
+     Side by side does not work. The Win pill is always in the DOM and merely
+     invisible, so pairing them left "My Team" sitting ~23px off centre with a
+     conspicuous gap beside it — the gap being the seat the Win pill is holding.
+     Neither badge was centred, and the arrangement leaked which side had a
+     result coming. Stacked, each badge is centred on its own line and carries
+     no positional information at all. Both rows are always present on both
+     sides, so east and west still measure the same. */
   .call__flags{
-    display:flex; align-items:center; justify-content:center; gap:.5cqw;
-    min-height:1.6cqw;
+    display:flex; flex-direction:column; align-items:center; gap:.35cqw;
   }
   /* a wrestler from your team, called out on the dohyō */
   .call__mine{ font-style:normal; font-family:"WDXL Lubrifont TC",ui-monospace,monospace;
         font-size:1cqw; font-weight:700; letter-spacing:.18em; text-transform:uppercase;
         color:#0d0f15; background:var(--sun); padding:.2cqw .8cqw; border-radius:99px;
-        box-shadow:0 0 0 1px rgba(var(--sun-rgb),.45); }
-  /* not yours — the badge still occupies the rail so both sides measure the
+        box-shadow:0 0 0 1px rgba(var(--sun-rgb),.45);
+        /* .call paints a triple black glow over everything for legibility on
+           the ring. On dark text sitting on a gold pill that reads as a smudge,
+           which is why .call__pill kills it too. */
+        text-shadow:none; }
+  /* not yours — the badge still occupies its row so both sides measure the
      same, exactly as .call__pill does for a bout nobody has won yet */
   .call__mine[aria-hidden="true"]{ visibility:hidden }
   .call__pill{
@@ -2922,6 +2932,71 @@ function setBtn(btn, ico, lbl){
   btn.querySelector(".ico").textContent = ico;
   const l = btn.querySelector(".lbl"); if (l) l.textContent = lbl;
 }
+/* ── keep the screen awake while bouts are playing ─────────────
+   A day's card runs for minutes with no input at all, which is exactly when a
+   phone dims, then locks. Screen Wake Lock is the only supported way to ask it
+   not to, and it is best-effort by design:
+
+     - secure context only. The live site is https; a page opened over plain
+       http simply won't have the API, hence the feature test.
+     - the browser RELEASES the lock whenever the document is hidden. It does
+       not come back on its own, so returning to the tab has to re-take it —
+       without that, tabbing away once quietly disables this for the rest of
+       the run.
+     - it can be refused outright (low battery, permissions policy). That has
+       to be silent: a simulation that throws because a phone is at 5% is a
+       worse outcome than one that dims.
+
+   Held only while a bout is actually running. A paused or finished run gives
+   the screen back, so leaving the tab open overnight can't hold the display
+   on — which is the failure mode of the naive "acquire once on load". */
+let wakeLock = null;      // the sentinel we currently hold, or null
+let wakeWant = false;     // what the transport says we SHOULD hold
+let wakeBusy = null;      // a transition already in flight
+
+/* Requesting and releasing are both async, and the transport flips faster than
+   they resolve — `enter()` starts a run and a stop() lands before the first
+   request has come back. Written naively as request-or-release, that release
+   sees wakeLock still null, does nothing, and then the request resolves and
+   assigns a lock nobody will ever let go of. Two rapid cycles leaked two.
+
+   So: record the intent, run one transition at a time, and re-check the intent
+   after every await instead of trusting the value it was called with. */
+function keepAwake(want){
+  wakeWant = !!want;
+  if (wakeBusy) return wakeBusy;               // the loop below will see the flag
+  /* The latch is cleared from .finally(), NOT from inside the block. A no-op
+     transition — and the first call on page load is one, because nothing is
+     playing yet — finishes synchronously, so an internal finally would run
+     BEFORE the assignment below and leave wakeBusy holding a settled promise
+     for good. Every later call then returns early and no lock is ever taken.
+     .finally() is a microtask, so it can only run after the assignment. */
+  const run = (async () => {
+    try {
+      for (;;) {
+        if (wakeWant && !wakeLock) {
+          if (!("wakeLock" in navigator)) break;
+          if (document.visibilityState !== "visible") break;   // hidden: can't hold one
+          const held = await navigator.wakeLock.request("screen");
+          wakeLock = held;
+          /* the browser drops it by itself when the page hides; clearing the
+             handle is what lets the visibilitychange listener take a fresh one */
+          held.addEventListener("release", () => { if (wakeLock === held) wakeLock = null; });
+        } else if (!wakeWant && wakeLock) {
+          const held = wakeLock; wakeLock = null;
+          await held.release();
+        } else break;                          // intent and reality agree
+      }
+    } catch (e) { wakeLock = null; }           // refused — carry on without it
+  })();
+  wakeBusy = run;
+  run.finally(() => { if (wakeBusy === run) wakeBusy = null; });
+  return run;
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") keepAwake(playing && !paused);
+});
+
 function syncPlayBtn(){
   const ico = !playing ? "▶" : paused ? "▶" : "⏸";
   const lbl = !playing ? "Play" : paused ? "Resume" : "Pause";
@@ -2935,6 +3010,8 @@ function syncPlayBtn(){
   if (replayBtn) replayBtn.disabled = !playing;
   /* every transport change is also a change to what comes next */
   paintUpNext();
+  /* …and to whether the screen is allowed to sleep */
+  keepAwake(playing && !paused);
 }
 
 

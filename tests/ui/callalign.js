@@ -124,6 +124,38 @@ const rows = p => p.evaluate(()=>{
     await ctx.close();
   }
 
+  /* ---- the badges must be centred and must not leak the result ----
+     Side by side, "My Team" sat ~23px off centre with the invisible Win pill
+     holding a seat beside it — never centred, and the shape of the pair told
+     you a result was coming on that side. Stacked rows, each centred. */
+  {
+    const {ctx,p} = await boot(b, 'east');
+    const badge = () => p.evaluate(()=>{
+      const st = document.querySelector('.call__stack');
+      const mine = st.querySelector('.call__mine'), pill = st.querySelector('.call__pill');
+      const R = e => e.getBoundingClientRect();
+      const sr = R(st);
+      const off = e => Math.round(((R(e).left + R(e).right)/2) - ((sr.left + sr.right)/2));
+      return { mine: off(mine), pill: off(pill),
+               sameRow: Math.abs(Math.round(R(mine).top - R(pill).top)) < 4,
+               shadow: getComputedStyle(mine).textShadow };
+    });
+    const pre = await badge();
+    chk('the My Team badge is centred on the stack', Math.abs(pre.mine) <= 2, pre.mine+'px off centre');
+    chk('so is the Win badge', Math.abs(pre.pill) <= 2, pre.pill+'px off centre');
+    chk('they are on separate rows', !pre.sameRow, pre.sameRow ? 'still sharing a line' : '');
+    chk('and the badge carries no inherited black glow',
+        pre.shadow === 'none', pre.shadow.slice(0,50));
+
+    /* the giveaway test: revealing the result must not move the My Team badge */
+    await p.evaluate(()=>document.querySelectorAll('.call')[0].classList.add('win'));
+    await p.waitForTimeout(700);
+    const post = await badge();
+    chk('revealing the win does not move the My Team badge', pre.mine === post.mine,
+        pre.mine+' -> '+post.mine);
+    await ctx.close();
+  }
+
   /* the winner's pill must not shift anything either */
   {
     const {ctx,p} = await boot(b, 'east');
