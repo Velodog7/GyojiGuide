@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-09-dismiss-reset';
+var BACKEND_VERSION = '2026-09-09-basho-panel';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -354,6 +354,8 @@ function doPost(e) {
     if (body.action === 'adminPinResets')     return json(adminPinResets(body.adminKey));
     if (body.action === 'adminApplyRanking')  return json(adminApplyRanking(body));
     if (body.action === 'adminResetPin')      return json(adminResetPin(body));
+    if (body.action === 'adminBasho')         return json(adminBasho(body.adminKey));
+    if (body.action === 'adminRefreshResults') return json(adminRefreshResults(body));
     if (body.action === 'adminDismissPinReset') return json(adminDismissPinReset(body));
     if (body.action === 'adminDeleteMessage') return json(adminDeleteMessageFn(body));
     if (body.action === 'adminSetFeedbackStatus') return json(adminSetFeedbackStatus(body));
@@ -2265,6 +2267,68 @@ function localHour_(d, tz) {
   return d.getUTCHours();
 }
 
+/* What the admin page needs to answer "are results coming in?" — kept out of
+   adminStats() on purpose, which already walks the whole PageViews sheet and is
+   the slowest call on the page. This one reads Meta and Results and stops. */
+function adminBasho(key) {
+  var bad = adminGate(key); if (bad) return bad;
+  var m = readMeta();
+  var sh = sh_(SHEET_RESULTS);
+  var v = sh ? sh.getDataRange().getValues() : [];
+  var byDay = {}, maxDay = 0, total = 0;
+  for (var r = 1; r < v.length; r++) {
+    var d = Number(v[r][0] || 0); if (!d) continue;
+    var div = String(v[r][1] || '');
+    if (!byDay[d]) byDay[d] = { makuuchi: 0, juryo: 0 };
+    if (/^j/i.test(div)) byDay[d].juryo++; else byDay[d].makuuchi++;
+    if (d > maxDay) maxDay = d;
+    total++;
+  }
+  var days = [];
+  for (var i = 1; i <= 15; i++)
+    days.push({ day: i, makuuchi: (byDay[i] || {}).makuuchi || 0, juryo: (byDay[i] || {}).juryo || 0 });
+
+  return { ok: true,
+    basho: String(m.basho || ''),
+    lastDay: Number(m.lastDay || 0),
+    yusho: String(m.yusho || ''),
+    sansho: String(m.sansho || ''),
+    rankedBasho: String(m.rankedBasho || ''),
+    archiveError: String(m.archiveError || ''),
+    rows: total, maxDay: maxDay, days: days,
+    lastImport: String(m.lastImport || ''),
+    lastImportAdded: (m.lastImportAdded === '' || m.lastImportAdded == null) ? null : Number(m.lastImportAdded),
+    serverNow: new Date().toISOString(),
+    /* the three places a basho is named, side by side. BASHO_ID drives the
+       sumo-api fetch, BASHO_LABEL is the code default, and Meta.basho is what
+       the site actually shows — they are edited in different places and at
+       different times, and nothing has ever compared them. */
+    bashoId: BASHO_ID, bashoLabel: BASHO_LABEL,
+    idExpects: bashoNameForId_(BASHO_ID) };
+}
+
+/* 'Aki 2026' from '202609'. The six honbasho sit on fixed months. */
+function bashoNameForId_(id) {
+  var s = String(id || '');
+  if (!/^\d{6}$/.test(s)) return '';
+  var names = { '01':'Hatsu', '03':'Haru', '05':'Natsu', '07':'Nagoya', '09':'Aki', '11':'Kyushu' };
+  var nm = names[s.slice(4, 6)];
+  return nm ? nm + ' ' + s.slice(0, 4) : '';
+}
+
+/* Run the importer by hand. The hourly trigger is the normal path; this is for
+   the morning the feed is late and you want to know now rather than at :16. */
+function adminRefreshResults(body) {
+  var bad = adminGate(body && body.adminKey); if (bad) return bad;
+  var before = 0;
+  try { before = Math.max(0, sh_(SHEET_RESULTS).getDataRange().getValues().length - 1); } catch (e) {}
+  try { refreshResults(); }
+  catch (err) { return { ok: false, error: 'Import failed: ' + String(err) }; }
+  var after = 0;
+  try { after = Math.max(0, sh_(SHEET_RESULTS).getDataRange().getValues().length - 1); } catch (e) {}
+  return { ok: true, added: Math.max(0, after - before), rows: after };
+}
+
 function adminStats() {
   var v = sh_(SHEET_PAGEVIEWS).getDataRange().getValues();
   var total = 0, uniques = {}, byPage = {}, since7 = Date.now() - 7 * 24 * 3600 * 1000, total7 = 0, uniq7 = {};
@@ -3352,6 +3416,8 @@ function json(obj) {
 var BASHO_ID = '202609';   // next basho, YYYYMM (Aki 2026 = 202609)
 
 function refreshResults() {
+  var startedAt = new Date().toISOString();
+  var addedRows = 0;
   var divisions = ['Makuuchi', 'Juryo'];
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RESULTS);
   var have = {};
@@ -3385,6 +3451,7 @@ function refreshResults() {
         var key = day + '|' + div + '|' + east + '|' + west;
         if (have[key]) continue;
         sh.appendRow([day, div, east, west, winner, kim]);
+        addedRows++;
         have[key] = true;
         if (day > maxDay) maxDay = day;
       }
@@ -3412,6 +3479,16 @@ function refreshResults() {
     var prizes = Object.keys(awards.sansho);
     if (prizes.length && !String(m.sansho || '').trim()) setMeta_('sansho', prizes.join(', '));
   }
+
+  /* The heartbeat. Written on EVERY run, including the ones that import
+     nothing — "the hourly trigger fired and found no new bouts" and "the
+     trigger is not running at all" look identical from the outside otherwise,
+     and they need completely different responses. The admin page reads these
+     two keys and nothing else to decide whether results are flowing. */
+  try {
+    setMeta_('lastImport', startedAt);
+    setMeta_('lastImportAdded', addedRows);
+  } catch (e3) {}
 
   /* Basho over? Snapshot everyone. Self-guarding (day 15, once per basho), so
      calling it on every tick costs one Meta read while the basho is running. */

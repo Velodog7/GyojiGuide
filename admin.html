@@ -80,6 +80,20 @@ main{ max-width:var(--maxw); margin:0 auto; padding:24px 20px 80px }
 .view{ display:none }
 .view.on{ display:block }
 .v-title{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.35rem; margin:0 0 6px }
+/* basho panel */
+.bs-head{ display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; margin:0 0 4px }
+.bs-name{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.5rem }
+.bs-day{ color:var(--gold,#e0a23a); font-weight:700 }
+.bs-grid{ display:grid; grid-template-columns:repeat(15,1fr); gap:4px; margin:12px 0 6px }
+.bs-d{ text-align:center; border:1px solid #2a2e3a; border-radius:6px; padding:6px 2px; font-size:.72rem; color:#878da0 }
+.bs-d b{ display:block; font-size:.8rem; color:#c9cede }
+.bs-d.has{ border-color:rgba(224,162,58,.5); background:rgba(224,162,58,.08) }
+.bs-d.has b{ color:#e0a23a }
+.bs-d.part{ border-color:rgba(226,59,46,.5); background:rgba(226,59,46,.08) }
+.bs-legend{ color:#878da0; font-size:.78rem; margin:0 0 4px }
+.bs-warn{ margin:10px 0 0; padding:9px 11px; border-radius:8px; font-size:.85rem;
+      border:1px solid rgba(226,59,46,.45); background:rgba(226,59,46,.08); color:#e8a49c }
+.bs-ok{ border-color:rgba(67,192,138,.4); background:rgba(67,192,138,.08); color:#8fd8b6 }
 .v-sub{ color:var(--muted); font-size:.86rem; margin:0 0 20px; line-height:1.5 }
 
 /* ---------- generic bits ---------- */
@@ -249,6 +263,10 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
         <span class="tab-lab">Connectivity</span>
       </button>
+      <button class="tab" id="tab-basho" role="tab" aria-selected="false" onclick="setView('basho')" aria-label="Basho" title="Basho">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span class="tab-lab">Basho</span>
+      </button>
       <button class="tab" id="tab-analytics" role="tab" aria-selected="false" onclick="setView('analytics')" aria-label="Analytics" title="Analytics">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="20" y2="21"/><rect x="5" y="12" width="3.5" height="7" fill="currentColor" stroke="none"/><rect x="10.5" y="8" width="3.5" height="11" fill="currentColor" stroke="none"/><rect x="16" y="4" width="3.5" height="15" fill="currentColor" stroke="none"/></svg>
         <span class="tab-lab">Analytics</span>
@@ -308,6 +326,19 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
         <p class="v-sub" style="margin:0 0 12px">Grades every player&#8217;s win rate for the basho on the curve, updates the banzuke ranks on the public leaderboard, and crowns the basho&#8217;s champions &#8212; the Sumo Slap Down title plus one per private league. Run this once, after all results for the basho are archived.</p>
         <button class="btn gold" id="applyRankBtn">Apply ranking for this basho</button>
         <div id="applyRankMsg" style="margin-top:10px;font-size:.9rem"></div>
+      </div>
+    </section>
+
+    <section class="view" id="v-basho">
+      <h2 class="v-title">Basho</h2>
+      <p class="v-sub">What the tournament actually looks like on the sheet right now, and whether results are still arriving. The hourly trigger does the importing; the button here is for when you don&rsquo;t want to wait for it.</p>
+      <div class="card" style="max-width:900px">
+        <div id="bashoBody">Loading&hellip;</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px">
+          <button class="btn gold" id="bashoRefreshBtn">Refresh results now</button>
+          <button class="btn" id="bashoReloadBtn">Reload panel</button>
+          <span id="bashoMsg" style="font-size:.9rem"></span>
+        </div>
       </div>
     </section>
 
@@ -575,9 +606,84 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     document.querySelectorAll(".tab").forEach(function(t){ t.setAttribute("aria-selected","false"); });
     $("v-"+v).classList.add("on");
     $("tab-"+v).setAttribute("aria-selected","true");
+    if (v === "basho") loadBasho();
     if (v === "users" && !state.loaded.users) loadUsers();
     if (v === "boards" && !state.loaded.boards) loadBoards();
     if (v === "feedback" && !state.loaded.feedback) loadFeedback();
+  };
+
+  /* ---------- basho ---------- */
+  function ago(iso, nowIso){
+    var t = Date.parse(iso || ""), now = Date.parse(nowIso || "") || Date.now();
+    if (isNaN(t)) return null;
+    return Math.max(0, Math.round((now - t) / 60000));   // whole minutes
+  }
+  function loadBasho(){
+    var body = $("bashoBody"); if (!body) return;
+    body.textContent = "Loading\u2026";
+    aPost("adminBasho").then(function(res){
+      if (!res || !res.ok){ body.textContent = (res && res.error) || "Couldn\u2019t load the basho state."; return; }
+      var mins = ago(res.lastImport, res.serverNow);
+      var running = res.rows > 0 && res.lastDay < 15;
+      var html = '<div class="bs-head"><span class="bs-name">' + esc(res.basho || "\u2014") + '</span>' +
+        '<span class="bs-day">' + (res.rows === 0 ? "not started"
+            : res.lastDay >= 15 ? "final" : "day " + res.lastDay + " of 15") + '</span></div>' +
+        '<div class="kv"><span class="lab">Result rows</span><b>' + res.rows + '</b></div>' +
+        '<div class="kv"><span class="lab">Last import run</span><b>' +
+          (mins === null ? "never" : (mins < 1 ? "just now" : mins + " min ago") +
+            (res.lastImportAdded === null ? "" : " \u00b7 added " + res.lastImportAdded)) + '</b></div>' +
+        (res.yusho  ? '<div class="kv"><span class="lab">Y\u016bsh\u014d</span><b>'  + esc(res.yusho)  + '</b></div>' : "") +
+        (res.sansho ? '<div class="kv"><span class="lab">Sansh\u014d</span><b>' + esc(res.sansho) + '</b></div>' : "");
+
+      /* Per-day bouts. A full Makuuchi day is 21 bouts and J\u016bry\u014d 14, so a day
+         that came in short is visible at a glance rather than only in the score. */
+      html += '<p class="bs-legend">Bouts imported per day \u2014 Makuuchi / J\u016bry\u014d. A complete day is about 21 / 14.</p><div class="bs-grid">' +
+        (res.days || []).map(function(d){
+          var n = d.makuuchi + d.juryo;
+          var cls = n === 0 ? "" : (d.makuuchi >= 18 && d.juryo >= 12 ? " has" : " part");
+          return '<div class="bs-d' + cls + '" title="Day ' + d.day + ': ' + d.makuuchi + ' Makuuchi, ' + d.juryo + ' J\u016bry\u014d">' +
+                 d.day + '<b>' + (n ? d.makuuchi + "/" + d.juryo : "\u2014") + '</b></div>';
+        }).join("") + '</div>';
+
+      /* The three places a basho gets named. They are edited separately and
+         nothing has ever compared them; a mismatch means the importer is
+         asking sumo-api for the wrong tournament and will quietly import
+         nothing all fortnight. */
+      var idName = res.idExpects || "";
+      var drift = [];
+      if (idName && res.basho && idName.toLowerCase() !== String(res.basho).toLowerCase())
+        drift.push("BASHO_ID " + res.bashoId + " is " + idName + ", but the sheet says " + res.basho);
+      if (idName && res.bashoLabel && idName.toLowerCase() !== String(res.bashoLabel).toLowerCase())
+        drift.push("BASHO_ID " + res.bashoId + " is " + idName + ", but BASHO_LABEL says " + res.bashoLabel);
+      html += '<div class="kv" style="margin-top:10px"><span class="lab">BASHO_ID (drives the import)</span><b>' +
+              esc(res.bashoId) + (idName ? " \u00b7 " + esc(idName) : "") + '</b></div>' +
+              '<div class="kv"><span class="lab">BASHO_LABEL (code default)</span><b>' + esc(res.bashoLabel) + '</b></div>';
+      if (drift.length)
+        html += '<div class="bs-warn"><b>These disagree.</b> ' + drift.map(esc).join(". ") +
+                '. The importer follows BASHO_ID, so results will not arrive until it is corrected in sumo-fantasy.gs and redeployed.</div>';
+
+      if (running && mins !== null && mins > 90)
+        html += '<div class="bs-warn">Nothing has been imported for ' + mins + ' minutes. The hourly trigger should run every 60 \u2014 check Triggers in the Apps Script editor.</div>';
+      if (running && mins === null)
+        html += '<div class="bs-warn">The importer has never recorded a run. Either it has not fired since this was deployed, or the hourly trigger is missing.</div>';
+      if (res.archiveError)
+        html += '<div class="bs-warn"><b>The last archive attempt failed.</b> ' + esc(res.archiveError) + '</div>';
+      if (res.rows > 0 && res.lastDay >= 15 && !res.rankedBasho)
+        html += '<div class="bs-warn">Day 15 is in and this basho has not been ranked yet \u2014 run <b>Apply ranking</b> on the Connectivity tab before starting the next one.</div>';
+
+      body.innerHTML = html;
+    });
+  }
+  $("bashoReloadBtn").onclick = function(){ $("bashoMsg").textContent = ""; loadBasho(); };
+  $("bashoRefreshBtn").onclick = async function(){
+    var b = $("bashoRefreshBtn"), m = $("bashoMsg");
+    b.disabled = true; m.textContent = "Fetching from sumo-api\u2026 this can take a minute.";
+    var res = await aPost("adminRefreshResults");
+    b.disabled = false;
+    if (res && res.ok) m.textContent = res.added ? ("Imported " + res.added + " new bout" + (res.added===1?"":"s") + ".")
+                                                 : "Nothing new to import.";
+    else m.textContent = (res && res.error) || "The import failed.";
+    loadBasho();
   };
 
   /* ---------- connectivity ---------- */
