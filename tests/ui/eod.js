@@ -25,15 +25,25 @@ const T=[]; const chk=(n,ok,x)=>{T.push(ok);console.log((ok?'  ok   ':'  FAIL ')
     const first=rows[0];
     return { rows:rows.length,
       recsPerRow: rows.map(r=>r.querySelectorAll('.bout__rec').length),
-      h2hKept: rows.every(r=>r.querySelector('.bout__past')!==null),
+      h2hInMid: rows.filter(r=>r.querySelector('.bout__mid .bout__h2h')).length,
+      trailing: document.querySelectorAll('#dayModalBody .bout__past').length,
+      bareRecs: rows[0] ? rows[0].querySelectorAll('.bout__rec').length : 0,
+      h2hLabelled: [...document.querySelectorAll('#dayModalBody .bout__h2h')]
+                     .every(e=>/^H2H\s/.test(e.textContent)),
       sample: first ? first.innerText.replace(/\s+/g,' ').trim() : '',
       recTexts: [...document.querySelectorAll('#dayModalBody .bout__rec')].slice(0,6).map(e=>e.textContent),
       kk: document.querySelectorAll('#dayModalBody .bout__rec.is-kk').length };
   });
   chk('every bout shows two records', m.rows>0 && m.recsPerRow.every(n=>n===2),
       m.rows+' rows, counts '+JSON.stringify(m.recsPerRow.slice(0,6)));
-  chk('the head-to-head is still there', m.h2hKept);
+  chk('the head-to-head moved into the middle, under the kimarite', m.h2hInMid===m.rows,
+      m.h2hInMid+' of '+m.rows+' rows');
+  chk('and no longer sits in a trailing column of its own', m.trailing===0,
+      m.trailing+' trailing cells left');
+  chk('so the only bare W\u2013L on a row are the two records', m.bareRecs===2,
+      m.bareRecs+' unlabelled numbers');
   chk('records look like W–L', m.recTexts.every(t=>/^\d+–\d+$/.test(t)), JSON.stringify(m.recTexts));
+  chk('the head-to-head says what it is', m.h2hLabelled);
   chk('no page errors', errs.length===0, errs[0]||'');
   console.log('         sample row: '+m.sample.slice(0,110));
 

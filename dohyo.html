@@ -245,11 +245,20 @@
     100%{ transform:scale(1.04); text-shadow:0 0 1.4cqw rgba(242,193,78,.5), 0 .2cqw 1.2cqw #000 }
   }
   .call__stack{ display:flex; flex-direction:column; align-items:center; gap:.35cqw }
+  /* The badge rail. Fixed height whatever it holds, so east and west stay level
+     with each other all the way down the stack. */
+  .call__flags{
+    display:flex; align-items:center; justify-content:center; gap:.5cqw;
+    min-height:1.6cqw;
+  }
   /* a wrestler from your team, called out on the dohyō */
   .call__mine{ font-style:normal; font-family:"WDXL Lubrifont TC",ui-monospace,monospace;
         font-size:1cqw; font-weight:700; letter-spacing:.18em; text-transform:uppercase;
         color:#0d0f15; background:var(--sun); padding:.2cqw .8cqw; border-radius:99px;
         box-shadow:0 0 0 1px rgba(var(--sun-rgb),.45); }
+  /* not yours — the badge still occupies the rail so both sides measure the
+     same, exactly as .call__pill does for a bout nobody has won yet */
+  .call__mine[aria-hidden="true"]{ visibility:hidden }
   .call__pill{
     font-style:normal; font-weight:700;
     font-size:.85cqw; letter-spacing:.24em; text-transform:uppercase;
@@ -1029,6 +1038,16 @@
     font-family:"WDXL Lubrifont TC",ui-monospace,monospace;
     font-size:13px; text-align:right; color:var(--faint);
   }
+  /* The end-of-day rows carry each wrestler's tournament record beside his
+     name, which left the old trailing head-to-head column as a second bare
+     W–L with nothing to say which was which. It now rides under the kimarite,
+     labelled, and the modal's rows lose the fourth track entirely. */
+  #dayModalBody .bout{ grid-template-columns:1fr 150px 1fr }
+  .bout__h2h{
+    display:block; font-size:9px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--faint); margin-top:2px;
+  }
+  @media (max-width:720px){ #dayModalBody .bout{ grid-template-columns:1fr auto 1fr } }
   .bout__mid.pending{ color:var(--faint); font-style:italic; letter-spacing:.04em }
   /* ── up next ───────────────────────────────────────────────
      Sits under the dohyō and takes the ring's own width, so the two read as
@@ -2643,9 +2662,17 @@ function nameCall(_side, name, rank){
   const move = d.move
     ? `<span class="call__move ${d.dir}">${ARROW[d.dir] || ""} ${d.move}</span>`
     : "";
+  /* Both badges live on ONE rail that is always in the DOM and always the same
+     height. The Win pill already worked this way — held in place, unseen — but
+     "My Team" was rendered only when it applied, so a bout with one of your
+     seven in it pushed that whole side down a row and nothing lined up across
+     the ring. Side by side rather than stacked, so a wrestler who is both
+     yours and the winner still costs exactly one row. */
   return `<span class="call__stack${mine ? " is-mine" : ""}">` +
-         (mine ? `<em class="call__mine">★ My Team</em>` : "") +
-         `<em class="call__pill">Win</em>` +
+         `<span class="call__flags">` +
+           `<em class="call__mine"${mine ? "" : ' aria-hidden="true"'}>★ My Team</em>` +
+           `<em class="call__pill">Win</em>` +
+         `</span>` +
          `<em class="call__kanji">${d.kanji || "&nbsp;"}</em>` +
          `<span class="call__romaji">${name}</span>` +
          `<span class="call__rank"><em>${rank}</em>${move}</span>` +
@@ -3480,9 +3507,9 @@ function buildDayModal(){
                   (mine.has(b[1]) ? " mine-e" : "") + (mine.has(b[5]) ? " mine-w" : "");
       html += `<div class="${cls}">` +
         `<span class="bout__e"><span class="bout__rank">${b[0]}</span><span class="bout__name${meE}">${mine.has(b[1]) ? '<i class="bout__star">&#9670;</i>' : ""}${b[1]}${kbTag(b,"e")}</span>${recChip(b[1], upto)}</span>` +
-        `<span class="bout__mid${b[2] ? "" : " pending"}">${b[2] ? b[3] : "\u2014"}${b[2] ? `<span>${b[2] === "e" ? "East wins" : "West wins"}</span>` : ""}</span>` +
+        `<span class="bout__mid${b[2] ? "" : " pending"}">${b[2] ? b[3] : "\u2014"}${b[2] ? `<span>${b[2] === "e" ? "East wins" : "West wins"}</span>` : ""}${
+          b[6] ? `<span class="bout__h2h" title="Head-to-head all-time, east\u2013west">H2H ${b[6]}</span>` : ""}</span>` +
         `<span class="bout__w">${recChip(b[5], upto)}<span class="bout__name${meW}">${b[5]}${kbTag(b,"w")}${mine.has(b[5]) ? '<i class="bout__star">&#9670;</i>' : ""}</span><span class="bout__rank">${b[4]}</span></span>` +
-        `<span class="bout__past" title="Head-to-head, east\u2013west">${b[6] || ""}</span>` +
       `</div>`;
     }
     html += `</section>`;
