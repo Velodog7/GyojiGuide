@@ -1031,6 +1031,14 @@
   }
   .bout__mid.pending{ color:var(--faint); font-style:italic; letter-spacing:.04em }
   .bout__name{ font-size:15px }
+  /* the simulated-tournament record, on both sides of an end-of-day bout.
+     Deliberately quieter than the rank badge beside it — it is a number you
+     scan down a column, not a label you read. */
+  .bout__rec{
+    font-family:"WDXL Lubrifont TC",ui-monospace,monospace;
+    font-size:12px; color:var(--dim); white-space:nowrap; flex:none;
+  }
+  .bout__rec.is-kk{ color:var(--sun) }        /* eight wins — kachi-koshi */
   /* your team's wrestlers, flagged in the day's matchups */
   .bout__star{ font-style:normal; color:var(--sun); font-size:11px; margin:0 5px;
         text-shadow:0 0 6px rgba(var(--sun-rgb),.6) }
@@ -1064,7 +1072,15 @@
   .card__sides button.w[aria-pressed="true"]{ background:var(--west) }
 
   @media (max-width:720px){
-      .bout{ grid-template-columns:1fr 110px 1fr; gap:8px }
+    /* Below 720 the two 1fr tracks collapse to ~77px, which is narrower than
+       most shikona — so the names were painting straight over the kimarite in
+       the middle column. Measured at 390px: 129 collisions across the day's
+       card, the worst 99px deep. Letting each side WRAP puts the name on its
+       own line under its rank badge instead, and an auto middle track stops
+       the fixed 110px squeezing them in the first place. */
+    .bout{ grid-template-columns:1fr auto 1fr; gap:6px 8px }
+    .bout__e, .bout__w{ flex-wrap:wrap; row-gap:2px }
+    .bout__mid{ font-size:10px }
     .bout__name{ font-size:13px }
   }
   @media (prefers-reduced-motion:reduce){ .slot img{ animation:none } }
@@ -2551,6 +2567,17 @@ function recordThrough(name, upto){
   }
   return { w, l };
 }
+/* The tournament record as a chip, for the day's-bouts list. Every wrestler in
+   Makuuchi and Juryo is in RESULTS — not just the team — so the rest of the
+   card can carry the same number the team card shows, instead of leaving the
+   head-to-head to stand in for a record it was never measuring. Eight wins is
+   kachi-koshi and gets the gold. */
+function recChip(name, upto){
+  const { w, l } = recordThrough(name, Math.max(0, Number(upto) || 0));
+  const kk = w >= 8 ? " is-kk" : "";
+  return `<span class="bout__rec${kk}" title="Record through day ${upto}">${w}\u2013${l}</span>`;
+}
+
 /* the numeric score shown beside the dots, revealed to the same day as them */
 function recordLine(name, reveal){
   const upto = Number(day) - (reveal ? 0 : 1);
@@ -3321,9 +3348,9 @@ function buildDayModal(){
       const cls = "bout revealed" + (b[2] ? ` won-${b[2]}` : "") +
                   (mine.has(b[1]) ? " mine-e" : "") + (mine.has(b[5]) ? " mine-w" : "");
       html += `<div class="${cls}">` +
-        `<span class="bout__e"><span class="bout__rank">${b[0]}</span><span class="bout__name${meE}">${mine.has(b[1]) ? '<i class="bout__star">&#9670;</i>' : ""}${b[1]}${kbTag(b,"e")}</span></span>` +
+        `<span class="bout__e"><span class="bout__rank">${b[0]}</span><span class="bout__name${meE}">${mine.has(b[1]) ? '<i class="bout__star">&#9670;</i>' : ""}${b[1]}${kbTag(b,"e")}</span>${recChip(b[1], upto)}</span>` +
         `<span class="bout__mid${b[2] ? "" : " pending"}">${b[2] ? b[3] : "\u2014"}${b[2] ? `<span>${b[2] === "e" ? "East wins" : "West wins"}</span>` : ""}</span>` +
-        `<span class="bout__w"><span class="bout__name${meW}">${b[5]}${kbTag(b,"w")}${mine.has(b[5]) ? '<i class="bout__star">&#9670;</i>' : ""}</span><span class="bout__rank">${b[4]}</span></span>` +
+        `<span class="bout__w">${recChip(b[5], upto)}<span class="bout__name${meW}">${b[5]}${kbTag(b,"w")}${mine.has(b[5]) ? '<i class="bout__star">&#9670;</i>' : ""}</span><span class="bout__rank">${b[4]}</span></span>` +
         `<span class="bout__past" title="Head-to-head, east\u2013west">${b[6] || ""}</span>` +
       `</div>`;
     }
