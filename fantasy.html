@@ -1772,7 +1772,8 @@ async function renderLeague(){
       lg.benchSize = d.league.benchSize; lg.farmSize = d.league.farmSize; lg.draftStatus = d.league.draftStatus;
       lg.scoring = d.league.scoring || null; lg.draftDate = d.league.draftDate || "";
       lg.draftAgreedCount = d.league.draftAgreedCount || 0; lg.draftMemberCount = d.league.draftMemberCount || (d.members||[]).length;
-      lg.iAgreedDraft = !!d.league.iAgreedDraft; }
+      lg.iAgreedDraft = !!d.league.iAgreedDraft;
+      lg.keepMk = d.league.keepMk; lg.keepJr = d.league.keepJr; }   // blank stays null (= keep everyone); never coerce to 0
   } else { lg.members = Array.isArray(lg.members) ? lg.members : []; lg.messages = lg.messages || []; }
   lgBusy(false); lgStatus("");
 
