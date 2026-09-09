@@ -87,6 +87,43 @@ const rows = p => p.evaluate(()=>{
     await ctx.close();
   }
 
+  /* ---- rank movement must read as good or bad news, correctly ----
+     .call__move.down was set to var(--win): a demotion was painted the same
+     green as a promotion, so falling from Sekiwake to Maegashira looked like
+     a rise. Checked as computed colour, per direction, on the real page. */
+  {
+    const {ctx,p} = await boot(b, 'none');
+    const cols = await p.evaluate(()=>{
+      const probe = dir => {
+        const el = document.createElement('span');
+        el.className = 'call__move ' + dir;
+        el.textContent = 'x';
+        (document.querySelector('.call__stack') || document.body).appendChild(el);
+        const c = getComputedStyle(el).color;
+        el.remove(); return c;
+      };
+      const varOf = n => {
+        const el = document.createElement('span');
+        el.style.color = 'var(' + n + ')';
+        document.body.appendChild(el);
+        const c = getComputedStyle(el).color; el.remove(); return c;
+      };
+      return { up:probe('up'), down:probe('down'), same:probe(''), neu:probe('new'),
+               win:varOf('--win'), loss:varOf('--loss'), sun:varOf('--sun') };
+    });
+    chk('a demotion is painted with the loss colour', cols.down===cols.loss,
+        'down='+cols.down+' loss='+cols.loss);
+    chk('a promotion is still the win colour', cols.up===cols.win,
+        'up='+cols.up+' win='+cols.win);
+    chk('the two directions do not look the same', cols.up!==cols.down,
+        'up='+cols.up+' down='+cols.down);
+    chk('an unchanged rank stays neutral', cols.same!==cols.win && cols.same!==cols.loss,
+        'same='+cols.same);
+    chk('new to the division keeps its own colour', cols.neu===cols.sun,
+        'new='+cols.neu+' sun='+cols.sun);
+    await ctx.close();
+  }
+
   /* the winner's pill must not shift anything either */
   {
     const {ctx,p} = await boot(b, 'east');
