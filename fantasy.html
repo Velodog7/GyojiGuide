@@ -750,7 +750,7 @@
 </style>
 <script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-basho.js"></script><script src="gg-mawashi.js"></script><script src="gg-dossier.js"></script></head>
 <body>
-<script src="gg-auth.js"></script><script src="gg-nav.js"></script>
+<script src="gg-notify.js"></script><script src="gg-auth.js"></script><script src="gg-nav.js"></script>
 <nav class="tabs" role="tablist">
   <div class="tabs-inner">
     <button class="tab" id="tab-team" role="tab" aria-selected="true" onclick="setView('team')" aria-label="Sumo Slap Down League (public)" title="Sumo Slap Down League (public)">
@@ -3194,6 +3194,69 @@ async function commitPick(lg, name){
   pollDraft(lg);
 }
 
+/* Draft-room notifications. Everything here is already in the draftState
+   payload the room polls every four seconds, so none of it costs a request.
+
+   All three are keyed on the LEAGUE, so two rooms open in two tabs don't
+   overwrite each other's baselines, and all three go through gg-notify's
+   change detection — which seeds silently, so opening a room mid-draft with a
+   full chat log doesn't fire a toast per message.
+
+   Your turn is deliberately sticky: it is the one alert with a clock on it,
+   and it should still be on screen when you come back to the tab. */
+function draftNotify(lg, res, turn, meOnClock){
+  const N = GyojiGuide.notify;
+  if (!N || !acct) return;
+  const key = s => s + ":" + lg.id;
+
+  /* your turn — announce the ARRIVAL of your turn, not the fact of it */
+  const onClock = meOnClock ? (turn.round + "/" + turn.phase + "/" + turn.cursor) : "";
+  const t = N.changed(key("turn"), onClock);
+  if (!t.first && t.changed && meOnClock){
+    N.push({ key:"turn", tag:"gg-turn-" + lg.id, sticky:true,
+             title:"Your pick in " + (lg.name || "the draft"),
+             body:"Round " + turn.round + " \u00b7 " +
+                  (turn.phase === "makuuchi" ? "Makuuchi" : "J\u016bry\u014d") + " phase.",
+             href:"fantasy.html" });
+  }
+
+  /* chat — one toast per burst, never one per message, and never for your own */
+  const chat = res.chat || [];
+  const last = chat.length ? chat[chat.length - 1] : null;
+  const mineHandle = (acct.handle || "").toLowerCase();
+  const c = N.changed(key("chat"), last ? String(last.id || chat.length) : "");
+  if (!c.first && c.changed && last &&
+      String(last.handle || "").toLowerCase() !== mineHandle){
+    N.push({ key:"chat", tag:"gg-chat-" + lg.id,
+             title:(last.name || last.handle || "Someone") + " in the draft room",
+             body:String(last.body || "").slice(0, 90),
+             href:"fantasy.html" });
+  }
+
+  /* who else is here — only ever announce someone ARRIVING, and never yourself */
+  const here = Object.keys(res.presence || {})
+    .filter(h => res.presence[h] != null && res.presence[h] < 90 &&
+                 h.toLowerCase() !== mineHandle)
+    .sort();
+  const p = N.changed(key("here"), here.join(","));
+  if (!p.first && p.changed){
+    const was = String(p.prev || "").split(",").filter(Boolean);
+    const joined = here.filter(h => was.indexOf(h) < 0);
+    if (joined.length){
+      const nameOf = h => {
+        const m = (res.members || []).find(x => String(x.handle).toLowerCase() === h.toLowerCase());
+        return (m && m.name) || h;
+      };
+      N.push({ key:"here", tag:"gg-here-" + lg.id,
+               title: joined.length === 1
+                 ? nameOf(joined[0]) + " joined the draft room"
+                 : joined.length + " more joined the draft room",
+               body: joined.length === 1 ? "" : joined.map(nameOf).join(", "),
+               href:"fantasy.html" });
+    }
+  }
+}
+
 async function pollDraft(lg){
   let res=null; try { res = await GyojiGuide.draftState(lg.id); } catch(e){}
   if (!res || !res.ok) return;
@@ -3214,6 +3277,7 @@ async function pollDraft(lg){
     + (draftDeadline ? `<span class="lg-tick" id="lgTick"></span>` : "")
     + (draftAuto ? ` <span class="lg-locked-note" style="margin:0">auto-draft on</span>` : "");
   paintTick();
+  draftNotify(lg, res, turn, meOnClock);
   if (!draftTick) draftTick = setInterval(paintTick, 1000);
   /* Nothing settles until somebody asks, so once the deadline is close, ask
      more often — otherwise an expired pick sits there for up to four seconds. */

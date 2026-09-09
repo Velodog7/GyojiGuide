@@ -178,6 +178,13 @@
     /* compact action grid (Messages / Avatar / Log out) — even, tidy buttons
        instead of full-width stacked bars */
     ".gga-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-top:14px}"+
+    /* the desktop-notification opt-in, under the action grid */
+    ".gga-notify{margin-top:10px;border-top:1px solid rgba(231,222,208,.16);padding-top:10px}"+
+    ".gga-notify__r{display:flex;align-items:center;gap:12px;justify-content:space-between}"+
+    ".gga-notify__r span{min-width:0}"+
+    ".gga-notify__r b{display:block;font-size:.92rem}"+
+    ".gga-notify__r em{display:block;font-style:normal;font-size:.8rem;color:#878da0;margin-top:2px}"+
+    ".gga-notify__n{margin:0;font-size:.8rem;color:#878da0;line-height:1.45}"+
     ".gga-act{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;"+
       "background:#1b1e27;border:1px solid #2a2d38;color:#e9eaf0;font:inherit;font-size:.78rem;font-weight:600;"+
       "padding:12px 8px;border-radius:11px;cursor:pointer;transition:border-color .12s,background .12s}"+
@@ -297,24 +304,97 @@
      auth-change hook do exactly that on load, which had the badge polling at
      twice the intended rate.) A sequence number retires every chain but the
      newest, and also stops a slow response from painting over a fresher one. */
+  /* Turn the poll's answer into notifications.
+
+     Only ever on a CHANGE, and never on the first answer after a load — the
+     baselines live in gg-notify and are seeded silently, so arriving at a page
+     with unread mail is not an event, receiving mail is. Both counters are
+     keyed per account, so signing in as someone else starts clean. */
+  function announce(res, unread){
+    var N = GG.notify;
+    if (!N || !res || !res.ok) return;
+
+    if (N.rose("dm", unread)) {
+      N.push({ key:"dm", tag:"gg-dm",
+               title: unread === 1 ? "New message" : unread + " unread messages",
+               body: "Open your inbox to read it.",
+               href: "fantasy.html" });
+    }
+
+    /* A day lands when the hourly importer finishes writing it, which is the
+       moment scores move. Keyed with the basho so the roll-over to day 0 of
+       the next tournament can't read as fifteen days going backwards. */
+    var day = Number(res.lastDay || 0) || 0;
+    var basho = String(res.basho || "");
+    if (day > 0 && N.rose("day:" + basho, day)) {
+      N.push({ key:"day", tag:"gg-day",
+               title: "Day " + day + " results are in",
+               body: basho + " \u00b7 standings have moved.",
+               href: "fantasy.html" });
+    }
+  }
+
   async function pollNavUnread(){
     var mine = ++navPollSeq;
     if (navUnreadTimer){ clearTimeout(navUnreadTimer); navUnreadTimer = null; }
-    if (!acct() || !GG.dmUnread) return;
+    if (!acct() || !(GG.whatsNew || GG.dmUnread)) return;
     wireNavVisibility();
     if (tabHidden()) return;                 // parked until the tab comes back
     try {
-      var res = await GG.dmUnread();
+      /* whatsNew replaced dmUnread here: the same single request now also
+         carries the basho day, so results notifications cost no extra call.
+         dmUnread is kept as the fallback for a backend not yet redeployed. */
+      var res = GG.whatsNew ? await GG.whatsNew() : await GG.dmUnread();
       if (mine !== navPollSeq) return;       // a newer poll started while this was away
+      var n = (res && res.ok) ? (res.unread || 0) : 0;
       var b = slot && slot.querySelector("#ggaChipDm");
       if (b){
-        var n = (res && res.ok) ? (res.unread || 0) : 0;
         if (n > 0){ b.textContent = n > 99 ? "99+" : String(n); b.hidden = false; }
         else b.hidden = true;
       }
+      announce(res, n);
     } catch (e){}
     if (mine !== navPollSeq) return;
     if (acct() && !tabHidden()) navUnreadTimer = setTimeout(pollNavUnread, 45000);   // re-check every 45s
+  }
+
+  /* Browser notifications, opt-in.
+
+     Permission can only be requested from a user gesture, and a denial is
+     final for the origin — the browser will not ask again, and neither should
+     we. So this is a button the reader presses, never something fired on load,
+     and each outcome says plainly what state they are now in. */
+  function notifyRowHTML(){
+    var N = GG.notify;
+    if (!N) return "";
+    var perm = N.osPermission();
+    var on   = perm === "granted" && N.osWanted();
+    if (perm === "unsupported")
+      return '<p class="gga-notify__n">This browser can\u2019t show desktop notifications. '+
+             'Alerts will still appear on the page while it\u2019s open.</p>';
+    if (perm === "denied")
+      return '<p class="gga-notify__n">Notifications are blocked for this site in your browser '+
+             'settings. Alerts will still appear on the page while it\u2019s open.</p>';
+    return '<div class="gga-notify__r">'+
+      '<span><b>Desktop notifications</b><em>'+
+        (on ? "On \u2014 alerts reach you when this tab is in the background."
+            : "Off \u2014 alerts only show while you\u2019re looking at the page.")+
+      '</em></span>'+
+      '<button class="gga-menu-btn" id="ggaNotifyBtn">'+(on ? "Turn off" : "Turn on")+'</button>'+
+      '</div>';
+  }
+  function wireNotifyRow(){
+    var row = modal && modal.querySelector("#ggaNotifyRow");
+    if (!row || !GG.notify) return;
+    row.innerHTML = notifyRowHTML();
+    var btn = row.querySelector("#ggaNotifyBtn");
+    if (!btn) return;
+    btn.onclick = function(){
+      var N = GG.notify;
+      if (N.osPermission() === "granted" && N.osWanted()){ N.setWanted(false); wireNotifyRow(); return; }
+      btn.disabled = true;
+      N.askOS().then(function(){ wireNotifyRow(); });   // repaint whatever it became
+    };
   }
 
   function mountNav(tries){
@@ -362,8 +442,10 @@
           '<button class="gga-act" id="ggaMessages"><span class="gga-act__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="5" width="18.8" height="14" rx="2.6"/><path d="M3.6 7.6 12 13.3 20.4 7.6"/></svg></span><span class="gga-act__lab">Messages</span><span class="gga-dm-badge" id="ggaDmBadge" hidden>0</span></button>'+
           (window.MawashiDesigner ? '<button class="gga-act" id="ggaEdit"><span class="gga-act__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1.6 1.6 0 0 1 1.6 1.6v9.2a1.6 1.6 0 0 1-1.6 1.6H7a1.6 1.6 0 0 1-1.6-1.6V5.6A1.6 1.6 0 0 1 7 4Z"/><path d="M8.6 8.4h6.8"/><path d="M6.6 18.6v2.4M9.8 18.6v2.4M13 18.6v2.4M16.2 18.6v2.4"/></svg></span><span class="gga-act__lab">Avatar</span></button>' : '')+
           '<button class="gga-act danger" id="ggaLogout"><span class="gga-act__ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.6 3.6h2.9A2.5 2.5 0 0 1 20 6.1v11.8a2.5 2.5 0 0 1-2.5 2.5h-2.9"/><path d="M9.8 16.4 5.4 12l4.4-4.4"/><path d="M5.4 12h9.4"/></svg></span><span class="gga-act__lab">Log out</span></button>'+
-        '</div>';
+        '</div>'+
+        '<div class="gga-notify" id="ggaNotifyRow"></div>';
       modal.querySelector(".gga-x").onclick = A.close;
+      wireNotifyRow();
       var eb = modal.querySelector("#ggaEdit"); if (eb) eb.onclick = openAvatar;
       modal.querySelector("#ggaLogout").onclick = function(){ GG.logout(); refresh(); fire(); A.close(); };
       modal.querySelector("#ggaMessages").onclick = function(){ openMessages(a); };

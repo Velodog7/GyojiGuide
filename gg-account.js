@@ -303,6 +303,10 @@
   GG.dmThreads   = function (){ return GG.apiGetQ("dmThreads", { handle: (GG.account.get()||{}).handle || "" }); };
   GG.dmDirectory = function (){ return GG.apiGetQ("dmDirectory", { handle: (GG.account.get()||{}).handle || "" }); };
   GG.dmUnread    = function (){ return GG.apiGetQ("dmUnread",  { handle: (GG.account.get()||{}).handle || "" }); };
+  /* Everything a page needs to notice something happened, in the one request
+     the nav poll was already making for the DM badge. Same cadence, same cost
+     — the extra fields are a few Meta cells. */
+  GG.whatsNew    = function (){ return GG.apiGetQ("whatsNew",  { handle: (GG.account.get()||{}).handle || "" }); };
   GG.dmSend      = function (to, body){ return GG.apiPost(authed({ action:"dmSend", to: to, body: body })); };
   GG.dmMarkRead  = function (other){ return GG.apiPost(authed({ action:"dmMarkRead", other: other })); };
   GG.dmDelete    = function (msgId){ return GG.apiPost(authed({ action:"dmDelete", msgId: msgId })); };

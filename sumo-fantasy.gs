@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-09-basho-id';
+var BACKEND_VERSION = '2026-09-09-whatsnew';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -282,6 +282,9 @@ function doGet(e) {
     // includes the auth column), so nothing admin-only leaks.
     if (action === 'dmThreads') return json(dmThreads(e.parameter.handle));
     if (action === 'dmUnread')  return json(dmUnread(e.parameter.handle));
+    /* dmUnread stays routed: a tab loaded before this deploy keeps polling it,
+       and there is no reason to break a page somebody already has open. */
+    if (action === 'whatsNew')  return json(whatsNew(e.parameter.handle));
     if (action === 'dmDirectory') return json(dmDirectory(e.parameter.handle));
     return json({ ok: true, users: readUsers(), results: readResults(), meta: readMeta(),
                   champion: reigningChampion_('') });
@@ -1200,6 +1203,32 @@ function dmUnread(handle) {
     if (String(v[r][3] || '').toLowerCase() === key && String(v[r][6] || '') !== '1') n++;
   }
   return { ok: true, unread: n };
+}
+
+/* One small payload carrying everything a page needs to notice that something
+   has happened for this reader. It REPLACES the dmUnread poll rather than
+   joining it: same one request every 45s, more in the answer, so the daily
+   quota this shares with the hourly importer is unchanged.
+
+   Deliberately cheap — Meta is a handful of rows, and the DM count is the scan
+   dmUnread was already doing. Nothing here reads Results or Users, because
+   this runs on every open tab all day and must never grow with them. */
+function whatsNew(handle) {
+  var out = { ok: true, unread: 0, basho: '', lastDay: 0, lastImport: '',
+              serverNow: new Date().toISOString() };
+  try {
+    var m = readMeta();
+    out.basho      = String(m.basho || '');
+    out.lastDay    = Number(m.lastDay || 0) || 0;
+    out.lastImport = String(m.lastImport || '');
+  } catch (e) {}
+  /* signed out is a legitimate state, not an error — the caller still wants
+     the basho half so a logged-out reader sees "day 3 is in" */
+  try {
+    var h = cleanHandle(handle);
+    if (h) out.unread = (dmUnread(h) || {}).unread || 0;
+  } catch (e) {}
+  return out;
 }
 
 function dmSend(body) {
