@@ -1030,6 +1030,24 @@
     font-size:13px; text-align:right; color:var(--faint);
   }
   .bout__mid.pending{ color:var(--faint); font-style:italic; letter-spacing:.04em }
+  /* ── up next ───────────────────────────────────────────── */
+  .upnext{
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    margin:0 0 10px; padding:9px 12px; border-radius:8px;
+    border:1px solid var(--line); background:rgba(68,52,79,.35);
+  }
+  .upnext[hidden]{ display:none }
+  .upnext__lab{
+    font-family:"WDXL Lubrifont TC",ui-monospace,monospace;
+    font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--faint); flex:none;
+  }
+  .upnext__body{ display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; min-width:0 }
+  .upnext__nm{ font-size:15px }
+  .upnext__nm.is-mine{ color:var(--sun) }
+  .upnext__vs{ color:var(--faint); font-size:11px; letter-spacing:.14em; text-transform:uppercase }
+  .upnext__none{ color:var(--dim); font-size:13px }
+  .upnext.is-mine{ border-color:rgba(var(--sun-rgb),.4) }
   .bout__name{ font-size:15px }
   /* the simulated-tournament record, on both sides of an end-of-day bout.
      Deliberately quieter than the rank badge beside it — it is a number you
@@ -1686,6 +1704,13 @@
   <div class="tabs tabs--wrap" role="tablist" id="divTabs">
     <button role="tab" data-tab="makuuchi" data-short="Maku" aria-selected="true">Makuuchi</button>
     <button role="tab" data-tab="juryo" data-short="Jūryō" aria-selected="false">Jūryō</button>
+  </div>
+  <!-- What the ring will call next. Reads off playableIdx(), the same sequence
+       the player actually walks, so in "only my team" it names your next bout
+       and skips everything in between rather than the literal next row. -->
+  <div class="upnext" id="upNext" hidden>
+    <span class="upnext__lab" id="upNextLab">Up next</span>
+    <span class="upnext__body" id="upNextBody"></span>
   </div>
   <div class="panel" id="p-makuuchi"><div class="bouts" id="l-makuuchi"></div></div>
   <div class="panel" id="p-juryo" hidden><div class="bouts" id="l-juryo"></div></div>
@@ -2630,6 +2655,77 @@ function playableIdx(){
   return out;
 }
 
+/* Which bout the ring will call next — an index into card[division], or null.
+
+   It walks playableIdx(), NOT the raw card, which is the whole point: under
+   "only my team" the next thing you will actually watch is your team's next
+   bout, not whatever row happens to sit below the current one. Both settings
+   fall out of the same call because the filtering already lives there.
+
+   Before a run starts this answers "what opens the day"; on the last bout it
+   answers null, which the strip reports rather than leaving stale. */
+function nextPlayable(){
+  const seq = playableIdx();
+  if (!seq.length) return null;                  // nothing to watch in this division
+  if (!playing) return seq[0];
+  const at = seq.indexOf(playIdx);
+  return (at >= 0 && at < seq.length - 1) ? seq[at + 1] : null;
+}
+
+/* The strip above the day's list. Names only — no result, no kimarite: this is
+   a bout that has not been fought on screen yet, and the list beside it goes to
+   some trouble to keep results hidden until each one is revealed.
+
+   The records are taken through YESTERDAY (day - 1) for exactly that reason.
+   recordThrough(name, day) would fold in today's result and quietly hand you
+   the outcome of the bout you are about to watch. */
+function paintUpNext(){
+  const el = document.getElementById("upNext");
+  if (!el) return;
+  const body = document.getElementById("upNextBody");
+  const lab  = document.getElementById("upNextLab");
+  const onCard = ["makuuchi","juryo"].some(n => {
+    const panel = document.getElementById("p-" + n);
+    return panel && !panel.hidden;
+  });
+  if (!onCard) { el.hidden = true; return; }
+  if (!card || !card[division]) { el.hidden = true; return; }
+
+  const seq = playableIdx();
+  const i = nextPlayable();
+  el.hidden = false;
+  el.classList.remove("is-mine");
+  lab.textContent = playing ? "Up next" : "First up";
+
+  if (i === null) {
+    lab.textContent = "Up next";
+    body.innerHTML = `<span class="upnext__none">${
+      !seq.length
+        ? (watchScope === "mine"
+            ? `None of your seven fight in ${DIV_NAME[division]} today.`
+            : "No bouts on this card.")
+        : "That was the last bout of the day."
+    }</span>`;
+    return;
+  }
+
+  const b = card[division][i];
+  const mine = myPicks();
+  const upto = Math.max(0, Number(day) - 1);     // coming IN to today — never today's result
+  const side = (rank, name) => {
+    const isMine = mine.has(name);
+    const { w, l } = recordThrough(name, upto);
+    return `<span class="bout__rank">${rank}</span>` +
+           `<span class="upnext__nm${isMine ? " is-mine" : ""}">${
+             isMine ? '<i class="bout__star">&#9670;</i>' : ""}${name}</span>` +
+           `<span class="bout__rec" title="Record coming into day ${day}">${w}\u2013${l}</span>`;
+  };
+  if (boutHasMine(b)) el.classList.add("is-mine");
+  body.innerHTML = side(b[0], b[1]) +
+                   `<span class="upnext__vs">vs</span>` +
+                   side(b[4], b[5]);
+}
+
 /* Play one bout fully (announce → stare-down → tachiai → result), then,
    if it still owns the run, auto-advance to the next. */
 async function playBout(i){
@@ -2779,6 +2875,8 @@ function syncPlayBtn(){
   if (prevBtn) prevBtn.disabled = !playing || at <= 0;
   if (nextBtn) nextBtn.disabled = !playing || at < 0 || at >= seq.length - 1;
   if (replayBtn) replayBtn.disabled = !playing;
+  /* every transport change is also a change to what comes next */
+  paintUpNext();
 }
 
 
@@ -2859,7 +2957,9 @@ function selectTab(name){
   if (name === "team") paintTeam();              // scores follow the current tournament
   if (name !== "roster" && name !== "team") {    // neither is a card you can play
     division = name;
-    syncPlayBtn();
+    syncPlayBtn();                               // …which repaints "up next"
+  } else {
+    paintUpNext();                               // hide it over a non-card tab
   }
 }
 document.querySelectorAll('[role="tab"]').forEach(t =>
@@ -3912,7 +4012,12 @@ pickGroup(document.getElementById("introRun"), "run", v => {
   divStep.style.opacity = off ? ".4" : "";
   div.querySelectorAll(".optcard").forEach(b => b.classList.toggle("is-disabled", off));
 });
-pickGroup(document.getElementById("introScope"), "scope", v => { watchScope = v; });
+pickGroup(document.getElementById("introScope"), "scope", v => {
+  watchScope = v;
+  /* the strip names a different bout under each setting, so repaint it the
+     moment the setting changes rather than on the next transport event */
+  try { paintUpNext(); } catch (e) {}
+});
 pickGroup(document.getElementById("introDiv"), "div", v => { watchDiv = v; });
 
 function syncIntro(){
