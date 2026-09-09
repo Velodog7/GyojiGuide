@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-09-basho-panel';
+var BACKEND_VERSION = '2026-09-09-draft-room';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -268,7 +268,7 @@ function doGet(e) {
     if (action === 'league')  return json(leagueDetail(e.parameter.id, e.parameter.handle));
     if (action === 'invite')  return json(leagueByInvite(e.parameter.code));
     if (action === 'history') return json({ ok: true, history: myHistory(e.parameter.handle) });
-    if (action === 'draftState') return json(draftState(e.parameter.id));
+    if (action === 'draftState') return json(draftState(e.parameter.id, e.parameter.who));
     if (action === 'keeperState') return json(keeperState(e.parameter.id, e.parameter.handle));
     if (action === 'trades')  return json({ ok: true, trades: myTrades(e.parameter.id, e.parameter.handle) });
     if (action === 'board')   return json({ ok: true, messages: boardMessages(e.parameter.handle) });
@@ -1722,7 +1722,48 @@ function settleDraft_(L){
   return leagueRow(L.id);
 }
 
-function draftState(id){
+/* ---------- who is in the draft room ----------
+
+   Presence lives in CacheService, never in the sheet. Every member polls the
+   draft every few seconds; writing that to a spreadsheet would be a row per
+   member per poll, all of it worthless a minute later, and all of it competing
+   for the same lock the picks need.
+
+   The cache gives a 5-minute TTL for free, and getAll() reads the whole
+   league in one call. What this can honestly tell you is "this handle polled
+   the draft N seconds ago" — that is what the room shows, and it is not a
+   claim about anyone's attention.
+
+   The handle arrives on an unauthenticated GET, so it is checked against the
+   league's membership before being recorded: a stranger cannot make a name
+   appear in someone else's room. A member could in principle post another
+   member's handle; presence is soft enough that this is noise, not a hole. */
+function presenceKey_(leagueId, handle){
+  return 'seen:' + leagueId + ':' + String(handle || '').toLowerCase();
+}
+function touchPresence_(leagueId, handle){
+  if (!handle) return;
+  try { CacheService.getScriptCache().put(presenceKey_(leagueId, handle), String(Date.now()), 300); }
+  catch (e) {}
+}
+/* handle (lowercased) -> seconds since that handle last polled, or null */
+function presenceOf_(leagueId, handles){
+  var out = {};
+  handles.forEach(function (h) { out[String(h).toLowerCase()] = null; });
+  try {
+    var keys = handles.map(function (h) { return presenceKey_(leagueId, h); });
+    if (!keys.length) return out;
+    var got = CacheService.getScriptCache().getAll(keys) || {};
+    var now = Date.now();
+    handles.forEach(function (h) {
+      var v = got[presenceKey_(leagueId, h)];
+      if (v) out[String(h).toLowerCase()] = Math.max(0, Math.round((now - Number(v)) / 1000));
+    });
+  } catch (e) {}
+  return out;
+}
+
+function draftState(id, who){
   var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
   /* Anyone polling advances the clock. Only take the lock when there is
      actually something overdue, so the common poll stays a plain read. */
@@ -1736,6 +1777,38 @@ function draftState(id){
   var turn = L.draftStatus === 'active' ? draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx) : { phase:L.draftStatus==='complete'?'done':'none' };
   var boards = L.mode === 'keepers' ? draftBoardsOf(L.id) : {};
   var onClock = boards[String(turn.handle || '').toLowerCase()];
+
+  /* Presence and chat ride on this poll rather than getting pollers of their
+     own. The draft room already asks for this every few seconds; two more
+     requests per member per tick would treble the load on the busiest minute
+     of the league's fortnight for no extra freshness. */
+  /* membersOf returns bare handles, not objects. Display names come from one
+     read of the Users sheet rather than a findUser() per member — this runs on
+     every poll from every member. */
+  /* Every one of these is best-effort. The room and the chat are decoration on
+     a poll whose real job is the pick clock — a missing or empty sheet must
+     leave the draft working, not take it down with it. */
+  var handles = [];
+  try { handles = membersOf(L.id) || []; } catch (e) {}
+  /* Deliberately NOT readUsers(): that parses every account's team JSON and
+     recomputes the whole rank ladder, and this runs on every poll from every
+     member. Two columns is all a name needs. */
+  var nameBy = {};
+  try {
+    var us = sh_(SHEET_USERS), uv = us.getRange(1, 1, Math.max(1, us.getLastRow()), 2).getValues();
+    for (var ui = 1; ui < uv.length; ui++)
+      nameBy[String(uv[ui][0]).toLowerCase()] = String(uv[ui][1] || uv[ui][0]);
+  } catch (e) {}
+  var members = handles.map(function (h) {
+    return { handle: h, name: nameBy[String(h).toLowerCase()] || h };
+  });
+  var mine = String(who || '').trim();
+  if (mine && handles.some(function (h) { return String(h).toLowerCase() === mine.toLowerCase(); }))
+    touchPresence_(L.id, mine);
+  /* Only the tail: the draft room is a live conversation, and the whole board
+     could be hundreds of posts by the end of a season. */
+  var chat = [];
+  try { chat = messagesOf(L.id).slice(-40); } catch (e) {}
   return { ok:true, league:{ id:L.id, mode:L.mode, rosterSize:L.rosterSize, benchSize:L.benchSize, farmSize:L.farmSize,
                              draftStatus:L.draftStatus, draftOrder:L.draftOrder, pickClock:L.pickClock },
     picks:picks, turn:turn, pickedNames:picks.map(function(p){ return p.rikishi; }),
@@ -1744,6 +1817,9 @@ function draftState(id){
     deadline: L.pickDeadline || '',
     clockSeconds: turn.handle ? clockFor_(L, turn.handle, boards) : 0,
     onClockAuto: !!(onClock && onClock.auto),
+    members: members,
+    presence: presenceOf_(L.id, handles),
+    chat: chat,
     serverNow: new Date().toISOString() };
 }
 

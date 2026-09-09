@@ -260,7 +260,10 @@
     return GG.apiPost(authed({ action:"startDraft", id:id,
       pickClock: pickClock || 120, pool: pool || null }));
   };
-  GG.draftState     = function (id){ return GG.apiGetQ("draftState", { id:id }); };
+  /* `who` is the handle doing the polling: the draft room shows who else is in
+     it, and this GET is the only thing every member calls on a tick. */
+  GG.draftState     = function (id){ var a = GG.account.get();
+                                     return GG.apiGetQ("draftState", { id:id, who:(a&&a.handle)||"" }); };
   GG.makePick       = function (id, rikishi){ return GG.apiPost(authed({ action:"makePick", id:id, rikishi:rikishi })); };
   GG.proposeTrade   = function (id, toHandle, offer, request){ return GG.apiPost(authed({ action:"proposeTrade", id:id, toHandle:toHandle, offer:offer, request:request })); };
   GG.respondTrade   = function (tradeId, accept){ return GG.apiPost(authed({ action:"respondTrade", tradeId:tradeId, accept:!!accept })); };

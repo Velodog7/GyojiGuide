@@ -511,6 +511,62 @@
   .lg-draft-pick.disabled{ opacity:.45; cursor:not-allowed; pointer-events:none }
   /* the top name still available on your own board, on your own turn */
   .lg-draft-pick.top{ border-color:var(--sun); color:var(--sun) }
+  /* --- the pool as cards --- */
+  .lg-draft-grid.cards{ grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); max-height:520px }
+  /* display:block on every wrapper matters. The faces are <span>s so they are
+     legal inside a <button>, and .pcard leans on aspect-ratio and
+     container-type:inline-size — neither applies to an inline box, so as bare
+     spans the cards collapsed into a stack of text. */
+  .dcard{ display:block; position:relative; perspective:900px; cursor:pointer;
+        background:none; border:0; padding:0; font:inherit; color:inherit; text-align:inherit }
+  .dcard .pcard{ display:block; width:100% }
+  .dcard__inner{ display:block; position:relative; transform-style:preserve-3d; transition:transform .45s cubic-bezier(.2,.7,.3,1) }
+  .dcard.flipped .dcard__inner{ transform:rotateY(180deg) }
+  .dcard__face{ display:block; backface-visibility:hidden; -webkit-backface-visibility:hidden }
+  .dcard__back{ position:absolute; inset:0; transform:rotateY(180deg); overflow:auto;
+        border:1px solid var(--line2); border-radius:12px; background:var(--surface-2); padding:9px 10px; text-align:left }
+  .dcard.sel .pcard, .dcard.sel .dcard__back{ box-shadow:0 0 0 2px var(--sun) }
+  .dcard[disabled]{ opacity:.45; cursor:not-allowed }
+  /* the flip control sits above the card and must not read as "pick him" */
+  .dcard__info{ position:absolute; top:5px; right:5px; z-index:3; width:22px; height:22px; border-radius:50%;
+        border:1px solid var(--line2); background:rgba(0,0,0,.55); color:var(--dim);
+        font:700 .74rem/1 "Zen Maru Gothic",sans-serif; cursor:pointer; display:grid; place-items:center }
+  .dcard__info:hover{ border-color:var(--sun); color:var(--sun) }
+  .db-name{ font-weight:700; font-size:.82rem; color:var(--ink); margin:0 0 1px }
+  .db-rank{ color:var(--sun); font-size:.7rem; margin:0 0 6px }
+  .db-row{ display:flex; justify-content:space-between; gap:6px; font-size:.68rem; color:var(--dim); line-height:1.5 }
+  .db-row b{ color:var(--ink); font-weight:600; text-align:right }
+  .db-note{ margin:6px 0 0; font-size:.66rem; color:var(--faint); line-height:1.45 }
+  .db-none{ font-size:.7rem; color:var(--faint) }
+  /* --- who is in the room --- */
+  .lg-room{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin:0 0 12px;
+        font-size:.78rem; color:var(--dim) }
+  .lg-room__lab{ color:var(--faint); letter-spacing:.06em; text-transform:uppercase; font-size:.68rem }
+  .lg-who{ display:inline-flex; align-items:center; gap:5px }
+  .lg-who__dot{ width:7px; height:7px; border-radius:50%; background:var(--line2); flex:none }
+  .lg-who.here .lg-who__dot{ background:#43c08a; box-shadow:0 0 0 3px rgba(67,192,138,.18) }
+  .lg-who.idle .lg-who__dot{ background:var(--sun) }
+  .lg-who.here{ color:var(--ink) }
+  .lg-who.you{ font-weight:700 }
+  /* --- draft chat --- */
+  .lg-chat{ border:1px solid var(--line2); border-radius:12px; background:var(--surface-2);
+        padding:10px 12px; margin:14px 0 0 }
+  .lg-chat h4{ margin:0 0 8px }
+  .lg-chat__log{ display:flex; flex-direction:column; gap:7px; max-height:210px; overflow-y:auto; margin-bottom:9px }
+  .lg-chat__m{ font-size:.85rem; line-height:1.45; color:var(--dim) }
+  .lg-chat__m b{ color:var(--ink) }
+  .lg-chat__m.me b{ color:var(--sun) }
+  .lg-chat__when{ color:var(--faint); font-size:.68rem; margin-left:6px }
+  .lg-chat__row{ display:flex; gap:8px; align-items:flex-start }
+  .lg-chat__row textarea{ flex:1; min-width:0; resize:vertical; background:var(--surface); border:1px solid var(--line);
+        border-radius:9px; color:var(--ink); font:inherit; font-size:.86rem; padding:8px 10px }
+  .lg-chat__row textarea:focus{ outline:none; border-color:var(--sun) }
+  .lg-chat__empty{ color:var(--faint); font-size:.82rem }
+  .lg-draft-search{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 10px }
+  .lg-draft-search input{ flex:1 1 200px; min-width:0; background:var(--surface); border:1px solid var(--line);
+        border-radius:9px; color:var(--ink); font:inherit; font-size:.86rem; padding:8px 11px }
+  .lg-draft-search input:focus{ outline:none; border-color:var(--sun) }
+  .lg-draft-count{ color:var(--faint); font-size:.78rem }
   /* the tapped name, waiting on the confirm button below */
   .lg-draft-pick.sel{ border-color:var(--sun); color:var(--ink); background:rgba(var(--sun-rgb),.16);
         box-shadow:0 0 0 1px var(--sun) inset }
@@ -587,7 +643,11 @@
   .lg-slots{ margin:0 0 14px }
 
   .lg-rostermoves{ margin-top:8px }
-  .rd-pool{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px }
+  /* The re-draft pools use the same cards as the snake draft — same grid, same
+     flip, same confirm bar. Two pools show at once, so each gets its own grid. */
+  .rd-pool{ display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:8px; margin-top:6px;
+        max-height:400px; overflow-y:auto; padding-right:2px }
+  .rd-pool--flat{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px }
   .rd-pick{ font-size:.82rem; padding:5px 10px }
   .rd-turn{ margin:8px 0; font-size:.95rem }
   .lu-item{ display:inline-flex; align-items:center; gap:5px; font-size:.85rem; padding:4px 9px; border:1px solid var(--line,#2a2e3a); border-radius:7px; cursor:pointer }
@@ -688,7 +748,7 @@
   .lg-score-fld small{ color:var(--faint); font-size:.74rem; line-height:1.35 }
   .lg-score-btns{ display:flex; align-items:center; gap:8px; flex-wrap:wrap }
 </style>
-<script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-basho.js"></script><script src="gg-mawashi.js"></script></head>
+<script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-basho.js"></script><script src="gg-mawashi.js"></script><script src="gg-dossier.js"></script></head>
 <body>
 <script src="gg-auth.js"></script><script src="gg-nav.js"></script>
 <nav class="tabs" role="tablist">
@@ -2246,7 +2306,8 @@ let keepPollTimer = null;
 /* does this league cut anyone at the roll-over? null in BOTH divisions means no */
 function keepLimited(lg){ return !!lg && (lg.keepMk != null || lg.keepJr != null); }
 function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } stopDraftTick();
-  draftSel = ""; draftSending = false; draftGridSig = ""; draftMsg = ""; }
+  draftSel = ""; draftSending = false; draftGridSig = ""; draftMsg = "";
+  draftPool = []; draftHay = {}; draftFilter = ""; draftFlipped = {}; }
 /* Mirrors rosterPlan() in sumo-fantasy.gs. rosterSize keeps its original
    meaning — the ACTIVE Makuuchi cap — so a league saved before benches existed
    reads back as bench 0 / farm = active, exactly as it behaved before. */
@@ -2524,16 +2585,41 @@ async function renderKeepers(lg, meCommish){
     el.innerHTML = `<div class="lg-draftroom">
       <h4>Snake draft — live</h4>
       <div class="lg-draft-turn" id="lgDraftTurn"><span class="gg-spin"></span>Loading…</div>
-      <div class="lg-draft-grid" id="lgDraftGrid"></div>
+      <div class="lg-room" id="lgRoom" hidden></div>
+      <div class="lg-draft-search">
+        <input id="lgDraftFind" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Filter by name, kanji, rank, stable or country\u2026">
+        <span class="lg-draft-count" id="lgDraftCount"></span>
+      </div>
+      <div class="lg-draft-grid cards" id="lgDraftGrid"></div>
       <div class="lg-draft-confirm" id="lgDraftConfirm" hidden></div>
       <p class="lg-draft-msg" id="lgDraftMsg" hidden></p>
       <h4 style="margin-top:14px">Picks so far</h4>
       <div class="lg-draft-board" id="lgDraftBoard"></div>
+      <div class="lg-chat">
+        <h4>Draft chat</h4>
+        <div class="lg-chat__log" id="lgChatLog"></div>
+        <div class="lg-chat__row">
+          <textarea id="lgChatInput" rows="2" maxlength="2000" placeholder="Say something to the league…"></textarea>
+          <button class="btn sm" id="lgChatSend" type="button">Send</button>
+        </div>
+        <span class="status" id="lgChatStatus"></span>
+      </div>
     </div>
     ${draftBoardPanelHTML(lg)}`;
     wireDraftBoard(lg);
     /* the room was just rebuilt: the grid is empty, so no cached signature */
     draftSel = ""; draftSending = false; draftGridSig = ""; draftMsg = "";
+    draftPool = []; draftHay = {}; draftFilter = ""; draftFlipped = {}; chatSig = "";
+    wireChat(lg);
+    const find = $("lgDraftFind");
+    if (find){
+      find.value = "";
+      /* Repaint on every keystroke. The pool is already in memory, so this
+         never touches the network and never waits on a poll. */
+      find.oninput = ()=>{ draftFilter = find.value || "";
+        paintDraftGrid(lg, lastDraftPhase, lastDraftMine, lastDraftBoard); };
+    }
     await pollDraft(lg);
     draftPollTimer = setInterval(()=>pollDraft(lg), 4000);
     draftPollTimer._ms = 4000;
@@ -2550,6 +2636,7 @@ async function renderKeepers(lg, meCommish){
 
   if (lg.draftStatus === "redraft") {
     el.innerHTML = `<div class="lg-draftroom"><h4>Supplemental re-draft <span class="lg-rm-window open">new banzuke</span></h4><div id="redraftBody">${ggSpinner('Loading the re-draft','sm')}</div></div>`;
+    rdSel = ""; rdSending = false; rdMsg = ""; rdSig = ""; rdFilter = "";
     await renderRedraft(lg);
     if (redraftPollTimer) clearInterval(redraftPollTimer);
     redraftPollTimer = setInterval(()=>renderRedraft(lg), 4000);
@@ -2727,6 +2814,107 @@ async function renderKeeperWindow(lg){
   };
 }
 
+/* ---------- the supplemental re-draft ----------
+   Structurally different from the snake draft: two pools are open at once and
+   the turn says how many slots you have left in each. The INTERACTION is
+   deliberately identical though — cards, an \u24d8 to flip, a filter, and a tap
+   that only selects. A re-draft pick is just as irreversible as a draft pick,
+   and it happens on the same phone with the same thumb. */
+let rdSel = "", rdSending = false, rdMsg = "", rdSig = "", rdFilter = "";
+let rdPool = [], rdHay = {}, rdMine = false, rdOpen = { mk:0, jr:0 };
+
+function rdShell(){
+  return `<p class="lg-myteam__hint" id="rdOrder"></p>
+    <p class="rd-turn" id="rdTurn"></p>
+    <div class="lg-draft-search">
+      <input id="rdFind" type="search" autocomplete="off" spellcheck="false"
+             placeholder="Filter by name, kanji, rank, stable or country\u2026">
+      <span class="lg-draft-count" id="rdCount"></span>
+    </div>
+    <div id="rdPools"></div>
+    <div class="lg-draft-confirm" id="rdConfirm" hidden></div>
+    <p class="lg-draft-msg" id="rdMsgBox" hidden></p>`;
+}
+
+function rdPaintSel(lg){
+  const pools = $("rdPools");
+  if (pools) pools.querySelectorAll(".dcard").forEach(c=>
+    c.classList.toggle("sel", c.dataset.pick === rdSel));
+  const box = $("rdMsgBox");
+  if (box){ box.hidden = !rdMsg; box.textContent = rdMsg || ""; }
+  const bar = $("rdConfirm"); if (!bar) return;
+  if (!rdSel && !rdSending){ bar.hidden = true; bar.innerHTML = ""; return; }
+  bar.hidden = false;
+  bar.innerHTML = rdSending
+    ? `<span class="gg-spin"></span><span>Drafting <b>${esc(rdSel)}</b>\u2026</span>`
+    : `<span class="lg-draft-confirm__q">Draft <b>${esc(rdSel)}</b>?</span>
+       <span class="lg-draft-confirm__acts">
+         <button class="btn sm" id="rdGo" type="button">Draft ${esc(rdSel)}</button>
+         <button class="btn ghost sm" id="rdNo" type="button">Cancel</button>
+       </span>`;
+  const go = $("rdGo"), no = $("rdNo");
+  if (go) go.onclick = ()=>rdCommit(lg, rdSel);
+  if (no) no.onclick = ()=>{ rdSel=""; rdMsg=""; rdPaintSel(lg); };
+}
+
+function rdPaintPools(lg){
+  const host = $("rdPools"); if (!host) return;
+  const q = rdFilter.trim().toLowerCase();
+  const shown = q ? rdPool.filter(p => (rdHay[p.name]||"").indexOf(q) >= 0) : rdPool;
+  const count = $("rdCount");
+  if (count) count.textContent = !rdPool.length ? ""
+    : q ? shown.length + " of " + rdPool.length : rdPool.length + " available";
+
+  const block = (list, label, open) => {
+    if (!list.length) return "";
+    /* A pool you have no room for is shown but not pickable — seeing who is
+       left in J\u016bry\u014d matters even when your farm is full. */
+    const room = open > 0;
+    return `<div class="lg-roster-block"><h5>${label} \u00b7 ${list.length} available` +
+      (rdMine ? (room ? ` \u00b7 ${open} slot${open===1?"":"s"} open` : " \u00b7 no open slot") : "") +
+      `</h5><div class="rd-pool">` +
+      list.map(p=>draftCardHTML(p.name, p.division, false)).join("") + `</div></div>`;
+  };
+  const mk = shown.filter(p=>p.division==="makuuchi"), jr = shown.filter(p=>p.division==="juryo");
+  host.innerHTML = (block(mk,"Makuuchi",rdOpen.mk) + block(jr,"J\u016bry\u014d",rdOpen.jr))
+    || `<p class="lg-locked-note">${rdPool.length ? "Nobody matches \u201c" + esc(rdFilter) + "\u201d." : "No wrestlers left to draft."}</p>`;
+
+  host.querySelectorAll(".dcard").forEach(c=>{
+    const name = c.dataset.pick;
+    const div = (rdPool.find(p=>p.name===name)||{}).division;
+    const info = c.querySelector(".dcard__info");
+    if (info) info.onclick = e => { e.stopPropagation(); e.preventDefault();
+      c.classList.toggle("flipped"); };
+    const room = div === "juryo" ? rdOpen.jr > 0 : rdOpen.mk > 0;
+    if (!rdMine || !room){ c.disabled = true; return; }
+    c.onclick = ()=>{ if (rdSending) return;
+      rdSel = (rdSel === name) ? "" : name; rdMsg = ""; rdPaintSel(lg); };
+  });
+  rdPaintSel(lg);
+}
+
+async function rdCommit(lg, name){
+  if (rdSending || !name) return;
+  rdSending = true; rdMsg = "";
+  rdPaintSel(lg);
+  const go = $("rdGo"); if (go) go.disabled = true;
+  let r = null;
+  try { r = await GyojiGuide.redraftPick(lg.id, name); } catch(e){}
+  rdSending = false;
+  if (r && r.ok){
+    rdSel = ""; rdSig = "";
+    const pools = $("rdPools");
+    if (pools) pools.querySelectorAll(".dcard").forEach(c=>{ c.disabled = true; c.classList.remove("sel"); c.onclick = null; });
+    const nt = r.nextTurn || {};
+    const turnEl = $("rdTurn");
+    if (turnEl && nt.handle) turnEl.innerHTML = `Waiting on <b>@${esc(nt.handle)}</b>\u2026`;
+  } else {
+    rdMsg = (r && r.error) || "Couldn\u2019t pick \u2014 try again.";
+  }
+  rdPaintSel(lg);
+  renderRedraft(lg);
+}
+
 async function renderRedraft(lg){
   const body = document.getElementById("redraftBody"); if (!body) return;
   let res=null; try { res = await GyojiGuide.redraftState(lg.id); } catch(e){}
@@ -2735,26 +2923,189 @@ async function renderRedraft(lg){
     if (redraftPollTimer) clearInterval(redraftPollTimer);
     lg.draftStatus = res.draftStatus || "complete"; renderLeague(); return;
   }
+  /* Build the shell once. The old version rewrote the whole body on every
+     four-second poll, which threw away the scroll position, any open card and
+     anything typed in the filter. */
+  if (!$("rdPools")){
+    body.innerHTML = rdShell();
+    rdSel = ""; rdSending = false; rdMsg = ""; rdSig = ""; rdFilter = "";
+    const find = $("rdFind");
+    if (find) find.oninput = ()=>{ rdFilter = find.value || ""; rdPaintPools(lg); };
+  }
+
   const me = acct ? acct.handle.toLowerCase() : "";
   const turn = res.turn || {};
-  const myTurn = turn.phase === "redraft" && turn.handle && turn.handle.toLowerCase() === me;
-  const pool = res.pool || [];
-  const mk = pool.filter(p=>p.division==="makuuchi"), jr = pool.filter(p=>p.division==="juryo");
-  const poolCard = (list, label) => list.length ? `<div class="lg-roster-block"><h5>${label} · ${list.length} available</h5><div class="rd-pool">${list.map(p=>
-      `<button class="btn rd-pick" data-name="${esc(p.name)}" ${myTurn?"":"disabled"}>${esc(p.name)}</button>`).join("")}</div></div>` : "";
-  body.innerHTML = `
-    <p class="lg-myteam__hint">Pick order (worst first): ${(res.order||[]).map((h,i)=>`${i+1}. @${esc(h)}`).join("  ·  ")}</p>
-    <p class="rd-turn">${turn.phase==="done" ? "Re-draft complete." : (myTurn ? "<b>You\u2019re on the clock</b> — pick a wrestler." : `Waiting on <b>@${esc(turn.handle||"")}</b>…`)}</p>
-    ${poolCard(mk,"Makuuchi")}${poolCard(jr,"Jūryō")}
-    ${(!mk.length && !jr.length) ? '<p class="lg-locked-note">No wrestlers left to draft.</p>' : ""}`;
-  if (myTurn) body.querySelectorAll(".rd-pick").forEach(b=>{
-    b.onclick = async ()=>{
-      body.querySelectorAll(".rd-pick").forEach(x=>x.disabled=true);
-      const r = await GyojiGuide.redraftPick(lg.id, b.dataset.name);
-      if (!(r && r.ok)) alert((r&&r.error)||"Couldn\u2019t pick.");
-      renderRedraft(lg);
+  rdMine = turn.phase === "redraft" && !!turn.handle && turn.handle.toLowerCase() === me;
+  rdOpen = turn.open || { mk:0, jr:0 };
+  rdPool = res.pool || [];
+
+  const order = $("rdOrder");
+  if (order) order.textContent = "Pick order (worst first): " +
+    (res.order||[]).map((h,i)=>`${i+1}. @${h}`).join("  \u00b7  ");
+  const turnEl = $("rdTurn");
+  if (turnEl) turnEl.innerHTML = turn.phase === "done" ? "Re-draft complete."
+    : rdMine ? "<b>You\u2019re on the clock</b> \u2014 pick a wrestler."
+             : `Waiting on <b>@${esc(turn.handle||"")}</b>\u2026`;
+
+  const sig = (rdMine?"me":"no") + "|" + rdOpen.mk + "/" + rdOpen.jr + "|" +
+              rdPool.map(p=>p.name).join("\u0001");
+  if (sig !== rdSig && !rdSending){
+    rdSig = sig;
+    rdHay = {}; rdPool.forEach(p=>{ rdHay[p.name] = draftHaystack(p.name); });
+    rdPaintPools(lg);
+  } else {
+    rdPaintSel(lg);
+  }
+  if (rdSel && !rdPool.some(p=>p.name===rdSel)){        // taken by someone else
+    rdMsg = rdSel + " was drafted by someone else."; rdSel = ""; rdPaintSel(lg);
+  }
+}
+
+/* ---------- the pool, as cards ----------
+   The dossier (gg-dossier.js) is the same table the Analysis page compares
+   from. Everything the back of a card shows is read straight out of it, so
+   there is nothing here to keep in step with that page by hand. */
+function dossier(name){
+  try { return (window.GyojiGuide && GyojiGuide.rikishi) ? GyojiGuide.rikishi(name) : null; }
+  catch(e){ return null; }
+}
+/* One haystack per wrestler, built once per grid render. Shikona, kanji, rank,
+   heya and birthplace — the five things people actually type when they are
+   hunting for someone on the clock. */
+function draftHaystack(name){
+  const d = dossier(name), k = RK[name] || {};
+  return [name, k.kanji || "", k.from || "",
+          d ? d.rank : rankLabel(name), d ? (d.stable||"") : "", d ? (d.country||"") : "",
+          d ? (d.rk||"") : ""].join(" ").toLowerCase();
+}
+function draftCardBack(name){
+  const d = dossier(name);
+  if (!d) return `<p class="db-name">${esc(name)}</p><p class="db-none">No dossier entry for this wrestler yet.</p>`;
+  const row = (k,v)=> v ? `<div class="db-row"><span>${k}</span><b>${esc(String(v))}</b></div>` : "";
+  const rec = (d.rec||[]);
+  const dash = t => String(t||"").replace(/-/g,"\u2013");
+  return `<p class="db-name">${esc(d.n)}</p>` +
+    `<p class="db-rank">${esc(d.rank||"")}${d.side?" "+esc(d.side):""}` +
+      (d.chg && d.chg.t ? ` \u00b7 ${esc(d.chg.t)}` : "") + `</p>` +
+    row("Last basho", dash(rec[0])) + row("Before that", dash(rec[1])) + row("And before", dash(rec[2])) +
+    row("Style", typeof archetype === "function" ? archetype(d.sig).replace(/&amp;/g,"&") : "") +
+    row("Elo", d.elo ? (d.elo + (d.eloPk ? " (pk " + d.eloPk + ")" : "")) : "") +
+    row("Highest", d.high) + row("Age", d.age ? d.age + " yrs" : "") +
+    row("Height", d.ht ? d.ht + " cm" : "") + row("Weight", d.wt ? d.wt + " kg" : "") +
+    row("Stable", d.stable) + row("From", d.from) +
+    (d.inj ? `<p class="db-note"><b>Health:</b> ${esc(d.inj)}</p>` : "") +
+    (d.form ? `<p class="db-note">${esc(d.form)}</p>` : "");
+}
+function draftCardHTML(name, phase, top){
+  const label = phase === "juryo" ? "J\u016bry\u014d" : "Makuuchi";
+  const tier  = (RK[name] && RK[name].code) ? RK[name].code[0] : "M";
+  return `<button type="button" class="dcard${top?" top":""}" data-pick="${esc(name)}" aria-label="${esc(name)}">
+      <span class="dcard__info" data-flip="${esc(name)}" role="button" tabindex="-1"
+            aria-label="More about ${esc(name)}" title="Records, style and health">i</span>
+      <span class="dcard__inner">
+        <span class="dcard__face"><span class="pcard filled r-${tier}">${pcardInner(name, label, false)}</span></span>
+        <span class="dcard__face dcard__back">${draftCardBack(name)}</span>
+      </span>
+    </button>`;
+}
+
+/* ---------- the room: who is here, and what they are saying ----------
+   Both ride on the draft poll's response — see draftState in sumo-fantasy.gs.
+   Neither has a timer of its own. */
+function paintRoom(res){
+  const box = $("lgRoom"); if (!box) return;
+  const members = res.members || [], seen = res.presence || {};
+  if (!members.length){ box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  /* "here" is a poll inside the last minute — one poll is 4 seconds, so a
+     minute is generous enough to survive a slow request or a locked phone. */
+  box.innerHTML = `<span class="lg-room__lab">In the room</span>` + members.map(m=>{
+    const s = seen[String(m.handle).toLowerCase()];
+    const cls = s == null ? "" : s <= 60 ? " here" : s <= 300 ? " idle" : "";
+    const me  = acct && String(m.handle).toLowerCase() === acct.handle.toLowerCase() ? " you" : "";
+    const title = s == null ? "not in the draft room" : s <= 60 ? "here now" : "last seen " + fmtAgo(s) + " ago";
+    return `<span class="lg-who${cls}${me}" title="${esc(title)}"><span class="lg-who__dot"></span>${esc(m.name || m.handle)}</span>`;
+  }).join("");
+}
+function fmtAgo(sec){
+  if (sec < 60) return sec + "s";
+  if (sec < 3600) return Math.round(sec/60) + "m";
+  return Math.round(sec/3600) + "h";
+}
+/* The league board, shown flat and newest-last so it reads like a chat. It IS
+   the league board — the same posts as the Messages tab, so draft-day banter
+   is still there tomorrow rather than living in a channel that evaporates. */
+let chatSig = "";
+function paintChat(res){
+  const log = $("lgChatLog"); if (!log) return;
+  const msgs = res.chat || [];
+  const sig = msgs.map(m=>m.id).join(",");
+  if (sig === chatSig) return;                 // don't fight the user's scroll
+  chatSig = sig;
+  const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+  log.innerHTML = msgs.length ? msgs.map(m=>{
+    const me = acct && String(m.handle).toLowerCase() === acct.handle.toLowerCase();
+    return `<div class="lg-chat__m${me?" me":""}"><b>${esc(m.name || m.handle)}</b>` +
+           `<span class="lg-chat__when">${esc(timeAgo(m.created))}</span><br>${esc(m.body)}</div>`;
+  }).join("") : `<p class="lg-chat__empty">Nothing said yet \u2014 the floor is yours.</p>`;
+  if (nearBottom) log.scrollTop = log.scrollHeight;
+}
+function wireChat(lg){
+  const send = $("lgChatSend"), input = $("lgChatInput"), st = $("lgChatStatus");
+  if (!send || !input) return;
+  const post = async ()=>{
+    const text = (input.value || "").trim();
+    if (!text) return;
+    send.disabled = true; if (st) st.textContent = "";
+    const r = await GyojiGuide.msgPost(lg.id, text, "");
+    send.disabled = false;
+    if (r && r.ok){ input.value = ""; chatSig = ""; pollDraft(lg); }
+    else if (st){ st.textContent = (r && r.error) || "Couldn\u2019t post that."; st.className = "status err"; }
+  };
+  send.onclick = post;
+  /* Enter sends, Shift+Enter breaks the line — the draft is a fast
+     conversation and reaching for the mouse mid-clock is a nuisance. */
+  input.onkeydown = e => { if (e.key === "Enter" && !e.shiftKey){ e.preventDefault(); post(); } };
+}
+
+/* Paint the pool, honouring the filter box. Kept apart from pollDraft so that
+   typing in the filter repaints instantly without waiting on the network. */
+let draftPool = [], draftHay = {}, draftFilter = "", draftFlipped = {};
+/* remembered so the filter box can repaint on its own, between polls */
+let lastDraftPhase = "makuuchi", lastDraftMine = false, lastDraftBoard = false;
+function paintDraftGrid(lg, phase, meOnClock, hasBoard){
+  const gridEl = $("lgDraftGrid"); if (!gridEl) return;
+  lastDraftPhase = phase; lastDraftMine = meOnClock; lastDraftBoard = hasBoard;
+  const q = draftFilter.trim().toLowerCase();
+  const shown = q ? draftPool.filter(n => (draftHay[n]||"").indexOf(q) >= 0) : draftPool;
+
+  const count = $("lgDraftCount");
+  if (count) count.textContent = !draftPool.length ? ""
+    : q ? shown.length + " of " + draftPool.length : draftPool.length + " available";
+
+  gridEl.innerHTML = shown.length
+    ? shown.map((n,i)=>draftCardHTML(n, phase, meOnClock && !q && i===0 && hasBoard)).join("")
+    : `<p class="lg-locked-note">${draftPool.length ? "Nobody matches \u201c" + esc(draftFilter) + "\u201d." : "No wrestlers left in this phase."}</p>`;
+
+  gridEl.querySelectorAll(".dcard").forEach(c=>{
+    const name = c.dataset.pick;
+    if (draftFlipped[name]) c.classList.add("flipped");
+    /* The \u24d8 flips; it must never draft. stopPropagation, or a look at a
+       wrestler's record would put him on your roster. */
+    const info = c.querySelector(".dcard__info");
+    if (info) info.onclick = e => { e.stopPropagation(); e.preventDefault();
+      const on = !c.classList.contains("flipped");
+      c.classList.toggle("flipped", on);
+      if (on) draftFlipped[name] = 1; else delete draftFlipped[name];
     };
+    if (!meOnClock){ c.disabled = true; return; }
+    /* A tap SELECTS. It does not draft. The pick leaves the browser only from
+       the confirm button, so a scroll that ends on a card is free to undo. */
+    c.onclick = ()=>{ if (draftSending) return;
+      draftSel = (draftSel === name) ? "" : name;
+      draftMsg = ""; paintDraftSel(lg); };
   });
+  paintDraftSel(lg);
 }
 
 /* The selection and the confirm bar, painted WITHOUT rebuilding the grid — the
@@ -2762,6 +3113,8 @@ async function renderRedraft(lg){
 function paintDraftSel(lg){
   const gridEl = $("lgDraftGrid");
   if (gridEl) gridEl.querySelectorAll("[data-pick]").forEach(c=>
+    c.classList.toggle("sel", c.dataset.pick === draftSel));
+  if (gridEl) gridEl.querySelectorAll(".dcard").forEach(c=>
     c.classList.toggle("sel", c.dataset.pick === draftSel));
   const msg = $("lgDraftMsg");
   if (msg){ msg.hidden = !draftMsg; msg.textContent = draftMsg || ""; }
@@ -2798,7 +3151,8 @@ async function commitPick(lg, name){
     draftDeadline = r.deadline || ""; draftAuto = false;
     const gridEl = $("lgDraftGrid");
     if (gridEl) gridEl.querySelectorAll("[data-pick]").forEach(c=>{
-      c.classList.add("disabled"); c.classList.remove("sel","top"); c.onclick = null; });
+      c.classList.add("disabled"); c.classList.remove("sel","top"); c.onclick = null;
+      if (c.tagName === "BUTTON") c.disabled = true; });
     const nt = r.nextTurn || {};
     const turnEl = $("lgDraftTurn");
     if (turnEl && r.draftStatus === "active" && nt.handle)
@@ -2870,15 +3224,9 @@ async function pollDraft(lg){
     const sig = turn.phase + "|" + (meOnClock ? "me" : "no") + "|" + pool.join("\u0001");
     if (sig !== draftGridSig && !draftSending){
       draftGridSig = sig;
-      gridEl.innerHTML = pool.map((n,i)=>`<div class="lg-draft-pick${meOnClock?"":" disabled"}${meOnClock&&i===0&&myOrder.length?" top":""}" data-pick="${esc(n)}">${esc(n)}</div>`).join("")
-        || `<p class="lg-locked-note">No wrestlers left in this phase.</p>`;
-      /* A tap SELECTS. It does not draft. The pick leaves the browser only from
-         the confirm button, so a scroll that ends on a name is free to undo. */
-      if (meOnClock) gridEl.querySelectorAll("[data-pick]").forEach(c=>{
-        c.onclick = ()=>{ if (draftSending) return;
-          draftSel = (draftSel === c.dataset.pick) ? "" : c.dataset.pick;
-          draftMsg = ""; paintDraftSel(lg); };
-      });
+      draftPool = pool.slice();
+      draftHay = {}; pool.forEach(n=>{ draftHay[n] = draftHaystack(n); });
+      paintDraftGrid(lg, turn.phase, meOnClock, myOrder.length > 0);
     }
     if (!meOnClock || !pool.length) draftSel = "";
     if (draftSel && pool.indexOf(draftSel) < 0){    // somebody else took him first
@@ -2887,6 +3235,8 @@ async function pollDraft(lg){
     }
     paintDraftSel(lg);
   }
+  paintRoom(res);
+  paintChat(res);
   const boardEl = $("lgDraftBoard");
   if (boardEl) boardEl.innerHTML = (res.picks||[]).slice().reverse().map(p=>{
     const you = acct && p.handle.toLowerCase()===acct.handle.toLowerCase();
