@@ -650,17 +650,23 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
          asking sumo-api for the wrong tournament and will quietly import
          nothing all fortnight. */
       var idName = res.idExpects || "";
+      var fromSheet = res.bashoIdSource === "sheet";
       var drift = [];
       if (idName && res.basho && idName.toLowerCase() !== String(res.basho).toLowerCase())
-        drift.push("BASHO_ID " + res.bashoId + " is " + idName + ", but the sheet says " + res.basho);
+        drift.push("The importer is on " + res.bashoId + ", which is " + idName + ", but the sheet says " + res.basho);
       if (idName && res.bashoLabel && idName.toLowerCase() !== String(res.bashoLabel).toLowerCase())
-        drift.push("BASHO_ID " + res.bashoId + " is " + idName + ", but BASHO_LABEL says " + res.bashoLabel);
-      html += '<div class="kv" style="margin-top:10px"><span class="lab">BASHO_ID (drives the import)</span><b>' +
+        drift.push("The importer is on " + res.bashoId + ", which is " + idName + ", but BASHO_LABEL says " + res.bashoLabel);
+      html += '<div class="kv" style="margin-top:10px"><span class="lab">Basho id (drives the import)</span><b>' +
               esc(res.bashoId) + (idName ? " \u00b7 " + esc(idName) : "") + '</b></div>' +
+              '<div class="kv"><span class="lab">Set by</span><b>' +
+              (fromSheet ? "Start a new basho (Meta.bashoId)" : "the BASHO_ID constant in the code") + '</b></div>' +
               '<div class="kv"><span class="lab">BASHO_LABEL (code default)</span><b>' + esc(res.bashoLabel) + '</b></div>';
       if (drift.length)
         html += '<div class="bs-warn"><b>These disagree.</b> ' + drift.map(esc).join(". ") +
-                '. The importer follows BASHO_ID, so results will not arrive until it is corrected in sumo-fantasy.gs and redeployed.</div>';
+                '. The importer follows the basho id, so results will not arrive until it is corrected \u2014 ' +
+                (fromSheet ? 'either start the basho again with the right name, or edit Meta.bashoId on the sheet.'
+                           : 'Meta.bashoId is unset, so it is coming from the code: start a new basho to set it, or edit BASHO_ID in sumo-fantasy.gs and redeploy.') +
+                '</div>';
 
       if (running && mins !== null && mins > 90)
         html += '<div class="bs-warn">Nothing has been imported for ' + mins + ' minutes. The hourly trigger should run every 60 \u2014 check Triggers in the Apps Script editor.</div>';
@@ -722,8 +728,17 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     if (res && res.ok){
       msg.style.color = "#5fd08a";
       msg.textContent = "Ready for " + res.basho + " \u2014 cleared " + (res.clearedRows || 0) + " result row" + (res.clearedRows === 1 ? "" : "s") +
-        (res.previous ? " from " + res.previous + "." : ".");
+        (res.previous ? " from " + res.previous + "." : ".") +
+        (res.bashoIdDerived ? " Importer set to " + res.bashoId + "." : "");
+      /* A name we can't parse leaves the importer pointed at the old basho, and
+         that is a silent fortnight of no results if nobody is told. */
+      if (!res.bashoIdDerived){
+        msg.style.color = "#e0a23a";
+        msg.textContent += " \u26a0 Couldn\u2019t read a basho id from that name, so the importer is still on " +
+          (res.bashoId || "the old one") + ". Use a name like \u201cKyushu 2026\u201d, or fix Meta.bashoId by hand.";
+      }
       var rc = $("recheckBtn"); if (rc) rc.click();
+      if (typeof loadBasho === "function") loadBasho();
     } else {
       msg.style.color = "#e0736a";
       msg.textContent = (res && res.error) || "Couldn\u2019t start a new basho \u2014 is the backend deployed?";

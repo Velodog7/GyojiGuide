@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-09-draft-room';
+var BACKEND_VERSION = '2026-09-09-basho-id';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -2375,12 +2375,43 @@ function adminBasho(key) {
     lastImport: String(m.lastImport || ''),
     lastImportAdded: (m.lastImportAdded === '' || m.lastImportAdded == null) ? null : Number(m.lastImportAdded),
     serverNow: new Date().toISOString(),
-    /* the three places a basho is named, side by side. BASHO_ID drives the
-       sumo-api fetch, BASHO_LABEL is the code default, and Meta.basho is what
-       the site actually shows — they are edited in different places and at
-       different times, and nothing has ever compared them. */
-    bashoId: BASHO_ID, bashoLabel: BASHO_LABEL,
-    idExpects: bashoNameForId_(BASHO_ID) };
+    /* The id the importer will actually use, and where it came from. Meta is
+       set by 'Start a new basho'; the code constant is the fallback for a sheet
+       that predates that. The drift check below compares the EFFECTIVE id, not
+       the constant — the constant being stale stopped mattering. */
+    bashoId: bashoId_(),
+    bashoIdSource: (/^\d{6}$/.test(String(m.bashoId || '').trim()) ? 'sheet' : 'code'),
+    bashoLabel: BASHO_LABEL,
+    idExpects: bashoNameForId_(bashoId_()) };
+}
+
+/* ---------- which tournament sumo-api is asked about ----------
+
+   BASHO_ID (down near refreshResults) is now only the FALLBACK. Meta.bashoId
+   wins when it is present and well-formed, and 'Start a new basho' sets it —
+   so the importer follows the basho the admin actually started instead of
+   waiting for someone to remember a code edit and a redeploy.
+
+   An absent or malformed Meta key falls straight back to the constant, which
+   is exactly the behaviour before this existed. That is deliberate: the key
+   does not exist yet on the live sheet, so nothing changes until the next
+   'Start a new basho' writes one. */
+function bashoId_() {
+  var v = '';
+  try { v = String(readMeta().bashoId || '').trim(); } catch (e) {}
+  return /^\d{6}$/.test(v) ? v : BASHO_ID;
+}
+
+/* '202611' from 'Kyushu 2026' — the inverse of bashoNameForId_, used to derive
+   the id from the label the admin types. Returns '' for anything that isn't a
+   recognised basho name plus a four-digit year, and the caller then leaves the
+   id alone rather than guessing. */
+function bashoIdForName_(label) {
+  var m = String(label || '').trim()
+    .match(/^(hatsu|haru|natsu|nagoya|aki|kyushu)\s+(\d{4})$/i);
+  if (!m) return '';
+  var mon = { hatsu:'01', haru:'03', natsu:'05', nagoya:'07', aki:'09', kyushu:'11' };
+  return m[2] + mon[m[1].toLowerCase()];
 }
 
 /* 'Aki 2026' from '202609'. The six honbasho sit on fixed months. */
@@ -2544,7 +2575,14 @@ function adminResetBasho(body){
     setMeta_('lastDay', 0);
     setMeta_('yusho',   '');
     setMeta_('sansho',  '');
-    return { ok:true, basho:label, previous:was, clearedRows:cleared };
+    /* Move the importer with the label. Derived from the name rather than
+       typed separately, so the two cannot disagree by construction — which was
+       the entire failure this replaces. A label we can't parse leaves the id
+       alone and says so, rather than guessing and importing the wrong basho. */
+    var newId = bashoIdForName_(label);
+    if (newId) setMeta_('bashoId', newId);
+    return { ok:true, basho:label, previous:was, clearedRows:cleared,
+             bashoId: newId || bashoId_(), bashoIdDerived: !!newId };
   } finally { unlock_(lock); }
 }
 
@@ -2881,7 +2919,7 @@ function applyKeeperCuts_(L){
 }
 
 function fetchBanzukeNames(bashoId){
-  bashoId = bashoId || BASHO_ID;
+  bashoId = bashoId || bashoId_();
   var out = { makuuchi:[], juryo:[] }, divs = [['Makuuchi','makuuchi'],['Juryo','juryo']];
   for (var d=0; d<divs.length; d++){
     try {
@@ -2952,7 +2990,7 @@ function openSupplementalDraft(body){
    from the commissioner (no keeper limits) or from closeKeeperWindow once the
    cut has been applied. */
 function startSupplementalDraft_(L){
-  var banzuke = fetchBanzukeNames(BASHO_ID);
+  var banzuke = fetchBanzukeNames(bashoId_());
   if (!banzuke.makuuchi.length && !banzuke.juryo.length) return { ok:false, error:'Could not read the current banzuke from sumo-api. Try again shortly.' };
   var inB = {}; banzuke.makuuchi.forEach(function(n){ inB[n.toLowerCase()]='makuuchi'; }); banzuke.juryo.forEach(function(n){ inB[n.toLowerCase()]='juryo'; });
   {
@@ -3220,7 +3258,7 @@ function tierFromRank_(rank, div){
   return String(div || '').toLowerCase().indexOf('juryo') >= 0 ? 'J' : 'M';
 }
 function fetchBanzukeTiers_(bashoId){
-  bashoId = bashoId || BASHO_ID;
+  bashoId = bashoId || bashoId_();
   var out = {}, divs = ['Makuuchi', 'Juryo'];
   for (var d = 0; d < divs.length; d++){
     try {
@@ -3265,7 +3303,7 @@ function archiveAllTeams_(opts){
 
   var tiers = {};
   try { tiers = JSON.parse(meta['tiers:' + basho] || '{}'); } catch (e) { tiers = {}; }
-  if (!Object.keys(tiers).length) tiers = tierMapFor_(basho, fetchBanzukeTiers_(BASHO_ID));
+  if (!Object.keys(tiers).length) tiers = tierMapFor_(basho, fetchBanzukeTiers_(bashoId_()));
 
   var model = serverScoreModel_(defaultScoring(), tiers);
   if (!Object.keys(model.wins).length)
@@ -3489,10 +3527,15 @@ function json(obj) {
  *  sumo-api.com for the live tournament before trusting it — they have
  *  changed over time. When in doubt, enter results by hand.
  ************************************************************************/
-var BASHO_ID = '202609';   // next basho, YYYYMM (Aki 2026 = 202609)
+/* FALLBACK ONLY. Meta.bashoId wins when it is set, and 'Start a new basho'
+   sets it from the name the admin types — see bashoId_(). This constant is
+   what a sheet without that key uses, so it is still worth keeping honest,
+   but you should not need to edit it between tournaments any more. */
+var BASHO_ID = '202609';   // fallback basho, YYYYMM (Aki 2026 = 202609)
 
 function refreshResults() {
   var startedAt = new Date().toISOString();
+  var bid = bashoId_();                       // resolved once, not per fetch
   var addedRows = 0;
   var divisions = ['Makuuchi', 'Juryo'];
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_RESULTS);
@@ -3506,7 +3549,7 @@ function refreshResults() {
   for (var day = 1; day <= 15; day++) {
     for (var d = 0; d < divisions.length; d++) {
       var div = divisions[d];
-      var url = 'https://sumo-api.com/api/basho/' + BASHO_ID + '/torikumi/' + div + '/' + day;
+      var url = 'https://sumo-api.com/api/basho/' + bid + '/torikumi/' + div + '/' + day;
       var bouts;
       try {
         var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
