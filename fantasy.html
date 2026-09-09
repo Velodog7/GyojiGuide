@@ -1467,7 +1467,13 @@ $("saveBtn").onclick = async () => {
   try {
     const res = await apiPost({ action:"save", handle:acct.handle, name:acct.name, auth:acct.auth, team });
     if (res && res.ok) setStatus(hasAPI() ? "Saved to the leaderboard ✓" : "Saved on this device ✓", "ok");
-    else setStatus((res && res.error) ? ("Couldn't save: " + res.error) : "Couldn't save.", "err");
+    else {
+      setStatus((res && res.error) ? ("Couldn't save: " + res.error) : "Couldn't save.", "err");
+      /* A tab left open across the day-1 boundary still holds the pre-basho
+         state, so its Save button looks live until someone reloads — and
+         nobody reloads. Take the server's refusal as the answer and lock. */
+      if (res && res.locked) { serverRefused = true; setDraftLocked(true, "running"); }
+    }
   } catch (e) {
     setStatus("Network error — saved on this device instead.", "err");
   }
@@ -1538,6 +1544,10 @@ function nextBasho(){
    matters: before the banzuke drops nobody knows the ranks, and once results
    exist the team is frozen because it is scored across all fifteen days. */
 let draftLocked = false, lockReason = "";
+/* Set when the SERVER refuses a save. The countdown re-evaluates the lock on
+   every tick, so without this a refusal would be painted over within a second
+   by a model that hasn't caught up yet. */
+let serverRefused = false;
 function lockCopy(){
   return lockReason === "running"  ? "<b>The basho is under way.</b> Teams are locked for the duration \u2014 every wrestler you drafted is scored across all fifteen days, so nobody can swap in the day-13 leaders."
        : lockReason === "finished" ? "<b>This basho has finished.</b> Teams stay locked until the next one opens, so the final standings and the archive can\u2019t move."
@@ -1564,7 +1574,16 @@ function setClock(ids, ms){
   $(ids[3]).textContent = String(s%60).padStart(2,"0");
 }
 function renderCountdown(model){
-  const active = model.started && model.lastDay < 15;
+  /* The CALENDAR decides whether a basho is under way — not the results.
+     Results only exist once the hourly importer lands day 1's bouts, which is
+     roughly nineteen hours after the tournament opens. In that gap nextBasho()
+     has already moved on to the NEXT tournament (its test is start > now), so
+     the page spent opening day counting down to Kyushu in Fukuoka and telling
+     everyone the draft was locked pending a banzuke. GyojiGuide.basho.current()
+     answers the real question and was already sitting in gg-basho.js unused. */
+  const live = (window.GyojiGuide && GyojiGuide.basho && GyojiGuide.basho.current()) || null;
+  const done = model.started && model.lastDay >= 15;
+  const active = !done && (!!live || model.started || serverRefused);
   if (cdTimer) { clearInterval(cdTimer); cdTimer = null; }
   /* This used to setDraftLocked(false) here — a running tournament was the one
      moment the board was guaranteed OPEN. Results existing is exactly when the
@@ -1590,7 +1609,7 @@ function renderCountdown(model){
       $("cdBzRow").hidden = true;
       $("cdSub").textContent = model.started
         ? "This basho has finished — draft again once the next one opens."
-        : "The banzuke is out — draft your team before the basho starts.";
+        : "The banzuke is out — draft your team now. Teams lock the moment day 1 begins, and stay locked for all fifteen days.";
     }
     /* A finished basho whose results are still on the sheet keeps the team
        locked even once the next banzuke is out — the standings and the archive
