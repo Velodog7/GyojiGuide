@@ -448,7 +448,7 @@ function register(body) {
     if (claimingAdmin) PropertiesService.getScriptProperties().deleteProperty('ALLOW_ADMIN_CLAIM'); else sendWelcomeDm(handle);
     return { ok: true, created: true, handle: handle };
   } finally {
-    lock.releaseLock();
+    unlock_(lock);
   }
 }
 
@@ -508,7 +508,7 @@ function changeHandle(body) {
     renameHandleInSheet_(SHEET_BOARD, [1], oldHandle, newHandle);
     renameHandleInSheet_(SHEET_BOARD_VOTES, [1], oldHandle, newHandle);
     return { ok: true, handle: newHandle };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 function renameHandleInSheet_(sheetName, cols, oldHandle, newHandle) {
   var sh = sh_(sheetName); if (!sh) return;
@@ -535,6 +535,8 @@ function saveTeam(body) {
     for (var r = 1; r < v.length; r++) {
       if (String(v[r][0]).trim().toLowerCase() === key) {
         if (String(v[r][2] || '') !== auth) return { ok: false, error: 'Not authorised for this handle.' };
+        if (teamsLocked_()) return { ok: false, locked: true,
+          error: 'The basho is under way \u2014 teams are locked until it ends.' };
         var name = String(body.name || v[r][1] || handle).trim().slice(0, 60);
         sh.getRange(r + 1, 1, 1, 5).setValues([[String(v[r][0]), name, auth, JSON.stringify(body.team || {}), new Date().toISOString()]]);
         return { ok: true, updated: true, handle: handle };
@@ -542,7 +544,7 @@ function saveTeam(body) {
     }
     return { ok: false, error: 'No account with that handle \u2014 create one first.' };
   } finally {
-    lock.releaseLock();
+    unlock_(lock);
   }
 }
 
@@ -566,7 +568,7 @@ function saveAvatar(body) {
     }
     return { ok: false, error: 'No account with that handle \u2014 create one first.' };
   } finally {
-    lock.releaseLock();
+    unlock_(lock);
   }
 }
 
@@ -640,6 +642,22 @@ function verifyAuth(handle, auth) {
   return u;
 }
 function sh_(name){ return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name); }
+
+/* Release a script lock the safe way.
+
+   Apps Script buffers spreadsheet writes and only commits them when the
+   EXECUTION ends -- which is after finally{} has already released the lock. So
+   a second request could take the lock, read the row this one just wrote, and
+   see the old value: two picks on one draft turn, two claims on one wrestler,
+   a trade accepted twice. Every read-modify-write under a lock in this file
+   depended on that not happening, and it happened.
+
+   flush() forces the writes out while we still hold the lock, so the next
+   request in line reads what we actually wrote. Always unlock through here. */
+function unlock_(lock){
+  try { SpreadsheetApp.flush(); } catch (e) {}
+  try { lock.releaseLock(); } catch (e) {}
+}
 function newId(prefix){ return prefix + Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36); }
 function inviteCode(){
   var a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s='';
@@ -833,7 +851,7 @@ function saveDraftBoard(body){
     }
     sh.appendRow([L.id, u.handle, JSON.stringify(mak), JSON.stringify(jur), auto, when]);
     return { ok:true, saved:mak.length + jur.length, auto:auto, updated:when };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 function leagueByInvite(code){
@@ -863,7 +881,7 @@ function createLeague(body){
     sh_(SHEET_MEMBERS).appendRow([id, u.handle, when]);
     return { ok:true, id:id, inviteCode:code, mode:mode, rosterSize:rosterSize,
              benchSize:benchSize, farmSize:farmSize, scoring:scoring };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 function joinLeague(body){
@@ -877,7 +895,7 @@ function joinLeague(body){
     if (isMember(L.id, u.handle)) return { ok:true, id:L.id, already:true };
     sh_(SHEET_MEMBERS).appendRow([L.id, u.handle, new Date().toISOString()]);
     return { ok:true, id:L.id, name:L.name };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* A live draft holds a SNAPSHOT of the member list in draftOrder. Letting
@@ -916,7 +934,7 @@ function removeMemberRow(id, handle){
     var sh = sh_(SHEET_MEMBERS), v = sh.getDataRange().getValues(), k=String(handle).toLowerCase();
     for (var r=v.length-1;r>=1;r--) if (String(v[r][0])===String(id) && String(v[r][1]).toLowerCase()===k) sh.deleteRow(r+1);
     return { ok:true };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 function renameLeague(body){
@@ -950,7 +968,7 @@ function deleteLeague(body){
     var ls = sh_(SHEET_LEAGUES), lv = ls.getDataRange().getValues();
     for (var r=lv.length-1;r>=1;r--) if (String(lv[r][0])===id) ls.deleteRow(r+1);
     return { ok:true };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 // delete every row in `sheetName` whose column `col` (0-based) equals `id`
 function deleteRowsWhere_(sheetName, col, id){
@@ -979,7 +997,7 @@ function postMessage(body){
     var mid = newId('m_');
     sh_(SHEET_MESSAGES).appendRow([mid, L.id, u.handle, u.name, text, String(body.parentId||''), new Date().toISOString()]);
     return { ok:true, id:mid };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 function deleteMessage(body){
   var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
@@ -1045,7 +1063,7 @@ function postBoardMessage(body){
     var mid = newId('bm_');
     sh_(SHEET_BOARD).appendRow([mid, u.handle, u.name, text, String(body.parentId||''), new Date().toISOString(), '', '']);
     return { ok:true, id:mid };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 function boardMsgRow_(msgId){
   var sh = sh_(SHEET_BOARD), v = sh.getDataRange().getValues();
@@ -1085,7 +1103,7 @@ function voteBoardMessage(body){
     }
     sh.appendRow([body.msgId, u.handle, val, new Date().toISOString()]);
     return { ok:true, tally: boardVoteTally_()[String(body.msgId)] || { up:0, down:0 } };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 function adminEditBoardMessage(body){
   var bad = adminGate(body.adminKey); if (bad) return bad;
@@ -1192,7 +1210,7 @@ function dmSend(body) {
     var id = newId('dm_');
     sh_(SHEET_DMS).appendRow([id, u.handle, u.name, target.handle, text, new Date().toISOString(), '']);
     return { ok: true, id: id };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* mark every message the OTHER handle sent to me as read. */
@@ -1211,7 +1229,7 @@ function dmMarkRead(body) {
       }
     }
     return { ok: true, marked: n };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 function dmDelete(body) {
@@ -1238,7 +1256,7 @@ function adminDmSend(body) {
     var id = newId('dm_');
     sh_(SHEET_DMS).appendRow([id, ADMIN_HANDLE, ADMIN_NAME, target.handle, text, new Date().toISOString(), '']);
     return { ok: true, id: id };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* One message to every user, delivered as a normal DM from the admin account so
@@ -1284,7 +1302,7 @@ function adminBroadcast(body) {
     var sh = sh_(SHEET_DMS);
     sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
     return { ok: true, sent: rows.length, audience: audience, batch: batch };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* the admin's own inbox: every thread ADMIN_HANDLE is part of. */
@@ -1307,7 +1325,7 @@ function adminDmMarkRead(body) {
       }
     }
     return { ok: true, marked: n };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* save a member's team for one specific league (independent of their
@@ -1328,7 +1346,7 @@ function saveLeagueTeam(body){
     }
     sh.appendRow([L.id, u.handle, teamJson, new Date().toISOString()]);
     return { ok:true, created:true };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* ============================================================
@@ -1355,6 +1373,20 @@ function saveLeagueTeam(body){
    ============================================================ */
 
 var MAKUUCHI_POOL = 42, JURYO_POOL = 28;   // approximate banzuke sizes, used only to cap roster size
+
+/* The public seven-band team is frozen for the whole of a basho.
+
+   Everything the leaderboard, the champion, the all-time ranking and the basho
+   archive report is computed from this one team, and it is scored across all
+   fifteen days — so a team edited on day 13 is retroactively credited with the
+   first twelve. The site's own copy already promises teams can't be swapped;
+   this is the enforcement that was missing.
+
+   The window is "there are result rows", not tournamentActive(): results appear
+   on day 1 and are only cleared by the admin's *New basho*, so this also covers
+   the gap between day 15 and the archive, where an edit would otherwise be the
+   thing that gets archived. */
+function teamsLocked_(){ return readResults().length > 0; }
 
 function tournamentActive(){
   var meta = readMeta();
@@ -1413,7 +1445,7 @@ function setLeagueKeepers(body){
     sh_(SHEET_LEAGUES).getRange(L.row, 20, 1, 2).setValues([[mk, jr]]);
     return { ok:true, keepMk: mk === '' ? null : mk, keepJr: jr === '' ? null : jr,
              rosterMk: plan.mk, rosterJr: plan.farm };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 // whose turn is it, given the draft order, the league's roster plan, and a
@@ -1484,7 +1516,7 @@ function setLeagueRoster(body){
     sh_(SHEET_LEAGUES).getRange(L.row, 7, 1, 1).setValue(sizes.active);
     sh_(SHEET_LEAGUES).getRange(L.row, 15, 1, 2).setValues([[sizes.bench, sizes.farm]]);
     return { ok:true, rosterSize:sizes.active, benchSize:sizes.bench, farmSize:sizes.farm, warn:warn };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* commissioner edits the league's scoring rules (both classic & keepers).
@@ -1514,7 +1546,7 @@ function setDraftDate(body){
   try {
     sh_(SHEET_LEAGUES).getRange(L.row, 13, 1, 2).setValues([[when, JSON.stringify(agree)]]);
     return { ok:true, draftDate:when };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* a member agrees to (or withdraws agreement from) the scheduled draft date. */
@@ -1531,7 +1563,7 @@ function agreeDraftDate(body){
     else agree[u.handle.toLowerCase()] = true;
     sh_(SHEET_LEAGUES).getRange(L.row, 14, 1, 1).setValue(JSON.stringify(agree));
     return { ok:true, agreed: body.agree !== false };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 function startDraft(body){
@@ -1580,7 +1612,7 @@ function startDraft(body){
     sh_(SHEET_LEAGUES).getRange(L.row, 17, 1, 3).setValues([[pickClock, deadline, JSON.stringify(defaultOrder)]]);
     return { ok:true, order:order, rosterSize:rosterSize, benchSize:benchSize, farmSize:farmSize,
              pickClock:pickClock, deadline:deadline };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 function draftPicksOf(id){
@@ -1694,7 +1726,7 @@ function draftState(id){
   if (L.draftStatus === 'active' && L.pickDeadline && new Date(L.pickDeadline).getTime() <= Date.now()){
     var lock = LockService.getScriptLock();
     if (lock.tryLock(15000)){
-      try { L = settleDraft_(leagueRow(id)); } finally { lock.releaseLock(); }
+      try { L = settleDraft_(leagueRow(id)); } finally { unlock_(lock); }
     }
   }
   var picks = draftPicksOf(L.id);
@@ -1758,7 +1790,7 @@ function makePick(body){
     var nextDeadline = (nextTurn.phase === 'done') ? '' : deadlineFor_(L, nextTurn.handle, boardsNow);
     sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue(nextDeadline);
     return { ok:true, nextTurn:nextTurn, draftStatus:status, deadline:nextDeadline };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 function keeperRostersOf(id){
@@ -1804,7 +1836,7 @@ function setActive(body){
     if (nActive > cap) return { ok:false, error:'You can only start ' + cap + ' active wrestlers.' };
     mine.forEach(function(m){ sh.getRange(m.row, 7).setValue(m.active ? 'active' : 'bench'); });
     return { ok:true, active:nActive, cap:cap };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 function whoOwns(id, rikishi){
   var v = sh_(SHEET_ROSTERS).getDataRange().getValues(), key = rikishi.toLowerCase();
@@ -1864,7 +1896,7 @@ function respondTrade(body){
       request.forEach(function(name){ var w = whoOwns(leagueId, name); sh_(SHEET_ROSTERS).getRange(w.row, 2).setValue(fromHandle); });
       sh.getRange(r+1, 7, 1, 2).setValues([['accepted', new Date().toISOString()]]);
       return { ok:true, accepted:true };
-    } finally { lock.releaseLock(); }
+    } finally { unlock_(lock); }
   }
   return { ok:false, error:'Trade not found.' };
 }
@@ -1898,7 +1930,7 @@ function addDrop(body){
     sh_(SHEET_ROSTERS).deleteRow(owned.row);
     sh_(SHEET_ROSTERS).appendRow([L.id, u.handle, add, owned.division, 'waiver', new Date().toISOString(), slot]);
     return { ok:true };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* ============================================================
@@ -1929,7 +1961,7 @@ function archiveTeam(body){
   var score = Number(body.score || 0), wins = Number(body.wins || 0);
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try { return historyUpsert_(u.handle, basho, teamJson, score, wins, rowsJson); }
-  finally { lock.releaseLock(); }
+  finally { unlock_(lock); }
 }
 
 /* One TeamHistory row, keyed on (handle, basho). Caller holds the script
@@ -2075,7 +2107,7 @@ function requestPinReset(body) {
         return { ok: true, already: true };
     }
     sh.appendRow([newId('rst_'), u.handle, u.name, new Date().toISOString(), 'pending']);
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
   try {                                                         // notify the admin inbox
     sh_(SHEET_DMS).appendRow([newId('dm_'), u.handle, u.name, ADMIN_HANDLE,
       'PIN reset requested \u2014 approve it from the admin page.', new Date().toISOString(), '']);
@@ -2119,7 +2151,7 @@ function adminResetPin(body) {
     for (var i = 1; i < v.length; i++)
       if (String(v[i][1]).toLowerCase() === handle.toLowerCase() && v[i][4] === 'pending')
         sh.getRange(i + 1, 5).setValue('done');
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
   try {                                                         // tell the user how to finish
     sh_(SHEET_DMS).appendRow([newId('dm_'), ADMIN_HANDLE, ADMIN_NAME, handle,
       'Your PIN has been reset. Open \u201cCreate account\u201d, enter your handle, and choose a new PIN to get back in.',
@@ -2344,7 +2376,7 @@ function adminResetBasho(body){
     setMeta_('yusho',   '');
     setMeta_('sansho',  '');
     return { ok:true, basho:label, previous:was, clearedRows:cleared };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 function adminResetAnalytics() {
@@ -2558,7 +2590,7 @@ function openKeeperWindow(body){
     deleteRowsWhere_(SHEET_KEEPS, 0, String(L.id));      // a fresh window starts clean
     sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue('keepers');
     return { ok:true, keepMk:kp.mk, keepJr:kp.jr };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* A member declares who he is keeping. Re-declaring replaces the previous
@@ -2594,7 +2626,7 @@ function declareKeepers(body){
     var now = new Date().toISOString(), rows = mk.concat(jr).map(function(n){ return [L.id, u.handle, n, now]; });
     if (rows.length) sh.getRange(sh.getLastRow()+1, 1, rows.length, 4).setValues(rows);
     return { ok:true, kept:{ makuuchi:mk, juryo:jr } };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* Everything the declaration screen needs. */
@@ -2635,7 +2667,7 @@ function closeKeeperWindow(body){
     if (!res.ok) return res;
     res.released = cut.released; res.autoKept = cut.autoKept;
     return res;
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* The cut itself. Caller holds the script lock. */
@@ -2744,7 +2776,7 @@ function openSupplementalDraft(body){
     return { ok:false, needsKeepers:true,
              error:'Open keeper declarations first \u2014 the re-draft fills rosters back up after the cut.' };
   var lock0 = LockService.getScriptLock(); lock0.waitLock(25000);
-  try { return startSupplementalDraft_(L); } finally { lock0.releaseLock(); }
+  try { return startSupplementalDraft_(L); } finally { unlock_(lock0); }
 }
 
 /* The re-draft proper. Caller holds the script lock. Reached either straight
@@ -2806,7 +2838,7 @@ function redraftPick(body){
     if (next.phase === 'done'){ sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue('complete'); setRedraft_(L.id, ''); }
     else { rd.cursor = next.cursor; setRedraft_(L.id, rd); }
     return { ok:true, nextTurn:next, draftStatus: next.phase==='done' ? 'complete' : 'redraft' };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 
 /* ============================================================
@@ -3095,7 +3127,7 @@ function archiveAllTeams_(opts){
 }
 function archiveBasho_(opts){
   var lock = LockService.getScriptLock(); lock.waitLock(25000);
-  try { return archiveAllTeams_(opts); } finally { lock.releaseLock(); }
+  try { return archiveAllTeams_(opts); } finally { unlock_(lock); }
 }
 function adminArchiveBasho(body){
   var bad = adminGate(body && body.adminKey); if (bad) return bad;
@@ -3258,7 +3290,7 @@ function applyBashoRanking(basho, tiers){
     setMeta_('rankedBasho', basho);
     return { ok:true, ranked:arr.length, basho:basho,
              champions:champs.awarded, championError:champs.error || '' };
-  } finally { lock.releaseLock(); }
+  } finally { unlock_(lock); }
 }
 function adminApplyRanking(body){
   var bad = adminGate(body.adminKey); if (bad) return bad;

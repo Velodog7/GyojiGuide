@@ -45,6 +45,7 @@
 .gg-acct b{color:var(--gold,#d8b25a)} .gg-acct em{font-style:normal;color:var(--faint,#6b7180);font-family:"WDXL Lubrifont TC",monospace;font-size:0.873rem}
 .gg-acct .gg-msg{font-size:.8rem;color:var(--muted,#878da0)} .gg-acct .gg-msg.ok{color:#43c08a} .gg-acct .gg-msg.err{color:#ef6f53}
 .gg-acct .gg-hint{flex-basis:100%;font-size:.74rem;color:var(--faint,#6b7180);margin:-2px 0 0}
+.gg-acct .gg-lock{flex-basis:100%;font-size:.78rem;color:var(--dim,#9aa1ad);margin:2px 0 0;line-height:1.45}
 .edohyo__save{font:inherit;font-family:"Zen Maru Gothic",sans-serif;font-weight:700;font-size:.95rem;
   padding:11px;border-radius:9px;border:1px solid rgba(216,178,90,.5);cursor:pointer;color:var(--gold,#d8b25a);background:rgba(216,178,90,.1)}
 .edohyo__save:hover{background:rgba(216,178,90,.18)}
@@ -1359,7 +1360,8 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
       box.innerHTML='<span>Signed in as <b>'+esc(a.name||a.handle)+'</b> <em>@'+esc(a.handle)+'</em></span>'+
         '<button class="gg-btn" id="ggSave">Save my team</button>'+
         '<button class="gg-btn ghost" id="ggOut">Sign out</button>'+
-        '<span class="gg-msg" id="ggMsg"></span>';
+        '<span class="gg-msg" id="ggMsg"></span>'+
+        '<p class="gg-lock" id="ggLockNote" hidden></p>';
       document.getElementById("ggSave").onclick=doSave;
       document.getElementById("ggOut").onclick=function(){ GG.logout(); renderAcct(); syncAcct(); };
     } else {
@@ -1407,10 +1409,43 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
       else msg((res&&res.error)||"Couldn't save.","err");
     }catch(e){ msg("Network error \u2014 saved locally.","err"); }
   }
+  /* Teams are frozen for the whole of a basho: the seven you drafted are scored
+     across all fifteen days, so a day-13 swap would be credited with the first
+     twelve. The server refuses these saves; this is so the button says why
+     rather than failing under the user's hands. Result rows exist from day 1
+     until the admin opens the next basho, which is exactly that window. */
+  var teamsLocked = false, lockedFinished = false;
+  /* Deliberately NOT fired at load. GG.dataOnce() memoises ONE shared promise,
+     so resolving it early changes when restoreFromAccount() gets its answer —
+     and the team restore is timing-sensitive enough that it is not worth
+     disturbing for a button state. This runs after the restore instead. */
+  async function checkTeamLock(){
+    if (!GG.hasAPI || !GG.hasAPI()) return;
+    /* Only matters when there IS a Save button, i.e. when signed in — and that
+       is also the one case where restoreFromAccount has already fetched this
+       payload, so we hit the memo instead of adding a request to page load. */
+    if (!GG.account.get()) return;
+    var d=null; try{ d = await GG.dataOnce(); }catch(e){ return; }
+    var m = GG.scoreModel(d||{});
+    teamsLocked = !!m.started;
+    lockedFinished = teamsLocked && m.lastDay >= 15;
+    syncAcct();
+  }
+  function lockNote(){
+    return lockedFinished
+      ? "This basho has finished \u2014 teams unlock when the next one opens."
+      : "The basho is under way \u2014 teams are locked until it ends.";
+  }
   function syncAcct(){
-    var save=document.getElementById("ggSave"); if(save) save.disabled = nPicked()!==7;
+    var save=document.getElementById("ggSave");
+    if(save){ save.disabled = teamsLocked || nPicked()!==7;
+      save.title = teamsLocked ? lockNote() : ""; }
+    var note=document.getElementById("ggLockNote");
+    if(note){ note.hidden = !teamsLocked; note.textContent = teamsLocked ? lockNote() : ""; }
     var mSave=document.getElementById("edohyoSave");
-    if(mSave){ var a=GG.account.get(); mSave.hidden=!a; mSave.disabled=nPicked()!==7; }
+    if(mSave){ var a=GG.account.get(); mSave.hidden=!a;
+      mSave.disabled = teamsLocked || nPicked()!==7;
+      mSave.title = teamsLocked ? lockNote() : ""; }
   }
   // wire the modal's "Save to my account" (shown at 7/7 when signed in)
   var mSave=document.getElementById("edohyoSave");
@@ -1427,11 +1462,12 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
   // keep Save buttons in step with the draft count
   if(typeof updateDraftCount==="function"){ var _u=updateDraftCount; updateDraftCount=function(){ _u.apply(this,arguments); syncAcct(); }; }
   renderAcct();
-  restoreFromAccount();
+  restoreFromAccount().then(checkTeamLock, checkTeamLock);
   // signing out elsewhere on the page shouldn't leave a stale offer standing
   // gg-auth.js dispatches this on document, and it doesn't bubble — listening
   // on window would silently never fire.
-  document.addEventListener("gg-auth-change", function(){ renderAcct(); restoreNote(""); restoreFromAccount(); });
+  document.addEventListener("gg-auth-change", function(){ renderAcct(); restoreNote("");
+    restoreFromAccount().then(checkTeamLock, checkTeamLock); });
 })();
 </script>
 </body>

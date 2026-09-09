@@ -402,9 +402,34 @@
   .lg-sub{ color:var(--faint); font-size:.82rem; margin-top:3px }
 
   /* league settings: scoring + draft date */
-  .lg-settings{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:0 0 18px }
-  @media (max-width:640px){ .lg-settings{ grid-template-columns:1fr } }
-  .lg-settings > div{ border:1px solid var(--line2); border-radius:var(--radius-sm); padding:14px 16px; background:var(--surface-2) }
+  /* Every settings card is the same height — grid-auto-rows:1fr sizes all four
+     to the tallest, rather than letting each ROW find its own height, which is
+     what left Roster sizes and Scoring rules short of their neighbours. */
+  .lg-settings{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:0 0 18px;
+        grid-auto-rows:1fr; align-items:stretch }
+  /* one column on a phone: matching heights there would just be dead space */
+  @media (max-width:640px){ .lg-settings{ grid-template-columns:1fr; grid-auto-rows:auto } }
+  /* ...and the same goes for an open editor. The scoring form is several times
+     the height of a resting card, and holding all four to it leaves three big
+     empty boxes. While any card is being edited the grid goes back to sizing
+     each row on its own; it snaps back to matching the moment you're done.
+     .lg-score-grid / .lg-score-form appear only in the three edit forms. */
+  .lg-settings:has(.lg-score-grid, .lg-score-form){ grid-auto-rows:auto }
+  /* margin:0 matters — .lg-roster-set carries a 16px bottom margin from when
+     these were stacked, and inside the grid that margin came straight off the
+     card's height, which is why two of the four always sat short. */
+  .lg-settings > div{ border:1px solid var(--line2); border-radius:var(--radius-sm); padding:14px 16px;
+        background:var(--surface-2); display:flex; flex-direction:column; margin:0 }
+  /* the body fills the card so its action can sit on the floor: with the cards
+     the same height, the buttons then line up across the row too */
+  .lg-settings > div > .lg-set-body,
+  .lg-settings > div > .lg-sched-body,
+  .lg-settings > div > .lg-scoring-body{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column }
+  .lg-set-body > .btn:last-child,
+  .lg-sched-body > .lg-sched-edit:last-child,
+  .lg-sched-body > .lg-agree-actions:last-child{ margin-top:auto }
+  /* a flex child stretches by default; buttons keep their own width */
+  .lg-set-body > .btn{ align-self:flex-start }
   .lg-set-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px }
   .lg-set-head h4{ margin:0; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--sun) }
   .lg-set-note{ color:var(--faint); font-size:.8rem; margin:6px 0 0; line-height:1.5 }
@@ -481,9 +506,31 @@
   .lg-draft-pick{ border:1px solid var(--line2); border-radius:10px; background:var(--surface-2); cursor:pointer;
         padding:8px; text-align:center; font-size:.8rem; color:var(--dim); transition:border-color .12s,color .12s }
   .lg-draft-pick:hover{ border-color:var(--sun); color:var(--ink) }
-  .lg-draft-pick.disabled{ opacity:.45; cursor:not-allowed }
+  /* pointer-events matters: these are divs, so "disabled" is only a look unless
+     we actually stop the clicks. Without it a locked grid still fired picks. */
+  .lg-draft-pick.disabled{ opacity:.45; cursor:not-allowed; pointer-events:none }
   /* the top name still available on your own board, on your own turn */
   .lg-draft-pick.top{ border-color:var(--sun); color:var(--sun) }
+  /* the tapped name, waiting on the confirm button below */
+  .lg-draft-pick.sel{ border-color:var(--sun); color:var(--ink); background:rgba(var(--sun-rgb),.16);
+        box-shadow:0 0 0 1px var(--sun) inset }
+  .lg-draft-confirm{ position:sticky; bottom:0; z-index:2; display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+        margin:0 0 14px; padding:10px 12px; border:1px solid var(--sun); border-radius:10px;
+        background:var(--surface-2); font-size:.9rem }
+  .lg-draft-confirm b{ color:var(--sun) }
+  .lg-draft-confirm .btn{ margin:0 }
+  .lg-draft-confirm__q{ flex:1 1 auto }
+  .lg-draft-confirm__acts{ display:flex; gap:8px; margin-left:auto }
+  /* on a phone the question takes its own line so the two buttons stay paired */
+  @media (max-width:520px){
+    .lg-draft-confirm__q{ flex:1 1 100% }
+    .lg-draft-confirm__acts{ margin-left:0; width:100% }
+    .lg-draft-confirm__acts .btn{ flex:1 }
+  }
+  .lg-draft-msg{ margin:0 0 12px; font-size:.85rem; color:var(--rose, #e06666) }
+  .teamlock{ margin:0 0 12px; padding:10px 13px; border:1px solid var(--line2); border-radius:10px;
+        background:var(--surface-2); color:var(--dim); font-size:.86rem; line-height:1.5 }
+  .teamlock b{ color:var(--sun) }
   .lg-draft-board{ display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto; font-size:.8rem }
   .lg-draft-board div{ display:flex; justify-content:space-between; gap:8px; padding:4px 8px; border-radius:6px }
   .lg-draft-board div.me{ background:rgba(var(--sun-rgb),.1) }
@@ -741,6 +788,8 @@
     </details>
 
     <div class="slots" id="slots"></div>
+
+    <p class="teamlock" id="teamLock" hidden></p>
 
     <div class="saverow">
       <button class="btn" id="saveBtn">Save my team</button>
@@ -1101,7 +1150,10 @@ function paintSlots(){
       const cur = team[band.id] || "";
       return cur
         ? `<div class="pcard filled locked r-${RK[cur].code[0]}" data-band="${band.id}">${pcardInner(cur,band.label)}</div>`
-        : `<div class="pcard empty locked" data-band="${band.id}"><div class="pc-empty"><b>${band.label}</b><span class="cta">\uD83D\uDD12 Opens when the banzuke drops</span></div></div>`;
+        : `<div class="pcard empty locked" data-band="${band.id}"><div class="pc-empty"><b>${band.label}</b><span class="cta">\uD83D\uDD12 ${
+            lockReason === "running" ? "Locked for the basho" :
+            lockReason === "finished" ? "Locked until the next basho" :
+            "Opens when the banzuke drops"}</span></div></div>`;
     }).join("");
     syncTeam();
     return;
@@ -1125,8 +1177,9 @@ function paintSlots(){
 function syncTeam(){
   $("pickN").textContent = teamCount() + "/7";
   $("saveBtn").disabled = draftLocked || teamCount() !== 7 || !acct;
-  $("saveBtn").title = draftLocked ? "Drafting opens when the banzuke drops"
-                     : (acct ? "" : "Create an account or sign in first");
+  $("saveBtn").title = draftLocked
+      ? (lockReason === "banzuke" ? "Drafting opens when the banzuke drops" : "Teams are locked for this basho")
+      : (acct ? "" : "Create an account or sign in first");
 }
 
 /* ---------- picker modal ---------- */
@@ -1421,12 +1474,26 @@ function nextBasho(){
   const now = Date.now();
   return UPCOMING_BASHO.find(b => new Date(b.start).getTime() > now) || null;
 }
-// Draft is locked until the banzuke drops (ranks unknown before then).
-let draftLocked = false;
-function setDraftLocked(v){
-  if (draftLocked === v) return;
-  draftLocked = v;
+/* The team is locked in two quite different situations, and saying which one
+   matters: before the banzuke drops nobody knows the ranks, and once results
+   exist the team is frozen because it is scored across all fifteen days. */
+let draftLocked = false, lockReason = "";
+function lockCopy(){
+  return lockReason === "running"  ? "<b>The basho is under way.</b> Teams are locked for the duration \u2014 every wrestler you drafted is scored across all fifteen days, so nobody can swap in the day-13 leaders."
+       : lockReason === "finished" ? "<b>This basho has finished.</b> Teams stay locked until the next one opens, so the final standings and the archive can\u2019t move."
+       : "<b>The draft is locked until the banzuke is released.</b> Ranks aren\u2019t set yet.";
+}
+function paintTeamLock(){
+  const el = $("teamLock"); if (!el) return;
+  el.hidden = !draftLocked;
+  if (draftLocked) el.innerHTML = lockCopy();
+}
+function setDraftLocked(v, reason){
+  reason = reason || (v ? (lockReason || "banzuke") : "");
+  if (draftLocked === v && lockReason === reason) return;
+  draftLocked = v; lockReason = reason;
   try { paintSlots(); } catch (e) {}   // re-render slots into/out of the locked state
+  paintTeamLock();
 }
 function banzukeDropped(b){ return !b || !b.banzuke || new Date(b.banzuke).getTime() <= Date.now(); }
 function setClock(ids, ms){
@@ -1439,9 +1506,14 @@ function setClock(ids, ms){
 function renderCountdown(model){
   const active = model.started && model.lastDay < 15;
   if (cdTimer) { clearInterval(cdTimer); cdTimer = null; }
-  if (active) { $("countdown").hidden = true; setDraftLocked(false); return; }
+  /* This used to setDraftLocked(false) here — a running tournament was the one
+     moment the board was guaranteed OPEN. Results existing is exactly when the
+     team must not move; the server refuses these saves either way now. */
+  if (active) { $("countdown").hidden = true; setDraftLocked(true, "running"); return; }
   const next = nextBasho();
-  if (!next) { $("countdown").hidden = true; setDraftLocked(false); return; }
+  if (!next) { $("countdown").hidden = true;
+    if (model.started) setDraftLocked(true, "finished"); else setDraftLocked(false, "");
+    return; }
   $("countdown").hidden = false;
   $("cdBasho").textContent = `${next.name} · ${next.venue}`;
   const tick = () => {
@@ -1460,7 +1532,11 @@ function renderCountdown(model){
         ? "This basho has finished — draft again once the next one opens."
         : "The banzuke is out — draft your team before the basho starts.";
     }
-    setDraftLocked(!dropped);
+    /* A finished basho whose results are still on the sheet keeps the team
+       locked even once the next banzuke is out — the standings and the archive
+       are computed from it right up until *New basho* clears the rows. */
+    if (model.started) setDraftLocked(true, "finished");
+    else setDraftLocked(!dropped, dropped ? "" : "banzuke");
   };
   tick();
   cdTimer = setInterval(tick, 1000);
@@ -2142,6 +2218,13 @@ let draftPollTimer = null;
    clock is minutes off would otherwise show a number nobody else sees.
    `draftSkew` is that correction, measured from serverNow on every poll. */
 let draftTick = null, draftSkew = 0, draftDeadline = "", draftAuto = false;
+/* Draft picks are select-then-confirm. A tap only sets draftSel; nothing is
+   sent until the confirm button, so a stray tap while scrolling the grid costs
+   nothing. draftSending is a real in-flight latch — the old code only added a
+   CSS class to the tiles, which on a <div> stops nothing, so a fast tapper
+   could fire several picks into one turn. draftGridSig lets us leave the grid
+   alone unless the names actually changed. */
+let draftSel = "", draftSending = false, draftGridSig = "", draftMsg = "";
 function stopDraftTick(){ if (draftTick){ clearInterval(draftTick); draftTick=null; } }
 function fmtTick(sec){
   if (sec <= 0) return "0:00";
@@ -2162,7 +2245,8 @@ let redraftPollTimer = null;
 let keepPollTimer = null;
 /* does this league cut anyone at the roll-over? null in BOTH divisions means no */
 function keepLimited(lg){ return !!lg && (lg.keepMk != null || lg.keepJr != null); }
-function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } stopDraftTick(); }
+function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } stopDraftTick();
+  draftSel = ""; draftSending = false; draftGridSig = ""; draftMsg = ""; }
 /* Mirrors rosterPlan() in sumo-fantasy.gs. rosterSize keeps its original
    meaning — the ACTIVE Makuuchi cap — so a league saved before benches existed
    reads back as bench 0 / farm = active, exactly as it behaved before. */
@@ -2441,11 +2525,15 @@ async function renderKeepers(lg, meCommish){
       <h4>Snake draft — live</h4>
       <div class="lg-draft-turn" id="lgDraftTurn"><span class="gg-spin"></span>Loading…</div>
       <div class="lg-draft-grid" id="lgDraftGrid"></div>
+      <div class="lg-draft-confirm" id="lgDraftConfirm" hidden></div>
+      <p class="lg-draft-msg" id="lgDraftMsg" hidden></p>
       <h4 style="margin-top:14px">Picks so far</h4>
       <div class="lg-draft-board" id="lgDraftBoard"></div>
     </div>
     ${draftBoardPanelHTML(lg)}`;
     wireDraftBoard(lg);
+    /* the room was just rebuilt: the grid is empty, so no cached signature */
+    draftSel = ""; draftSending = false; draftGridSig = ""; draftMsg = "";
     await pollDraft(lg);
     draftPollTimer = setInterval(()=>pollDraft(lg), 4000);
     draftPollTimer._ms = 4000;
@@ -2669,6 +2757,65 @@ async function renderRedraft(lg){
   });
 }
 
+/* The selection and the confirm bar, painted WITHOUT rebuilding the grid — the
+   grid is a scrolling list and rebuilding it moves what is under the finger. */
+function paintDraftSel(lg){
+  const gridEl = $("lgDraftGrid");
+  if (gridEl) gridEl.querySelectorAll("[data-pick]").forEach(c=>
+    c.classList.toggle("sel", c.dataset.pick === draftSel));
+  const msg = $("lgDraftMsg");
+  if (msg){ msg.hidden = !draftMsg; msg.textContent = draftMsg || ""; }
+  const bar = $("lgDraftConfirm");
+  if (!bar) return;
+  if (!draftSel && !draftSending){ bar.hidden = true; bar.innerHTML = ""; return; }
+  bar.hidden = false;
+  bar.innerHTML = draftSending
+    ? `<span class="gg-spin"></span><span>Drafting <b>${esc(draftSel)}</b>\u2026</span>`
+    : `<span class="lg-draft-confirm__q">Draft <b>${esc(draftSel)}</b>?</span>
+       <span class="lg-draft-confirm__acts">
+         <button class="btn sm" id="lgPickGo" type="button">Draft ${esc(draftSel)}</button>
+         <button class="btn ghost sm" id="lgPickNo" type="button">Cancel</button>
+       </span>`;
+  const go = $("lgPickGo"), no = $("lgPickNo");
+  if (go) go.onclick = ()=>commitPick(lg, draftSel);
+  if (no) no.onclick = ()=>{ draftSel=""; draftMsg=""; paintDraftSel(lg); };
+}
+
+/* Send exactly one pick. draftSending latches for real, and the button is a
+   <button> that is genuinely disabled while it is in flight. */
+async function commitPick(lg, name){
+  if (draftSending || !name) return;
+  draftSending = true; draftMsg = "";
+  paintDraftSel(lg);
+  const go = $("lgPickGo"); if (go) go.disabled = true;
+  let r = null;
+  try { r = await GyojiGuide.makePick(lg.id, name); } catch(e){}
+  draftSending = false;
+  if (r && r.ok){
+    /* Paint from THIS response instead of throwing it away and waiting on a
+       second round trip — that second wait is what read as "very delayed". */
+    draftSel = ""; draftGridSig = "";
+    draftDeadline = r.deadline || ""; draftAuto = false;
+    const gridEl = $("lgDraftGrid");
+    if (gridEl) gridEl.querySelectorAll("[data-pick]").forEach(c=>{
+      c.classList.add("disabled"); c.classList.remove("sel","top"); c.onclick = null; });
+    const nt = r.nextTurn || {};
+    const turnEl = $("lgDraftTurn");
+    if (turnEl && r.draftStatus === "active" && nt.handle)
+      turnEl.innerHTML = `<b>${esc(nt.handle)}</b> is on the clock \u00b7 Round ${nt.round}`
+        + ` \u00b7 ${nt.phase==="makuuchi"?"Makuuchi":"J\u016bry\u014d"} phase`
+        + (draftDeadline ? `<span class="lg-tick" id="lgTick"></span>` : "");
+    paintDraftSel(lg);
+    if (r.draftStatus !== "active"){
+      lg.draftStatus = r.draftStatus; stopDraftPolling(); renderLeague(); return;
+    }
+  } else {
+    draftMsg = (r && r.error) || "Couldn\u2019t draft that pick \u2014 try again.";
+    paintDraftSel(lg);
+  }
+  pollDraft(lg);
+}
+
 async function pollDraft(lg){
   let res=null; try { res = await GyojiGuide.draftState(lg.id); } catch(e){}
   if (!res || !res.ok) return;
@@ -2716,16 +2863,29 @@ async function pollDraft(lg){
   const topOfBoard = meOnClock ? pool[0] : null;
   const gridEl = $("lgDraftGrid");
   if (gridEl) {
-    gridEl.innerHTML = pool.map((n,i)=>`<div class="lg-draft-pick${meOnClock?"":" disabled"}${meOnClock&&i===0&&myOrder.length?" top":""}" data-pick="${esc(n)}">${esc(n)}</div>`).join("")
-      || `<p class="lg-locked-note">No wrestlers left in this phase.</p>`;
-    if (meOnClock) gridEl.querySelectorAll("[data-pick]").forEach(c=>{
-      c.onclick = async ()=>{
-        gridEl.querySelectorAll("[data-pick]").forEach(x=>x.classList.add("disabled"));
-        const r = await GyojiGuide.makePick(lg.id, c.dataset.pick);
-        if (!(r && r.ok)) alert((r&&r.error)||"Couldn't draft that pick.");
-        pollDraft(lg);
-      };
-    });
+    /* Rebuild the grid only when the names actually change. It used to redraw on
+       every four-second poll, which yanked the list out from under a finger
+       mid-scroll and threw the scroll position away with it — a good share of
+       the "I misclicked" reports start right there. */
+    const sig = turn.phase + "|" + (meOnClock ? "me" : "no") + "|" + pool.join("\u0001");
+    if (sig !== draftGridSig && !draftSending){
+      draftGridSig = sig;
+      gridEl.innerHTML = pool.map((n,i)=>`<div class="lg-draft-pick${meOnClock?"":" disabled"}${meOnClock&&i===0&&myOrder.length?" top":""}" data-pick="${esc(n)}">${esc(n)}</div>`).join("")
+        || `<p class="lg-locked-note">No wrestlers left in this phase.</p>`;
+      /* A tap SELECTS. It does not draft. The pick leaves the browser only from
+         the confirm button, so a scroll that ends on a name is free to undo. */
+      if (meOnClock) gridEl.querySelectorAll("[data-pick]").forEach(c=>{
+        c.onclick = ()=>{ if (draftSending) return;
+          draftSel = (draftSel === c.dataset.pick) ? "" : c.dataset.pick;
+          draftMsg = ""; paintDraftSel(lg); };
+      });
+    }
+    if (!meOnClock || !pool.length) draftSel = "";
+    if (draftSel && pool.indexOf(draftSel) < 0){    // somebody else took him first
+      draftMsg = draftSel + " was drafted by someone else.";
+      draftSel = "";
+    }
+    paintDraftSel(lg);
   }
   const boardEl = $("lgDraftBoard");
   if (boardEl) boardEl.innerHTML = (res.picks||[]).slice().reverse().map(p=>{
