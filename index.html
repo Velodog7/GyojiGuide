@@ -106,11 +106,12 @@
   .bz-welcome .view-sub{ margin:0 }
   .bz-logo{ width:min(200px,52%); height:auto; margin:0; filter:drop-shadow(0 4px 14px rgba(0,0,0,.5)) }
   /* ── live basho strip ───────────────────────────────────
-     Sits at the top of the welcome card. The card scrolls internally
-     (max-height + overflow auto above), so this costs the banzuke behind it
-     nothing — it never widens the card or pushes it over the sanyaku. */
+     Sits directly under the logo — the logo is the card's header, and this is
+     the "what's happening right now" line beneath it. Above the logo it read
+     as a system banner floating over the brand. Spacing comes from the
+     .bz-welcome flex gap, so when the strip hides there is no orphan margin. */
   .bz-strip{ display:flex; align-items:center; gap:9px; width:100%; box-sizing:border-box;
-        margin:0 0 4px; padding:8px 12px; border-radius:999px; text-decoration:none;
+        margin:0; padding:8px 12px; border-radius:999px; text-decoration:none;
         border:1px solid rgba(216,178,90,.34); background:rgba(216,178,90,.08);
         color:var(--ink); font-size:.86rem; line-height:1.25;
         transition:border-color .14s, background .14s }
@@ -134,8 +135,8 @@
   }
   .bz-welcome .bz-intro{ width:100%; color:var(--dim); font-size:1rem; line-height:1.55 }
   .bz-intro b{ color:var(--ink) }
-  .bz-features{ list-style:none; margin:0; padding:0; text-align:left; width:100%; display:flex; flex-direction:column; gap:8px }
-  .bz-features li{ position:relative; padding-left:20px; color:var(--dim); font-size:1rem; line-height:1.55 }
+  .bz-features{ list-style:none; margin:0; padding:0; text-align:left; width:100%; display:flex; flex-direction:column; gap:7px }
+  .bz-features li{ position:relative; padding-left:20px; color:var(--dim); font-size:.97rem; line-height:1.5 }
   .bz-features li::before{ content:"\25B8"; position:absolute; left:0; top:0; color:var(--sun) }
   .bz-feat-h{ color:var(--sun); font-weight:700 }
   .view-h{ font-family:"Potta One","Zen Maru Gothic",sans-serif; font-weight:900; font-size:1.5rem; margin:0 0 6px }
@@ -320,24 +321,25 @@
   <div class="bz-card" id="bzCard">
     <div class="bz-mv on" id="mv-welcome">
       <div class="bz-welcome">
-        <!-- live basho strip: painted from the schedule in gg-basho.js with no
-             network at all; only a tournament actually in progress makes it
-             reach for the leaderboard. Hidden until it has something to say. -->
+        <!-- live basho strip, sitting under the logo: painted from the schedule
+             in gg-basho.js with no network at all; only a tournament actually in
+             progress makes it reach for the leaderboard. Hidden until it has
+             something to say, and the flex gap closes cleanly when it is. -->
+        <img class="bz-logo" src="SumoSlapdown-logoTall.svg" alt="Sumo Slapdown">
         <a class="bz-strip" id="bzStrip" href="fantasy.html" hidden>
           <span class="bz-strip__dot" aria-hidden="true"></span>
           <span class="bz-strip__main" id="bzStripMain"></span>
           <span class="bz-strip__meta" id="bzStripMeta"></span>
           <span class="bz-strip__go" aria-hidden="true">&#8594;</span>
         </a>
-        <img class="bz-logo" src="SumoSlapdown-logoTall.svg" alt="Sumo Slapdown">
         <h1 class="sr-only">Sumo Slap Down — Fantasy Sumo: rikishi analysis, mock drafts, a basho simulator, and private fantasy leagues</h1>
-<p class="view-sub bz-intro">Welcome to <b>Sumo Slap Down</b>! I created this site because my family and friends who love sumo and fantasy sports wanted a single destination to analyze rikishi, mock draft your team, simulate upcoming basho, and customize private fantasy leagues. The site is still in beta so please reach out with any bug reports or suggestions on how to improve the site. Hakkeyoi!</p>
+<p class="view-sub bz-intro">Welcome to <b>Sumo Slap Down</b>! I built this for the family and friends who love sumo and fantasy sports and wanted one place to do all of it. Still in beta — bug reports and ideas are very welcome. Hakkeyoi!</p>
         <ul class="bz-features">
-          <li><span class="bz-feat-h">Analyze Wrestlers</span> — Dig into historical stats, monitor health updates, and track performance to scout your perfect lineup.</li>
-          <li><span class="bz-feat-h">Create Mock Drafts</span> — Practice your picks and have your draft instantly graded against our predictions.</li>
-          <li><span class="bz-feat-h">Run Simulations</span> — Watch a day-to-day simulation of the entire tournament using hypothetical matchups.</li>
-          <li><span class="bz-feat-h">Compete in Leagues</span> — Join public games or create private custom fantasy leagues—including dedicated Keeper Leagues that let you build a stable and carry your top wrestlers from one basho to the next.</li>
-          <li><span class="bz-feat-h">Stay Connected</span> — All of our rikishi data and tournament results are powered by the sumo-api, ensuring your stats, rankings, and match history are always accurate and up to date.</li>
+          <li><span class="bz-feat-h">Analyze Wrestlers</span> — Stats, health and form, to scout your lineup.</li>
+          <li><span class="bz-feat-h">Create Mock Drafts</span> — Practice your picks and get graded instantly.</li>
+          <li><span class="bz-feat-h">Run Simulations</span> — Watch a whole basho play out, day by day.</li>
+          <li><span class="bz-feat-h">Compete in Leagues</span> — Public games, private leagues, and Keeper Leagues that carry your stable between basho.</li>
+          <li><span class="bz-feat-h">Stay Connected</span> — Live rikishi data and results, straight from sumo-api.</li>
         </ul>
       </div>
     </div>
