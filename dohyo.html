@@ -1539,13 +1539,13 @@
   }
   @media (max-width:560px){ .bz__side .nm{ font-size:13px } .bz__row{ gap:6px } }
 </style>
-<script src="gg-config.js"></script><script src="gg-account.js"></script><script src="gg-roster.js"></script></head>
+<script src="gg-config.js"></script><script src="gg-basho.js"></script><script src="gg-account.js"></script><script src="gg-roster.js"></script></head>
 <body>
 <script src="gg-mawashi.js"></script><script src="gg-auth.js"></script><script src="gg-nav.js"></script>
 
 <header class="menu" id="menu">
   <div class="menu__inner">
-    <span class="menu__brand"><b>Nagoya 2026</b><i class="menu__sub">·</i><span class="menu__sub" id="daySub">Nagoya Basho · 15 days</span></span>
+    <span class="menu__brand"><b id="bashoName">Aki 2026</b><i class="menu__sub">·</i><span class="menu__sub" id="daySub">Nagoya Basho · 15 days</span></span>
     <nav class="menu__nav">
       <div class="menu__view">
         <select id="daySel" aria-label="Day"></select>
@@ -1694,7 +1694,7 @@
   </div>
 </div>
 
-<p class="credit">Every bout is simulated from Elo ratings — these are not real results. Banzuke, kanji, heya, origin, physique and rank movement from <a href="https://gyojiguide.com" target="_blank" rel="noopener">Sumo Slapdown</a> · Nagoya 2026</p>
+<p class="credit">Every bout is simulated from Elo ratings — these are not real results. Banzuke, kanji, heya, origin, physique and rank movement from <a href="https://gyojiguide.com" target="_blank" rel="noopener">Sumo Slapdown</a> · <span id="creditBasho">Aki 2026</span></p>
 
 <div class="modal" id="dayModal" hidden>
   <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="dayModalTitle">
@@ -4164,6 +4164,23 @@ paintIntroSlots();
 syncIntro();
 runCeremony();
 applyFit();                 // and once at start, before the first paint settles
+
+/* ---------- which basho this is ----------
+   The simulation runs on the live banzuke (refreshed just below), so the
+   tournament it depicts is whatever the schedule says is current — never a
+   name typed into the markup. The hardcoded values in the HTML are only a
+   fallback for a page served without gg-basho.js; they read "Nagoya 2026" for
+   a whole tournament after the site had moved on, which is the bug this ends. */
+(function(){
+  var GG = window.GyojiGuide;
+  if (!GG || !GG.basho || !GG.basho.focusName) return;
+  var name = GG.basho.focusName();
+  if (!name) return;
+  ["bashoName", "creditBasho"].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.textContent = name;
+  });
+})();
 
 /* ---------- live banzuke refresh (gg-roster.js) ----------
    The forecast runs on curated Elo / stable / fighting-style data that the

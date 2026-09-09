@@ -99,6 +99,31 @@
       return { phase:"idle", basho:null, day:0, banzukeOut:true };
     },
 
+    /* THE tournament the site is currently about — the one answer every page
+       should print when it needs to name a basho.
+
+       "Current" is not enough on its own: for most of the year no tournament is
+       being fought, and between them the site is plainly about the next one.
+       So: the basho being fought if there is one, otherwise the next announced.
+       When the table runs out it returns the last entry rather than null, so a
+       label degrades to a stale-but-real name instead of going blank.
+
+       Use this for anything that names the tournament as a SCHEDULE fact — a
+       page title, a subnav, "simulate <basho>". Do NOT use it for text that
+       describes hand-maintained content (the health notes, the honours tables):
+       those are written for one specific basho and making them follow the
+       calendar would have them claim an update that never happened. */
+    focus: function (now) {
+      now = now || Date.now();
+      return B.current(now) || B.next(now) || SCHEDULE[SCHEDULE.length - 1] || null;
+    },
+
+    /* the name alone, which is what almost every caller actually wants */
+    focusName: function (now) {
+      var b = B.focus(now);
+      return b ? b.name : "";
+    },
+
     /* "9d 14:22:01" — days only when there are any, so it fits one line */
     countdown: function (msLeft) {
       var s = Math.max(0, Math.floor(msLeft / 1000));

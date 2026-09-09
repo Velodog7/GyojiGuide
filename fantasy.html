@@ -1517,7 +1517,12 @@ async function loadBoard(){
   if (!data || !data.ok){
     const users = [];
     if (acct && teamCount()===7) users.push({ handle:acct.handle, name:acct.name||acct.handle, team });
-    cache = { users, results:[], meta:{ basho:"Aki 2026", lastDay:0 } };
+    /* The backend is unreachable, so there is no Meta to read — but a hardcoded
+       name here would outlive the tournament it was typed during. The schedule
+       is bundled and needs no network, which is exactly what this path has. */
+    var offlineBasho = (window.GyojiGuide && GyojiGuide.basho && GyojiGuide.basho.focusName())
+                       || "";
+    cache = { users, results:[], meta:{ basho: offlineBasho, lastDay:0 } };
     publicChampHandles = [];
   } else {
     cache = { users:data.users||[], results:data.results||[], meta:data.meta||{} };

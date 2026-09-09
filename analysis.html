@@ -1091,7 +1091,7 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
 <div class="edohyo__panel">
 <div class="edohyo__seal">満</div>
 <h2 class="edohyo__title">Enter the Dohyō</h2>
-<p class="edohyo__sub">Your seven-strong stable is set. Take them to the ring to simulate Aki 2026 — your picks carry over automatically.</p>
+<p class="edohyo__sub">Your seven-strong stable is set. Take them to the ring to simulate <span id="edohyoBasho">Aki 2026</span> — your picks carry over automatically.</p>
 <div class="edohyo__team" id="edohyoTeam"></div>
 <div class="edohyo__acts">
 <button class="edohyo__go" id="edohyoGo">Enter the Dohyō &rarr;</button>
@@ -1311,6 +1311,18 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
      so resolving it early changes when restoreFromAccount() gets its answer —
      and the team restore is timing-sensitive enough that it is not worth
      disturbing for a button state. This runs after the restore instead. */
+  /* The modal names the tournament it will send your seven to. That is a
+     schedule fact, so it comes from the schedule — not from a name typed into
+     the markup, which is how the simulation page ended up advertising Nagoya
+     through the whole of Aki. */
+  (function(){
+    var el = document.getElementById("edohyoBasho");
+    var GG = window.GyojiGuide;
+    if (el && GG && GG.basho && GG.basho.focusName){
+      var n = GG.basho.focusName(); if (n) el.textContent = n;
+    }
+  })();
+
   async function checkTeamLock(){
     /* The calendar half needs no account and no network, so do it first and
        unconditionally: between day 1 opening and the first bouts importing —
