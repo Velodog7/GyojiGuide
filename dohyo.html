@@ -1030,24 +1030,44 @@
     font-size:13px; text-align:right; color:var(--faint);
   }
   .bout__mid.pending{ color:var(--faint); font-style:italic; letter-spacing:.04em }
-  /* ── up next ───────────────────────────────────────────── */
+  /* ── up next ───────────────────────────────────────────────
+     Sits under the dohyō and takes the ring's own width, so the two read as
+     one object. Three tracks: east — label — west, each side pushed to its
+     own edge exactly as the ring above and the card below arrange them. The
+     label is the hinge in the middle rather than a heading on the left. */
   .upnext{
-    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
-    margin:0 0 10px; padding:9px 12px; border-radius:8px;
+    display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:14px;
+    box-sizing:border-box;
+    width:min(100%, calc((var(--stagevh,92) * 1vh - var(--menu-h)) * 1.2179));
+    margin:12px auto 0; padding:9px 16px; border-radius:10px;
     border:1px solid var(--line); background:rgba(68,52,79,.35);
   }
   .upnext[hidden]{ display:none }
   .upnext__lab{
     font-family:"WDXL Lubrifont TC",ui-monospace,monospace;
     font-size:10px; letter-spacing:.18em; text-transform:uppercase;
-    color:var(--faint); flex:none;
+    color:var(--faint); white-space:nowrap; text-align:center;
   }
-  .upnext__body{ display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; min-width:0 }
+  .upnext__side{ display:flex; align-items:baseline; gap:8px; min-width:0 }
+  .upnext__side--e{ justify-content:flex-start }
+  .upnext__side--w{ justify-content:flex-end; text-align:right }
   .upnext__nm{ font-size:15px }
   .upnext__nm.is-mine{ color:var(--sun) }
-  .upnext__vs{ color:var(--faint); font-size:11px; letter-spacing:.14em; text-transform:uppercase }
-  .upnext__none{ color:var(--dim); font-size:13px }
+  /* the empty message borrows the label's cell, so it has to undo the label's
+     tracking and caps or it shouts a full sentence at you */
+  .upnext__none{ color:var(--dim); font-size:13px; text-align:center;
+        text-transform:none; letter-spacing:normal;
+        font-family:"Zen Maru Gothic",system-ui,sans-serif }
   .upnext.is-mine{ border-color:rgba(var(--sun-rgb),.4) }
+  /* nothing to line up — let the message have the whole strip */
+  .upnext.is-empty{ grid-template-columns:1fr }
+  .upnext.is-empty .upnext__side{ display:none }
+  /* a phone cannot hold both sides on one line; stack them, still e-then-w */
+  @media (max-width:560px){
+    .upnext{ grid-template-columns:1fr; gap:4px; padding:8px 12px; text-align:center }
+    .upnext__side--e, .upnext__side--w{ justify-content:center; text-align:center }
+    .upnext__lab{ order:-1 }
+  }
   .bout__name{ font-size:15px }
   /* the simulated-tournament record, on both sides of an end-of-day bout.
      Deliberately quieter than the rank badge beside it — it is a number you
@@ -1109,6 +1129,7 @@
   /* the dohyō stays on stage the whole time — the setup sits beneath it,
      while the ring-entering ceremony plays above. */
   body.setup .wrap,
+  body.setup .upnext,
   body.setup .credit{ display:none }
   /* during setup the subnav stays, but swaps its live controls for a
      compact Steps 1–4 progress strip */
@@ -1636,6 +1657,17 @@
   <button class="slot slot--west" id="west" aria-label="West side"></button>
 </div>
 
+<!-- What the ring will call next — sat directly under the dohyō and sized to
+     it, so it reads as part of the bout rather than as a header on the list
+     below. East and west take their own sides, mirroring both the ring above
+     and the day's card below. Reads off playableIdx(), the same sequence the
+     player walks, so "only my team" names YOUR next bout and skips the rest. -->
+<div class="upnext" id="upNext" hidden>
+  <span class="upnext__side upnext__side--e" id="upNextE"></span>
+  <span class="upnext__lab" id="upNextLab">Up next</span>
+  <span class="upnext__side upnext__side--w" id="upNextW"></span>
+</div>
+
 <div class="intro" id="intro">
   <div class="intro__step">Step 1 <b>— pick your seven</b></div>
   <div class="intro__reslot" id="introReslot" hidden></div>
@@ -1704,13 +1736,6 @@
   <div class="tabs tabs--wrap" role="tablist" id="divTabs">
     <button role="tab" data-tab="makuuchi" data-short="Maku" aria-selected="true">Makuuchi</button>
     <button role="tab" data-tab="juryo" data-short="Jūryō" aria-selected="false">Jūryō</button>
-  </div>
-  <!-- What the ring will call next. Reads off playableIdx(), the same sequence
-       the player actually walks, so in "only my team" it names your next bout
-       and skips everything in between rather than the literal next row. -->
-  <div class="upnext" id="upNext" hidden>
-    <span class="upnext__lab" id="upNextLab">Up next</span>
-    <span class="upnext__body" id="upNextBody"></span>
   </div>
   <div class="panel" id="p-makuuchi"><div class="bouts" id="l-makuuchi"></div></div>
   <div class="panel" id="p-juryo" hidden><div class="bouts" id="l-juryo"></div></div>
@@ -2682,8 +2707,9 @@ function nextPlayable(){
 function paintUpNext(){
   const el = document.getElementById("upNext");
   if (!el) return;
-  const body = document.getElementById("upNextBody");
-  const lab  = document.getElementById("upNextLab");
+  const eEl = document.getElementById("upNextE");
+  const wEl = document.getElementById("upNextW");
+  const lab = document.getElementById("upNextLab");
   const onCard = ["makuuchi","juryo"].some(n => {
     const panel = document.getElementById("p-" + n);
     return panel && !panel.hidden;
@@ -2694,36 +2720,41 @@ function paintUpNext(){
   const seq = playableIdx();
   const i = nextPlayable();
   el.hidden = false;
-  el.classList.remove("is-mine");
+  el.classList.remove("is-mine", "is-empty");
   lab.textContent = playing ? "Up next" : "First up";
 
   if (i === null) {
-    lab.textContent = "Up next";
-    body.innerHTML = `<span class="upnext__none">${
+    el.classList.add("is-empty");
+    lab.innerHTML = `<span class="upnext__none">${
       !seq.length
         ? (watchScope === "mine"
             ? `None of your seven fight in ${DIV_NAME[division]} today.`
             : "No bouts on this card.")
         : "That was the last bout of the day."
     }</span>`;
+    eEl.innerHTML = wEl.innerHTML = "";
     return;
   }
 
   const b = card[division][i];
   const mine = myPicks();
   const upto = Math.max(0, Number(day) - 1);     // coming IN to today — never today's result
-  const side = (rank, name) => {
+  /* East reads rank → name → record, west mirrors it so both rank badges sit
+     on the outer edges and the two names face each other across the label. */
+  const parts = (rank, name) => {
     const isMine = mine.has(name);
     const { w, l } = recordThrough(name, upto);
-    return `<span class="bout__rank">${rank}</span>` +
-           `<span class="upnext__nm${isMine ? " is-mine" : ""}">${
-             isMine ? '<i class="bout__star">&#9670;</i>' : ""}${name}</span>` +
-           `<span class="bout__rec" title="Record coming into day ${day}">${w}\u2013${l}</span>`;
+    return {
+      rank: `<span class="bout__rank">${rank}</span>`,
+      name: `<span class="upnext__nm${isMine ? " is-mine" : ""}">${
+               isMine ? '<i class="bout__star">&#9670;</i>' : ""}${name}</span>`,
+      rec:  `<span class="bout__rec" title="Record coming into day ${day}">${w}\u2013${l}</span>`
+    };
   };
+  const e = parts(b[0], b[1]), w = parts(b[4], b[5]);
   if (boutHasMine(b)) el.classList.add("is-mine");
-  body.innerHTML = side(b[0], b[1]) +
-                   `<span class="upnext__vs">vs</span>` +
-                   side(b[4], b[5]);
+  eEl.innerHTML = e.rank + e.name + e.rec;
+  wEl.innerHTML = w.rec + w.name + w.rank;
 }
 
 /* Play one bout fully (announce → stare-down → tachiai → result), then,

@@ -50,10 +50,10 @@ const read = p => p.evaluate(()=>{
   const el=document.getElementById('upNext');
   return { hidden: el.hidden, width: Math.round(el.getBoundingClientRect().width),
     lab: (document.getElementById('upNextLab')||{}).textContent||'',
-    text: (document.getElementById('upNextBody')||{}).innerText.replace(/\s+/g,' ').trim(),
-    names: [...document.querySelectorAll('#upNextBody .upnext__nm')].map(e=>e.textContent.replace(/[^A-Za-z]/g,'')),
+    text: el.innerText.replace(/\s+/g,' ').trim(),
+    names: [...el.querySelectorAll('.upnext__nm')].map(e=>e.textContent.replace(/[^A-Za-z]/g,'')),
     mineFlag: el.classList.contains('is-mine'),
-    recs: [...document.querySelectorAll('#upNextBody .bout__rec')].map(e=>e.textContent) };
+    recs: [...el.querySelectorAll('.bout__rec')].map(e=>e.textContent) };
 });
 
 (async ()=>{
@@ -69,6 +69,51 @@ const read = p => p.evaluate(()=>{
     chk('and names the first bout of the card',
         u.names[0]===first[0] && u.names[1]===first[1], JSON.stringify(u.names)+' vs '+JSON.stringify(first));
     chk('no page errors', errs.length===0, errs[0]||'');
+
+    /* ---- the layout itself: east left, west right, sized to the ring ---- */
+    const geo = await p.evaluate(()=>{
+      const el=document.getElementById('upNext');
+      const e=document.getElementById('upNextE'), w=document.getElementById('upNextW');
+      const lab=document.getElementById('upNextLab');
+      const stage=document.querySelector('.stage');
+      const R=x=>x.getBoundingClientRect();
+      const r=R(el), er=R(e), wr=R(w), lr=R(lab), sr=R(stage);
+      return {
+        eastLeftOfLabel:  Math.round(lr.left - er.left),
+        westRightOfLabel: Math.round(wr.right - lr.right),
+        eastStartsAtEdge: Math.round(er.left - r.left),
+        westEndsAtEdge:   Math.round(r.right - wr.right),
+        widthVsStage: Math.round(r.width - sr.width),
+        centredWith:  Math.round((r.left + r.width/2) - (sr.left + sr.width/2)),
+        belowStage:   Math.round(r.top - sr.bottom),
+        /* is it above the day's list, i.e. did it leave .wrap? */
+        beforeWrap: !!(document.querySelector('.wrap') &&
+          (el.compareDocumentPosition(document.querySelector('.wrap')) & Node.DOCUMENT_POSITION_FOLLOWING)),
+        insideWrap: !!el.closest('.wrap')
+      };
+    });
+    chk('it sits under the dohyo, not inside the list section',
+        !geo.insideWrap && geo.beforeWrap && geo.belowStage >= 0 && geo.belowStage < 60,
+        JSON.stringify({insideWrap:geo.insideWrap, belowStage:geo.belowStage}));
+    chk('and takes the ring’s own width, centred on it',
+        Math.abs(geo.widthVsStage) <= 2 && Math.abs(geo.centredWith) <= 2,
+        'width diff '+geo.widthVsStage+', centre diff '+geo.centredWith);
+    chk('east sits left of the label, west right of it',
+        geo.eastLeftOfLabel > 40 && geo.westRightOfLabel > 40,
+        'east '+geo.eastLeftOfLabel+'px left, west '+geo.westRightOfLabel+'px right');
+    chk('each side is pushed to its own edge',
+        geo.eastStartsAtEdge < 24 && geo.westEndsAtEdge < 24,
+        'east inset '+geo.eastStartsAtEdge+', west inset '+geo.westEndsAtEdge);
+
+    const order = await p.evaluate(()=>{
+      const cls = el => [...el.children].map(c=>c.className.split(' ')[0]);
+      return { e: cls(document.getElementById('upNextE')),
+               w: cls(document.getElementById('upNextW')) };
+    });
+    chk('east reads rank→name→record and west mirrors it',
+        JSON.stringify(order.e)==='["bout__rank","upnext__nm","bout__rec"]' &&
+        JSON.stringify(order.w)==='["bout__rec","upnext__nm","bout__rank"]',
+        JSON.stringify(order));
     await ctx.close();
   }
 
@@ -117,8 +162,8 @@ const read = p => p.evaluate(()=>{
       const seq = playableIdx(); const seen = [];
       playing = true;
       for (const i of seq){ playIdx = i; paintUpNext();
-        const nm=[...document.querySelectorAll('#upNextBody .upnext__nm')].map(e=>e.textContent.replace(/[^A-Za-z]/g,''));
-        seen.push(nm.length ? nm.join('|') : (document.querySelector('#upNextBody .upnext__none')||{}).textContent); }
+        const nm=[...document.querySelectorAll('#upNext .upnext__nm')].map(e=>e.textContent.replace(/[^A-Za-z]/g,''));
+        seen.push(nm.length ? nm.join('|') : (document.querySelector('#upNext .upnext__none')||{}).textContent); }
       return { seq, seen, card: seq.map(i=>card.makuuchi[i][1]+'|'+card.makuuchi[i][5]) };
     });
     /* while on seq[k], the strip must name seq[k+1] */
@@ -136,8 +181,8 @@ const read = p => p.evaluate(()=>{
     const {ctx,p} = await boot(b,{scope:'all'});
     const spoil = await p.evaluate(()=>{
       const b0 = card.makuuchi[0];
-      const txt = document.getElementById('upNextBody').innerText;
-      const recs = [...document.querySelectorAll('#upNextBody .bout__rec')]
+      const txt = document.getElementById('upNext').innerText;
+      const recs = [...document.querySelectorAll('#upNext .bout__rec')]
         .map(e=>e.textContent.split('–').map(Number)).map(([w,l])=>w+l);
       return { kimarite: b0[3] ? txt.includes(b0[3]) : false,
                saysWin: /wins/i.test(txt), maxBouts: Math.max(...recs), day: Number(day) };
@@ -153,9 +198,13 @@ const read = p => p.evaluate(()=>{
   {
     const {ctx,p} = await boot(b,{scope:'mine'});
     const t = await p.evaluate(()=>{ selectTab('juryo'); paintUpNext();
-      return document.getElementById('upNextBody').innerText.replace(/\s+/g,' ').trim(); });
+      return document.getElementById('upNext').innerText.replace(/\s+/g,' ').trim(); });
     chk('an empty division says so rather than showing nothing',
         /None of your seven|Jūryō|Juryo/i.test(t), t.slice(0,70));
+    const caps = await p.evaluate(()=>{
+      const n=document.querySelector('#upNext .upnext__none');
+      return n ? getComputedStyle(n).textTransform : 'missing'; });
+    chk('and is not shouted in the label’s caps', caps==='none', caps);
     await ctx.close();
   }
 
