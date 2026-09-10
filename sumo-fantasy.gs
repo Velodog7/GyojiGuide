@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-10-savename';
+var BACKEND_VERSION = '2026-09-10-draftctl';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -135,7 +135,7 @@ function setup() {
   ensureSheet(ss, SHEET_RESULTS, ['day', 'division', 'east', 'west', 'winner', 'kimarite']);
   var leagues = ensureSheet(ss, SHEET_LEAGUES, ['id', 'name', 'commissioner', 'created', 'inviteCode',
     'mode', 'rosterSize', 'draftStatus', 'draftOrder', 'draftPickIdx', 'draftPhase', 'scoring', 'draftDate', 'draftAgree',
-    'benchSize', 'farmSize', 'pickClock', 'pickDeadline', 'defaultOrder']);
+    'benchSize', 'farmSize', 'pickClock', 'pickDeadline', 'defaultOrder', 'keepMk', 'keepJr', 'draftPaused']);
   migrateLeaguesV2(leagues);   // upgrades an older Leagues sheet (no keeper columns) in place
   ensureSheet(ss, SHEET_MEMBERS, ['leagueId', 'handle', 'joined']);
   ensureSheet(ss, SHEET_MESSAGES, ['id', 'leagueId', 'handle', 'name', 'body', 'parentId', 'created']);
@@ -243,6 +243,16 @@ function migrateLeaguesV2(sh) {
   if (String(head[19] || '').toLowerCase() !== 'keepmk') {
     sh.getRange(1, 20, 1, 2).setValues([['keepMk', 'keepJr']]);
   }
+  ensurePausedHead_(sh);
+}
+/* v7: the commissioner's pause. BLANK = the clock is running (every existing
+   row). A number = the draft is frozen and that many milliseconds were left on
+   the clock when it stopped. Called from setup() and, because running setup()
+   from the editor is unreliable, lazily from the pause/rewind write paths too. */
+function ensurePausedHead_(sh){
+  sh = sh || sh_(SHEET_LEAGUES);
+  var head = sh.getRange(1, 1, 1, Math.max(22, sh.getLastColumn())).getValues()[0];
+  if (String(head[21] || '').toLowerCase() !== 'draftpaused') sh.getRange(1, 22).setValue('draftPaused');
 }
 
 // pre-regionality PageViews sheets had only [ts,page,visitorId]. Append the
@@ -321,6 +331,9 @@ function doPost(e) {
     if (body.action === 'agreeDraftDate') return json(agreeDraftDate(body));
     if (body.action === 'startDraft')    return json(startDraft(body));
     if (body.action === 'makePick')      return json(makePick(body));
+    if (body.action === 'pauseDraft')    return json(pauseDraft(body));
+    if (body.action === 'resumeDraft')   return json(resumeDraft(body));
+    if (body.action === 'rewindDraft')   return json(rewindDraft(body));
     if (body.action === 'proposeTrade')  return json(proposeTrade(body));
     if (body.action === 'respondTrade')  return json(respondTrade(body));
     if (body.action === 'setActive')     return json(setActive(body));
@@ -697,6 +710,10 @@ function unlock_(lock){
   try { SpreadsheetApp.flush(); } catch (e) {}
   try { lock.releaseLock(); } catch (e) {}
 }
+/* Call straight after taking a lock, before the first read that decides
+   anything. Belt and braces: the guard that actually holds is
+   draftRowStale_(), which checks the row against the pick log. */
+function freshen_(){ try { SpreadsheetApp.flush(); } catch (e) {} }
 function newId(prefix){ return prefix + Date.now().toString(36) + Math.floor(Math.random()*1e6).toString(36); }
 function inviteCode(){
   var a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789', s='';
@@ -730,7 +747,9 @@ function leagueRow(id){
     /* null = no keeper limit set = keep everyone (the pre-v6 behaviour).
        Blank and 0 mean different things here, so don't collapse them. */
     keepMk: (v[r][19] === '' || v[r][19] == null) ? null : (Number(v[r][19]) || 0),
-    keepJr: (v[r][20] === '' || v[r][20] == null) ? null : (Number(v[r][20]) || 0)
+    keepJr: (v[r][20] === '' || v[r][20] == null) ? null : (Number(v[r][20]) || 0),
+    /* null = the clock is running. A number = paused, with that many ms left. */
+    draftPaused: (v[r][21] === '' || v[r][21] == null) ? null : Math.max(0, Number(v[r][21]) || 0)
   };
   return null;
 }
@@ -1680,6 +1699,35 @@ function startDraft(body){
   } finally { unlock_(lock); }
 }
 
+/* =====================================================================
+   STALE LEAGUE ROWS
+   ---------------------------------------------------------------------
+   Flushing before releasing the lock (unlock_) was not enough on its own. In
+   the Chanko Boogie draft on 10 Sept a single expired clock was auto-picked
+   FIVE times at pick 22, and three times at pick 27, two seconds apart — one
+   per waiting poll. The pick log was always fresh (each auto-pick skipped the
+   names the previous one took) but the league row was not: every poll read it
+   before waiting for the lock, and the re-read after the lock came back with
+   the same pre-lock values, still showing the old cursor and the old, expired
+   deadline.
+
+   So the pick log is the authority. Picks are numbered 0,1,2… with no gaps,
+   so the next pick index is simply (highest pickIndex + 1). If the row's
+   cursor says anything else, the row is stale and nothing may be written from
+   it. A rewind that deleted picks is caught the same way: the log is then
+   SHORTER than the cursor claims. */
+function nextPickFromLog_(picks){
+  var hi = -1;
+  for (var i = 0; i < picks.length; i++){
+    if (picks[i].phase === 'redraft') continue;     // the supplemental re-draft logs every pick as index 0
+    if (picks[i].pickIndex > hi) hi = picks[i].pickIndex;
+  }
+  return hi + 1;
+}
+function draftRowStale_(L, picks){
+  return nextPickFromLog_(picks) !== Number(L.draftPickIdx || 0);
+}
+
 function draftPicksOf(id){
   var v = sh_(SHEET_PICKS).getDataRange().getValues(), out = [];
   for (var r=1;r<v.length;r++){
@@ -1738,9 +1786,16 @@ function orderFor_(L, handle, phase, boards){
    row as it now stands (re-read if anything was written). */
 function settleDraft_(L){
   if (!L || L.draftStatus !== 'active') return L;
+  if (L.draftPaused != null) return L;           // the commissioner froze the clock
   if (!L.pickDeadline) return L;                 // no clock on this draft
   var boards = draftBoardsOf(L.id);
   var picks = draftPicksOf(L.id);
+  /* The league row may be stale even inside the lock (see draftRowStale_). If
+     the pick log disagrees with it, some other request has already moved the
+     draft on: award nothing, and let the next poll — a fresh execution — settle
+     against the real state. This is what stopped Gyoji taking five wrestlers at
+     pick 22 of the Chanko Boogie draft. */
+  if (draftRowStale_(L, picks)) return L;
   var taken = {};
   picks.forEach(function(p){ taken[String(p.rikishi).toLowerCase()] = 1; });
   var plan = rosterPlan(L);
@@ -1832,7 +1887,7 @@ function draftState(id, who){
   if (L.draftStatus === 'active' && L.pickDeadline && new Date(L.pickDeadline).getTime() <= Date.now()){
     var lock = LockService.getScriptLock();
     if (lock.tryLock(15000)){
-      try { L = settleDraft_(leagueRow(id)); } finally { unlock_(lock); }
+      try { freshen_(); L = settleDraft_(leagueRow(id)); } finally { unlock_(lock); }
     }
   }
   var picks = draftPicksOf(L.id);
@@ -1871,12 +1926,18 @@ function draftState(id, who){
      could be hundreds of posts by the end of a season. */
   var chat = [];
   try { chat = messagesOf(L.id).slice(-40); } catch (e) {}
+  var paused = L.draftStatus === 'active' && L.draftPaused != null;
   return { ok:true, league:{ id:L.id, mode:L.mode, rosterSize:L.rosterSize, benchSize:L.benchSize, farmSize:L.farmSize,
-                             draftStatus:L.draftStatus, draftOrder:L.draftOrder, pickClock:L.pickClock },
+                             draftStatus:L.draftStatus, draftOrder:L.draftOrder, pickClock:L.pickClock,
+                             commissioner:L.commissioner },
+    /* frozen by the commissioner: no clock runs, no pick can be made, and
+       pausedLeft is what the man on the clock will have when it resumes */
+    paused: paused,
+    pausedLeft: paused ? Math.round(L.draftPaused / 1000) : 0,
     picks:picks, turn:turn, pickedNames:picks.map(function(p){ return p.rikishi; }),
     /* the clock, as the client needs to draw it: when this pick expires, how
        long the man on the clock was given, and whether he asked to be auto-drafted */
-    deadline: L.pickDeadline || '',
+    deadline: paused ? '' : (L.pickDeadline || ''),
     clockSeconds: turn.handle ? clockFor_(L, turn.handle, boards) : 0,
     onClockAuto: !!(onClock && onClock.auto),
     members: members,
@@ -1887,20 +1948,25 @@ function draftState(id, who){
 
 function makePick(body){
   var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
-  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
-  if (L.draftStatus !== 'active') return { ok:false, error:'The draft isn\u2019t running.' };
-  if (!isMember(L.id, u.handle)) return { ok:false, error:'You\u2019re not in this league.' };
   var rikishi = String(body.rikishi || '').trim();
   if (!rikishi) return { ok:false, error:'No wrestler given.' };
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
-    // re-read fresh inside the lock — another pick may have landed since the client last polled
-    L = leagueRow(body.id);
+    /* The league is read for the FIRST time here, inside the lock. Reading it
+       before waiting for the lock is what served the stale row that let one
+       member draft several wrestlers on one turn (see draftRowStale_). */
+    freshen_();
+    var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+    if (L.draftStatus !== 'active') return { ok:false, error:'The draft isn\u2019t running.' };
+    if (!isMember(L.id, u.handle)) return { ok:false, error:'You\u2019re not in this league.' };
+    if (L.draftPaused != null) return { ok:false, error:'The commissioner has paused the draft.' };
     /* Settle first: if his clock ran out while the click was in flight, the
        board has already picked for him and this click must not win a turn he
        no longer owns. */
     L = settleDraft_(L);
     if (L.draftStatus !== 'active') return { ok:false, error:'The draft is already complete.' };
+    if (draftRowStale_(L, draftPicksOf(L.id)))
+      return { ok:false, error:'The board just moved \u2014 give it a second and try again.' };
     var turn = draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx);
     if (turn.phase === 'done') return { ok:false, error:'The draft is already complete.' };
     if (!turn.handle || turn.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'It\u2019s not your turn.' };
@@ -1932,6 +1998,158 @@ function makePick(body){
     sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue(nextDeadline);
     return { ok:true, nextTurn:nextTurn, draftStatus:status, deadline:nextDeadline };
   } finally { unlock_(lock); }
+}
+
+/* =====================================================================
+   COMMISSIONER DRAFT CONTROLS — pause, resume, undo / rewind
+   ---------------------------------------------------------------------
+   Ported from the mock draft room. All three are commissioner-only and all
+   three read the league for the first time INSIDE the lock, for the reason
+   given at draftRowStale_.
+
+   Pause freezes the clock: the time left is parked in draftPaused and the
+   deadline is cleared, so settleDraft_ has nothing to expire and makePick
+   refuses. Resume puts exactly that much time back on the clock.
+
+   Rewind deletes every pick from `toPick` onward — and the roster rows those
+   picks created — and puts the cursor back on `toPick`. Undo is a rewind of
+   one. The draft always comes back PAUSED, with a full clock for whoever is
+   now on it: after a rewind the room needs a moment to catch up before anyone
+   is timed out, and the commissioner says when to go again.
+   ===================================================================== */
+function draftCommish_(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase())
+    return { error:'Only the commissioner can run the draft controls.' };
+  if (L.mode !== 'keepers') return { error:'Draft controls are for keepers leagues.' };
+  return { u:u, L:L };
+}
+
+function pauseDraft(body){
+  if (!verifyAuth(body.handle, body.auth)) return { ok:false, error:'Not authorised.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    freshen_();
+    var c = draftCommish_(body); if (c.error) return { ok:false, error:c.error };
+    var L = c.L;
+    if (L.draftStatus !== 'active') return { ok:false, error:'The draft isn\u2019t running.' };
+    if (L.draftPaused != null) return { ok:true, paused:true, left:Math.round(L.draftPaused / 1000) };
+    /* A clock that has already run out is owed its pick — award it before
+       freezing, or pausing would become a way to rescue a missed turn. */
+    L = settleDraft_(L);
+    if (L.draftStatus !== 'active') return { ok:false, error:'The draft has just finished.' };
+    var boards = draftBoardsOf(L.id);
+    var turn = draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx);
+    var full = clockFor_(L, turn.handle, boards) * 1000;
+    var left = L.pickDeadline ? new Date(L.pickDeadline).getTime() - Date.now() : full;
+    left = Math.max(5000, Math.min(full, isNaN(left) ? full : left));   // never resume onto a 0-second clock
+    ensurePausedHead_();
+    sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue('');
+    sh_(SHEET_LEAGUES).getRange(L.row, 22).setValue(left);
+    return { ok:true, paused:true, left:Math.round(left / 1000) };
+  } finally { unlock_(lock); }
+}
+
+function resumeDraft(body){
+  if (!verifyAuth(body.handle, body.auth)) return { ok:false, error:'Not authorised.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    freshen_();
+    var c = draftCommish_(body); if (c.error) return { ok:false, error:c.error };
+    var L = c.L;
+    if (L.draftStatus !== 'active') return { ok:false, error:'The draft isn\u2019t running.' };
+    if (L.draftPaused == null) return { ok:true, paused:false, deadline:L.pickDeadline || '' };
+    var deadline = new Date(Date.now() + Math.max(5000, L.draftPaused)).toISOString();
+    sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue(deadline);
+    sh_(SHEET_LEAGUES).getRange(L.row, 22).setValue('');
+    return { ok:true, paused:false, deadline:deadline };
+  } finally { unlock_(lock); }
+}
+
+/* body.toPick — the 0-based pick index to go back to (that pick and every one
+   after it are removed). Omit it to undo just the most recent pick. */
+function rewindDraft(body){
+  if (!verifyAuth(body.handle, body.auth)) return { ok:false, error:'Not authorised.' };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    freshen_();
+    var c = draftCommish_(body); if (c.error) return { ok:false, error:c.error };
+    var L = c.L;
+    if (L.draftStatus !== 'active' && L.draftStatus !== 'complete')
+      return { ok:false, error:'There\u2019s no draft to rewind.' };
+    var picks = draftPicksOf(L.id).filter(function(p){ return p.phase !== 'redraft'; });
+    if (!picks.length) return { ok:false, error:'Nobody has picked yet.' };
+    var next = nextPickFromLog_(picks);
+    var to = (body.toPick === undefined || body.toPick === null || body.toPick === '')
+      ? next - 1 : Math.floor(Number(body.toPick));
+    if (isNaN(to) || to < 0 || to >= next) return { ok:false, error:'That pick isn\u2019t on the board.' };
+
+    /* A finished draft can be reopened only while its rosters are still exactly
+       what the draft made them. Once a trade, an add/drop or a tournament has
+       happened, taking picks back would unpick those too. */
+    if (L.draftStatus === 'complete'){
+      if (tournamentActive()) return { ok:false, error:'The tournament has started \u2014 the draft can\u2019t be reopened now.' };
+      var keptAny = Object.keys(keepsOf(L.id)).length > 0;
+      if (keptAny || getRedraft_(L.id) || draftPicksOf(L.id).some(function(p){ return p.phase === 'redraft'; }))
+        return { ok:false, error:'This league has already rolled over to a new basho \u2014 its first draft can\u2019t be reopened.' };
+      var tv = sh_(SHEET_TRADES) ? sh_(SHEET_TRADES).getDataRange().getValues() : [];
+      for (var ti = 1; ti < tv.length; ti++) if (String(tv[ti][1]) === String(L.id))
+        return { ok:false, error:'Trades have been made since the draft \u2014 it can\u2019t be reopened.' };
+      var rv0 = sh_(SHEET_ROSTERS).getDataRange().getValues();
+      for (var ri0 = 1; ri0 < rv0.length; ri0++){
+        if (String(rv0[ri0][0]) !== String(L.id)) continue;
+        var via0 = String(rv0[ri0][4] || '').toLowerCase();
+        if (via0 !== 'draft' && via0 !== 'auto')
+          return { ok:false, error:'Rosters have changed since the draft \u2014 it can\u2019t be reopened.' };
+      }
+    }
+
+    var gone = picks.filter(function(p){ return p.pickIndex >= to; });
+    /* the roster rows those picks created: one per (member, wrestler) */
+    var want = {};
+    gone.forEach(function(p){
+      var k = String(p.handle).toLowerCase() + '|' + String(p.rikishi).toLowerCase();
+      want[k] = (want[k] || 0) + 1;
+    });
+    var rs = sh_(SHEET_ROSTERS), rv = rs.getDataRange().getValues(), rosterDel = [];
+    for (var r = rv.length - 1; r >= 1; r--){
+      if (String(rv[r][0]) !== String(L.id)) continue;
+      var via = String(rv[r][4] || '').toLowerCase();
+      if (via !== 'draft' && via !== 'auto') continue;
+      var key = String(rv[r][1]).toLowerCase() + '|' + String(rv[r][2]).toLowerCase();
+      if (want[key]){ want[key]--; rosterDel.push(r + 1); }
+    }
+    var ps = sh_(SHEET_PICKS), pv = ps.getDataRange().getValues(), pickDel = [];
+    for (var q = pv.length - 1; q >= 1; q--)
+      if (String(pv[q][0]) === String(L.id) && String(pv[q][3]) !== 'redraft' && Number(pv[q][1]) >= to) pickDel.push(q + 1);
+    deleteRowList_(rs, rosterDel);
+    deleteRowList_(ps, pickDel);
+
+    var plan = rosterPlan(L), boards = draftBoardsOf(L.id);
+    var turn = draftTurn(L.draftOrder, plan, to);
+    ensurePausedHead_();
+    sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue('active');
+    sh_(SHEET_LEAGUES).getRange(L.row, 10, 1, 2).setValues([[to, turn.phase]]);
+    sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue('');
+    sh_(SHEET_LEAGUES).getRange(L.row, 22).setValue(clockFor_(L, turn.handle, boards) * 1000);
+    return { ok:true, removed:pickDel.length, toPick:to, turn:turn, paused:true,
+             draftStatus:'active' };
+  } finally { unlock_(lock); }
+}
+/* Delete sheet rows by 1-based index, highest first so earlier indexes hold.
+   Runs of adjacent rows go in one deleteRows call — a rewind of a few rounds is
+   dozens of rows, and deleteRow is one round trip each. */
+function deleteRowList_(sh, rows){
+  rows = rows.slice().sort(function(a, b){ return b - a; });
+  var i = 0;
+  while (i < rows.length){
+    var hi = rows[i], lo = hi;
+    while (i + 1 < rows.length && rows[i + 1] === lo - 1){ lo = rows[i + 1]; i++; }
+    if (sh.deleteRows) sh.deleteRows(lo, hi - lo + 1);
+    else for (var d = hi; d >= lo; d--) sh.deleteRow(d);
+    i++;
+  }
 }
 
 function keeperRostersOf(id){

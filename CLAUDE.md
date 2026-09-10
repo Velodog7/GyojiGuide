@@ -57,6 +57,35 @@ function unlock_(lock){
 Flush before release. Doing it after fixes nothing and looks identical in
 review. `tests/backend/draftlock.js` asserts no raw `releaseLock` survives.
 
+### …and don't trust a row you read before the lock
+
+Flushing was not enough. On 10 Sept (Chanko Boogie) one expired clock was
+auto-picked five times, two seconds apart, with `unlock_` already live. Each
+waiting `draftState` poll had read the league row *before* waiting for the
+lock, and its re-read *inside* the lock came back with those same stale values
+(old cursor, old expired deadline) — while the pick log, read for the first
+time inside the lock, was fresh.
+
+- Read the league for the first time **inside** the lock where you can
+  (`makePick`, `pauseDraft`, `resumeDraft`, `rewindDraft` all do).
+- Where you can't (`draftState` needs a pre-read to decide whether to lock),
+  check the row against the pick log: `draftRowStale_(L, picks)`. Picks are
+  numbered with no gaps, so the next index is max `pickIndex` + 1. If the row
+  disagrees, write nothing — the next poll is a fresh execution.
+- `tests/backend/draftctl.js` reproduces the stale read and must stay red
+  against any build without the guard.
+
+### Draft controls
+
+Commissioner-only `pauseDraft` / `resumeDraft` / `rewindDraft` (undo = rewind
+of one). Pause parks the ms left in Leagues col 22 `draftPaused` and blanks the
+deadline; `settleDraft_` and `makePick` both refuse while it is set. A rewind
+deletes picks `>= toPick` plus the roster rows they created, and always leaves
+the draft **paused** with a full clock for whoever is back on it. A finished
+draft can be reopened only before any trade, add/drop, keeper roll-over or
+tournament. The supplemental re-draft logs every pick as index 0 with phase
+`redraft` — the guard and the rewind both skip those rows.
+
 ### Bump `BACKEND_VERSION` with every backend change
 
 `?action=version` returns it. If it doesn't match what you just wrote, the
