@@ -1138,6 +1138,10 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
 
   /* ---------- live leaderboard leader strip ---------- */
   (async function(){
+    /* NOTE: #ggLeader does not exist on this page and never has — this whole
+       block is unreachable. If it is ever wired up, `await GG.ranksReady()`
+       before GG.standings(), or it will score the sanyaku bonus off the stale
+       snapshot bundled in gg-account.js and disagree with the leaderboard. */
     var el=document.getElementById("ggLeader"); if(!el) return;
     try{
       var s=await GG.standings();

@@ -49,6 +49,68 @@
   // The page can hand us the current banzuke (e.g. from its own roster) so
   // the bonus math always matches what players actually drafted.
   GG.setRanks = function (map) { if (map) { RANKS = {}; for (var k in map) RANKS[k] = map[k]; GG.RANKS = RANKS; } };
+
+  /* The sanyaku bonus is computed from RANKS, which ships as a snapshot baked
+     into this file — right on the day it was written, and wrong from the next
+     banzuke onward. fantasy.html has always overridden it with its own live
+     data via setRanks(); index.html and analysis.html never did, so the SAME
+     team scored differently depending on which page you looked at. Going into
+     Aki the snapshot had eight sanyaku wrong (Aonishiki S→O, Fujinokawa M→S,
+     Daieisho and Hakunofuji M→K, and four demotions out of sanyaku), which is
+     more than enough to name a different leader on the homepage strip than the
+     leaderboard itself shows.
+
+     One memoised load, shared by every page that scores: ask GGRoster for the
+     live banzuke and derive the tiers from it. Await it before standings().
+     If sumo-api can't be reached we keep the bundled snapshot and say so in
+     the return value — slightly stale beats blank, but the caller can tell. */
+  function rosterReady() {
+    if (window.GGRoster && GGRoster.load && GGRoster.deriveFromRank) return Promise.resolve(true);
+    if (typeof document === "undefined" || document.readyState !== "loading") {
+      return Promise.resolve(!!(window.GGRoster && GGRoster.load));   // deferred scripts have run
+    }
+    return new Promise(function (res) {
+      document.addEventListener("DOMContentLoaded", function () {
+        res(!!(window.GGRoster && GGRoster.load && GGRoster.deriveFromRank));
+      }, { once: true });
+    });
+  }
+  var ranksPromise = null;
+  GG.ranksReady = function () {
+    if (ranksPromise) return ranksPromise;
+    ranksPromise = (function () {
+      /* gg-roster.js is loaded with `defer`, so it has NOT executed yet when a
+         page's inline script runs — which is exactly when the leader strips
+         ask for their numbers. Giving up here on a missing GGRoster is why the
+         first version of this fix changed nothing at all. Deferred scripts run
+         before DOMContentLoaded, so waiting for that event is enough; if it
+         still isn't there by then, it genuinely isn't on the page. */
+      return rosterReady().then(function (have) {
+        if (!have) return false;
+        return GGRoster.load().then(function (res) {
+        if (!res || !res.ok || !res.ranks) return false;
+        /* GGRoster hands back rows it has already normalised — the tier is
+           computed in fetchBanzuke, so take it rather than re-deriving from a
+           field name that doesn't exist on these rows (it is rankStr, not
+           rank). Re-derive only as a fallback. */
+        var map = {}, n = 0;
+        for (var name in res.ranks) {
+          var row = res.ranks[name] || {};
+          var tier = row.tier;
+          if (!tier && row.rankStr) {
+            var d = GGRoster.deriveFromRank(row.rankStr, row.div === "juryo" ? "Juryo" : "Makuuchi");
+            tier = d && d.tier;
+          }
+          if (tier) { map[name] = tier; n++; }
+        }
+        if (!n) return false;
+        GG.setRanks(map);
+        return true;
+        });
+      }).catch(function () { return false; });
+    })();
+    return ranksPromise;
+  };
   function tierOf(n) { return RANKS[n] || "M"; }
   function levelOf(n) { return LEVEL[tierOf(n)] || 0; }
 

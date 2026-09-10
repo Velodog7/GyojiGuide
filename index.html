@@ -434,6 +434,10 @@
       var hit = JSON.parse(sessionStorage.getItem(CACHE_KEY) || "null");
       if (hit && (Date.now() - hit.at) < CACHE_MS){ live = hit.v; paint(); return; }
     } catch (e) {}
+    /* The bonus math needs the LIVE banzuke, not the snapshot bundled in
+       gg-account.js — otherwise this strip and the leaderboard disagree.
+       After the cache check, so a warm strip still costs nothing. */
+    try { if (GG.ranksReady) await GG.ranksReady(); } catch (e) {}
     try {
       var s = await GG.standings();
       var top = s && s.rows && s.rows[0];
