@@ -105,6 +105,11 @@
   .lm-rank{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.78rem; margin-left:4px }
   .lm-pct{ font-family:"IBM Plex Mono",monospace; color:var(--muted); width:4.5em }
   .lm-h2h{ font-family:"IBM Plex Mono",monospace; font-weight:600; width:7em }
+  /* the word does the work; the percentage qualifies it and the colour only
+     ever agrees with the two of them */
+  .lm-edge{ width:9em; white-space:nowrap }
+  .lm-edge b{ font-weight:600 }
+  .lm-ep{ font-family:"IBM Plex Mono",monospace; font-size:.8rem; color:var(--faint) }
   .lm-up{ color:var(--win) } .lm-down{ color:var(--loss) }
   .lm-even{ color:var(--dim) } .lm-new{ color:var(--faint); font-weight:500 }
   .lm-none{ color:var(--faint) }
@@ -1114,7 +1119,12 @@
     meta('meta[property="og:description"]', "property", desc, "og:description");
     meta('meta[property="og:type"]', "property", "profile", "og:type");
     meta('meta[property="og:url"]', "property", SITE + "/rikishi.html?n=" + encodeURIComponent(r.n), "og:url");
-    meta('meta[property="og:image"]', "property", photo(r.n), "og:image");
+    /* Open Graph image URLs must be absolute — a relative one is silently
+       ignored by every unfurler, which is exactly how a preview ends up with no
+       picture and no error anywhere. canonical and og:url are already absolute;
+       this one was not. */
+    meta('meta[property="og:image"]', "property",
+         new URL(photo(r.n), SITE + "/").href, "og:image");
     meta('meta[name="twitter:card"]', "name", "summary", "twitter:card");
     meta('link[rel="canonical"]', "rel", SITE + "/rikishi.html?n=" + encodeURIComponent(r.n), "canonical");
   }
@@ -1231,6 +1241,87 @@
     return Promise.all(new Array(Math.min(width, jobs.length)).fill(0).map(next));
   }
 
+  /* ── who is favoured ───────────────────────────────────────────────────
+     The head-to-head column answers "have they met, and how did it go". It
+     cannot answer "is this a good day for him", because most of these men have
+     never met at all — the column is mostly "never met", and a blank is not an
+     opinion.
+
+     Rating is the only thing with an opinion about every pairing, so it is the
+     base: the same logistic the simulator's bout model uses, on the same 400
+     scale, so this page and the simulator never disagree about who is better.
+
+         p = 1 / (1 + 10^((theirs − his) / 400))
+
+     Where they HAVE met, the record should move that estimate — but by how
+     much depends entirely on how often. Beating a man once is barely evidence;
+     beating him nine times in twelve is most of what there is to know. So the
+     rating estimate is treated as a prior worth EDGE_PRIOR meetings and the
+     real series is added to it:
+
+         p = (EDGE_PRIOR × p_rating + wins) / (EDGE_PRIOR + wins + losses)
+
+     One meeting nudges the number a little, a long series takes it over. That
+     is a Beta prior centred on the rating, and it is the reason a single fluke
+     upset cannot flip a row from Favoured to Tough.
+
+     EDGE_PRIOR is 6 because 4 and 8 each break at one end. Measured against the
+     cases that actually matter, at the 58/42 thresholds below:
+
+                                        k=4       k=6       k=8
+       evenly rated, he is 1-0 up      60% Fav   57% Even  56% Even
+       higher rated but 3-9 down       38% Tough 42% Tough 45% Even
+       big underdog, 3-0 up            48% Even  39% Tough 34% Tough
+
+     At 4 a single win turns a coin toss into "Favoured", which is exactly the
+     over-reaction the prior exists to prevent. At 8 a 3-9 hiding reads as
+     "Even", which no one watching those twelve bouts would accept. Six is the
+     only one that gets both ends right.
+
+     Both inputs missing means no opinion, and the row says so rather than
+     printing an even 50% it has not earned. A rating alone is never defaulted:
+     the simulator falls back to 2200 for a man with no dossier entry, which is
+     right for running a tournament and wrong here, where it would manufacture
+     a coin toss out of nothing. */
+  var EDGE_PRIOR = 6;                    // the rating estimate is worth this many meetings
+
+  function eloOf(name){
+    var d = find(name) || {};
+    var e = Number(d.elo);
+    return (isFinite(e) && e > 0) ? e : 0;
+  }
+  function edgeOf(meName, oppName, h){
+    var mine = eloOf(meName), his = eloOf(oppName);
+    var met = h && h.total ? h : null;
+    if (!mine || !his){
+      if (!met) return null;             // nothing to go on, and we do not pretend
+      return { p: (EDGE_PRIOR * 0.5 + h.a) / (EDGE_PRIOR + h.a + h.b), basis: "record" };
+    }
+    var p = 1 / (1 + Math.pow(10, (his - mine) / 400));
+    if (!met) return { p: p, basis: "rating" };
+    return { p: (EDGE_PRIOR * p + h.a) / (EDGE_PRIOR + h.a + h.b), basis: "both" };
+  }
+
+  /* Three words, not five. The model is a rating plus a handful of meetings;
+     it can tell a mismatch from a coin toss and should not pretend to finer
+     grain than that. The percentage beside the word carries the intensity, and
+     the word carries the meaning — so colour is never the only tell, and a
+     reader who cannot see the colour loses nothing. */
+  function edgeLabel(p){
+    if (p >= 0.58) return { word:"Favoured", cls:"lm-up" };
+    if (p <= 0.42) return { word:"Tough",    cls:"lm-down" };
+    return { word:"Even", cls:"lm-even" };
+  }
+  function edgeCell(e){
+    if (!e) return '<span class="lm-none">—</span>';
+    var l = edgeLabel(e.p);
+    return '<b class="' + l.cls + '">' + l.word + '</b> <span class="lm-ep">' +
+           Math.round(e.p * 100) + '%</span>';
+  }
+  var EDGE_WHY = { rating:"on current rating alone — they have never met",
+                   record:"on their record alone — no rating for one of them",
+                   both:"on current rating, moved by their record" };
+
   function renderLikely(r){
     var host = document.getElementById("h2hBody");
     if (!host) return;
@@ -1250,11 +1341,13 @@
       host.innerHTML =
         '<p class="lm-note">Projected by the same matchmaking model the simulator uses, over ' +
         TK_RUNS + ' runs of the basho. <b>Seen</b> is how often that pairing came up — day one is ' +
-        'near-certain, later days depend on how everyone is doing.</p>' +
+        'near-certain, later days depend on how everyone is doing. <b>Edge</b> is his estimated ' +
+        'chance of winning that bout, from current rating and adjusted by their head-to-head ' +
+        'where they have one.</p>' +
         '<table class="lm"><thead><tr><th>Day</th><th>Likely opponent</th><th>Seen</th>' +
-        '<th>Head to head</th></tr></thead><tbody>' +
+        '<th>Head to head</th><th>Edge</th></tr></thead><tbody>' +
         rows.map(function(row){
-          if (!row.opp) return '<tr><td>' + row.day + '</td><td colspan="3" class="lm-none">no bout projected</td></tr>';
+          if (!row.opp) return '<tr><td>' + row.day + '</td><td colspan="4" class="lm-none">no bout projected</td></tr>';
           var o = find(row.opp) || {};
           var lv = liveOf(row.opp) || {};
           return '<tr data-opp="' + esc(row.opp) + '"><td>' + row.day + '</td>' +
@@ -1262,7 +1355,10 @@
               esc(String(qs().get("from") || "rikishi")) + '">' + esc(row.opp) + '</a>' +
               (lv.code ? ' <span class="lm-rank">' + esc(lv.code) + '</span>' : '') + '</td>' +
             '<td class="lm-pct">' + row.pct + '%</td>' +
-            '<td class="lm-h2h" data-for="' + esc(row.opp) + '">…</td></tr>';
+            '<td class="lm-h2h" data-for="' + esc(row.opp) + '">…</td>' +
+            '<td class="lm-edge" data-for="' + esc(row.opp) + '" title="' +
+              esc(EDGE_WHY[(edgeOf(r.n, row.opp, null) || {}).basis] || "not enough to say") + '">' +
+              edgeCell(edgeOf(r.n, row.opp, null)) + '</td></tr>';
         }).join("") + '</tbody></table>';
 
       var seen = {};
@@ -1272,6 +1368,7 @@
           seen[row.opp] = 1;
           var oppId = apiId(find(row.opp) || {});
           var cells = host.querySelectorAll('.lm-h2h[data-for="' + CSS.escape(row.opp) + '"]');
+          var edges = host.querySelectorAll('.lm-edge[data-for="' + CSS.escape(row.opp) + '"]');
           if (!oppId){ cells.forEach(function(c){ c.textContent = "—"; }); return Promise.resolve(); }
           return h2hFor(meId, oppId).then(function(h){
             cells.forEach(function(c){
@@ -1282,6 +1379,16 @@
               c.className = "lm-h2h " + cls;
               c.textContent = h.a + "–" + h.b;
             });
+            /* the rating-only estimate is already on screen; fold the series in.
+               Nothing moves for a pair who have never met, which is most of
+               them — so the column does not flicker its way down the table. */
+            if (h && h.total){
+              var e = edgeOf(r.n, row.opp, h);
+              edges.forEach(function(c){
+                c.innerHTML = edgeCell(e);
+                c.title = EDGE_WHY[(e || {}).basis] || "not enough to say";
+              });
+            }
           });
         };
       });

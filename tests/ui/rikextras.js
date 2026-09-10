@@ -5,14 +5,14 @@
    charts pull and used to throw away. So the first thing asserted is the thing
    that would quietly stop being true: that adding them added no requests.
 
-   The arithmetic is checked against a 31-bout fixture small enough to verify by
+   The arithmetic is checked against a 32-bout fixture small enough to verify by
    hand (tests/ui/fixtures/career.js). It is built per opponent, so the rivalry
    totals and the technique totals come from the same rows and cannot drift
    apart in the fixture itself.
 
-   Three things here are deliberate traps for the implementation:
+   Four things here are deliberate traps for the implementation:
 
-   - /stats reports 27 matches and 19–8 while /matches returns 31 rows. The real
+   - /stats reports 27 matches and 19–8 while /matches returns 32 rows. The real
      API disagrees with itself the same way (258 vs 261 for Onosato). Honours must
      print /stats' figures and the technique panel must print its own, and neither
      may add the two together.
@@ -20,6 +20,10 @@
      mae-zumo. Those bouts belong in the technique and rivalry history and must
      NOT reach the career chart. Move the "was he in this bout" filter after the
      "is this basho on the chart" filter and Kirishima disappears from the rivals.
+   - One bout has an empty kimarite. That is not a technique the map has never
+     heard of, it is a real result the Association never published a finish for —
+     mae-zumo never gets one, and nor did Aonishiki's day-16 playoff win over
+     Atamifuji in Nagoya 2026. It counts as a win and belongs in its own row.
    - Every record's `winnerJp` is an <img onerror> tag, which is what that field
      really contains in some responses. If any of it reaches innerHTML the page
      sets window.__XSS and the test says so. */
@@ -280,6 +284,10 @@ const cells = (p, sel) => p.evaluate(s=>[...document.querySelectorAll(s)]
   chk('the tags are replaced, not duplicated', meta.canonN === 1 && meta.descN === 1,
       'canonical '+meta.canonN+' description '+meta.descN);
   chk('an unfurl gets his portrait', /\.(jpg|png|webp|svg)/i.test(meta.ogi||''), meta.ogi);
+  /* and can actually fetch it: a relative og:image is silently ignored by every
+     unfurler, so the preview comes back with no picture and no error */
+  chk('at an absolute URL, or no unfurler will load it',
+      /^https:\/\/sumoslapdown\.com\/\S+/.test(meta.ogi||''), meta.ogi);
   chk('og and the page agree', meta.ogt === meta.title && meta.ogd === meta.desc,
       meta.ogt+' / '+meta.ogd);
 
