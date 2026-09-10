@@ -22,6 +22,25 @@
   a{ color:inherit }
   .wrap{ max-width:1180px; margin:0 auto; padding:18px 16px 60px; width:100% }
 
+  /* ── the analysis subnav, so a profile still reads as part of that page ──
+     A rikishi profile IS the Rikishi tab's content; without the bar it looks
+     like a page that fell out of the site. The current tab is a <span>, not a
+     link — a link to where you already are is a dead end. */
+  nav.tabs{ position:sticky; top:0; z-index:30; background:rgba(14,15,20,.92);
+            -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+            border-bottom:1px solid var(--line) }
+  .tabs-inner{ max-width:1180px; margin:0 auto; padding:0 6px; display:flex }
+  .tab{ flex:1 1 0; position:relative; display:flex; flex-direction:column; align-items:center;
+        justify-content:center; gap:4px; background:none; border:0; border-bottom:2px solid transparent;
+        color:var(--muted); padding:9px 0; cursor:pointer; transition:color .12s;
+        text-decoration:none; font-family:inherit }
+  .tab svg{ width:20px; height:20px; display:block }
+  .tab-lab{ font-size:.85rem; font-weight:600; letter-spacing:.01em; line-height:1.15; text-align:center }
+  .tab:hover{ color:var(--dim) }
+  .tab[aria-selected="true"]{ color:var(--sun); border-bottom-color:var(--red); cursor:default }
+  @media (max-width:640px){ .tab svg{ width:17px; height:17px }
+    .tab-lab{ font-size:.62rem; font-weight:500; line-height:1.1 } }
+
   /* ── profile ───────────────────────────────────────────── */
   .back{ display:inline-flex; align-items:center; gap:6px; color:var(--muted); text-decoration:none;
          font-size:.85rem; margin-bottom:14px }
@@ -124,6 +143,8 @@
 </head>
 <body>
 <script src="gg-mawashi.js"></script><script src="gg-notify.js"></script><script src="gg-auth.js"></script><script src="gg-nav.js"></script>
+
+<nav class="tabs" aria-label="Analysis views"><div class="tabs-inner"><a class="tab" href="analysis.html#browse" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v2H9z"/><line x1="12" y1="10.5" x2="12" y2="16.5"/><line x1="9" y1="13.5" x2="15" y2="13.5"/></svg><span class="tab-lab">Banzuke</span></a><span class="tab" aria-current="page" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="tab-lab">Rikishi</span></span><a class="tab" href="analysis.html#health" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21l8.8-8.3a5 5 0 0 0 0-7.1z"/></svg><span class="tab-lab">Health</span></a><a class="tab" href="analysis.html#compare" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/></svg><span class="tab-lab">Compare</span></a><a class="tab" href="analysis.html#tiers" aria-selected="false"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="4" rx="1.2"/><rect x="4" y="10" width="12" height="4" rx="1.2"/><rect x="4" y="16" width="8" height="4" rx="1.2"/></svg><span class="tab-lab">Tiers</span></a><a class="tab" href="analysis.html#draft" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="tab-lab">Mock Draft</span></a></div></nav>
 
 <div class="wrap">
   <div id="view" aria-live="polite"><p class="empty">Loading the banzuke…</p></div>
