@@ -73,6 +73,23 @@
   .h2h__out b{ color:var(--ink); font-size:1.1rem }
 
   .empty{ color:var(--muted); font-size:.92rem }
+  /* ── likely matchups ───────────────────────────────────── */
+  .lm-note{ margin:0 0 12px; color:var(--muted); font-size:.84rem; line-height:1.5; max-width:70ch }
+  .lm-note b{ color:var(--dim) }
+  .lm{ width:100%; border-collapse:collapse; font-size:.88rem }
+  .lm th, .lm td{ text-align:left; padding:6px 9px; border-bottom:1px solid var(--line) }
+  .lm th{ color:var(--faint); font-weight:500; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em }
+  .lm td{ color:var(--dim) }
+  .lm td:first-child{ font-family:"IBM Plex Mono",monospace; color:var(--faint); width:3.2em }
+  .lm a{ color:var(--ink); text-decoration:none; border-bottom:1px solid transparent }
+  .lm a:hover{ border-bottom-color:var(--gold) }
+  .lm-rank{ color:var(--faint); font-family:"IBM Plex Mono",monospace; font-size:.78rem; margin-left:4px }
+  .lm-pct{ font-family:"IBM Plex Mono",monospace; color:var(--muted); width:4.5em }
+  .lm-h2h{ font-family:"IBM Plex Mono",monospace; font-weight:600; width:7em }
+  .lm-up{ color:var(--win) } .lm-down{ color:var(--loss) }
+  .lm-even{ color:var(--dim) } .lm-new{ color:var(--faint); font-weight:500 }
+  .lm-none{ color:var(--faint) }
+
   /* ── career charts ─────────────────────────────────────── */
   .cc-tools{ display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; align-items:center; margin-bottom:12px }
   .cc-range{ display:flex; gap:6px }
@@ -114,6 +131,7 @@
 
 <script src="gg-dossier.js" defer></script>
 <script src="gg-rikishi.js" defer></script>
+<script src="gg-torikumi.js" defer></script>
 <script src="gg-roster.js" defer></script>
 <script src="taiko-radio.js" defer></script>
 
@@ -315,36 +333,15 @@
     var basho = bashoBlock(r);
     if (basho) html += '<div class="sect"><h3>Recent basho</h3>' + basho + '</div>';
 
-    /* Head-to-head is the one thing here that costs a request, so it is asked
-       for rather than loaded: pick an opponent and it fetches that pair only. */
-    if (apiId(r)) {
-      var opts = all().filter(function(o){ return o.n !== r.n && apiId(o); })
-        .sort(function(a,b){ return sortKey(a) - sortKey(b); })
-        .map(function(o){ return '<option value="' + esc(o.n) + '">' + esc(o.n) + '</option>'; }).join("");
-      html += '<div class="sect"><h3>Head to head</h3><div class="h2h">' +
-        '<select id="h2hSel" aria-label="Opponent"><option value="">Choose an opponent…</option>' + opts + '</select>' +
-        '<span class="h2h__out" id="h2hOut"></span></div></div>';
-    }
-
+    /* The old control asked you to pick an opponent. The useful question is
+       which opponents he is going to GET, so the model answers that instead. */
+    html += '<div class="sect" id="h2hSect"><h3>Likely matchups</h3><div id="h2hBody"></div></div>';
     html += '<div class="sect" id="ccSect"><h3>Career</h3><div id="ccBody"></div></div>';
 
     view.innerHTML = html;
     document.title = r.n + " · Sumo Slapdown";
     renderCareer(r);
-
-    var sel = document.getElementById("h2hSel");
-    if (sel) sel.onchange = function(){
-      var out = document.getElementById("h2hOut");
-      var opp = find(sel.value);
-      if (!opp || !apiId(opp)) { out.textContent = ""; return; }
-      out.textContent = "…";
-      if (!window.GGRoster || !GGRoster.headToHead) { out.textContent = "unavailable"; return; }
-      GGRoster.headToHead(apiId(r), apiId(opp)).then(function(h){
-        if (!h) { out.textContent = "no meetings on record"; return; }
-        out.innerHTML = '<b>' + h.a + '–' + h.b + '</b> to ' + esc(r.n) +
-                        ' <span style="color:var(--faint)">(' + h.total + ' meetings)</span>';
-      }).catch(function(){ out.textContent = "couldn’t reach sumo-api"; });
-    };
+    renderLikely(r);
   }
 
   /* ── career charts ─────────────────────────────────────────────────────
@@ -629,6 +626,176 @@
       var t = null;
       window.addEventListener("resize", function(){ clearTimeout(t); t = setTimeout(paint, 180); });
     });
+  }
+
+  /* ── likely matchups ───────────────────────────────────────────────────
+     Who is he actually going to face? The site already owns a model of that:
+     the matchmaking engine that builds the simulator's card, now shared as
+     gg-torikumi.js. It is fed the live banzuke rather than the simulator's
+     roster, and asked the same question the schedulers answer each morning.
+
+     One run of that model is ONE plausible bracket, not a schedule — after day
+     one the pairings depend on how everybody has been doing, which the model
+     decides with a die. So this runs it many times and reports how often each
+     opponent turns up on each day. A man who appears in most runs is genuinely
+     likely; one who appears in a third is a coin toss, and the page says so
+     rather than presenting either as a fixture. */
+  var TK_RUNS = 25;                       // ~11ms each; the whole sweep is well under half a second
+  var tkEngine = null;
+  function buildEngine(){
+    if (tkEngine !== null) return tkEngine;
+    tkEngine = false;
+    if (!window.GGTorikumi || !LIVE) return tkEngine;
+    var ROSTER = {}, BYDIV = { makuuchi:[], juryo:[] };
+    Object.keys(LIVE).forEach(function(n){
+      var row = LIVE[n] || {}, dos = (GG.rikishi && GG.rikishi(n)) || {};
+      var d = row.div === "juryo" ? "juryo" : "makuuchi";
+      if (!row.code) return;
+      ROSTER[n] = { d:d, code:row.code,
+                    elo: Number(dos.elo) || 2200,
+                    stable: dos.stable || "",
+                    sig: (dos.sig && dos.sig.length) ? dos.sig : ["oshi"] };
+      BYDIV[d].push(n);
+    });
+    if (!BYDIV.makuuchi.length) return tkEngine;
+    tkEngine = GGTorikumi.create({
+      ROSTER: ROSTER, ROSTER_BY_DIV: BYDIV, BASHO_DAYS: 15,
+      RANK_ORDER: { Y:0, O:1, S:2, K:3, M:4, J:5 },
+      REAL_SNAP: {},                       // no announced cards on this page
+      ELO_SCALE: 400, FORM_PTS: 8,
+      onBanzuke: function(n){ return !!ROSTER[n]; },
+      elo: function(n){ return ROSTER[n] ? ROSTER[n].elo : 2200; },
+      pairKey: function(a,b){ return a < b ? a+"|"+b : b+"|"+a; }
+    });
+    return tkEngine;
+  }
+
+  function likelySchedule(name){
+    var tk = buildEngine();
+    if (!tk) return null;
+    var tally = {};                        // day -> { opponent: times seen }
+    for (var s = 0; s < TK_RUNS; s++){
+      var out = tk.runSeason(tk.rng32(9176 + s * 7919), true);
+      for (var d = 1; d <= 15; d++){
+        var day = out.days[String(d)];
+        if (!day) continue;
+        ["makuuchi","juryo"].forEach(function(div){
+          (day[div] || []).forEach(function(bt){
+            var opp = bt[1] === name ? bt[5] : (bt[5] === name ? bt[1] : null);
+            if (!opp) return;
+            (tally[d] = tally[d] || {});
+            tally[d][opp] = (tally[d][opp] || 0) + 1;
+          });
+        });
+      }
+    }
+    /* Taking each day's most frequent opponent INDEPENDENTLY produces a card
+       that repeats men — Fujinokawa on day 7 and again on day 8 — because he
+       can win the vote on two different days across different runs. No such
+       basho exists: nobody meets twice, and the engine itself forbids it. So
+       assign greedily instead, most confident day first, each day taking the
+       likeliest opponent still unclaimed. The result is one coherent card. */
+    var order = [];
+    for (var day = 1; day <= 15; day++){
+      var t = tally[day];
+      if (!t) { order.push({ day:day, dist:null, top:0 }); continue; }
+      var top = 0;
+      Object.keys(t).forEach(function(n){ if (t[n] > top) top = t[n]; });
+      order.push({ day:day, dist:t, top:top });
+    }
+    var taken = {}, byDay = {};
+    order.slice().sort(function(a,b){ return b.top - a.top; }).forEach(function(o){
+      if (!o.dist) return;
+      var pick = null;
+      Object.keys(o.dist).forEach(function(n){
+        if (taken[n]) return;
+        if (!pick || o.dist[n] > o.dist[pick]) pick = n;
+      });
+      if (!pick) return;
+      taken[pick] = 1;
+      byDay[o.day] = { opp:pick, pct: Math.round(o.dist[pick] / TK_RUNS * 100),
+                       spread: Object.keys(o.dist).length };
+    });
+    var rows = [];
+    for (var d2 = 1; d2 <= 15; d2++){
+      var hit = byDay[d2];
+      rows.push(hit ? { day:d2, opp:hit.opp, pct:hit.pct, spread:hit.spread } : { day:d2, opp:null });
+    }
+    return rows;
+  }
+
+  /* One request per distinct opponent, a few at a time. Fifteen parallel
+     fetches at sumo-api is rude and the page has nothing to do with the extra
+     speed — the rows paint as each answer lands. */
+  var h2hCache = {};
+  function h2hFor(meId, oppId){
+    var key = meId + ":" + oppId;
+    if (h2hCache[key]) return h2hCache[key];
+    h2hCache[key] = GGRoster.headToHead(meId, oppId).catch(function(){ return null; });
+    return h2hCache[key];
+  }
+  function inSeries(jobs, width){
+    var i = 0;
+    function next(){ return i >= jobs.length ? Promise.resolve() : jobs[i++]().then(next); }
+    return Promise.all(new Array(Math.min(width, jobs.length)).fill(0).map(next));
+  }
+
+  function renderLikely(r){
+    var host = document.getElementById("h2hBody");
+    if (!host) return;
+    var meId = apiId(r);
+    if (!meId){ host.innerHTML = '<p class="empty">Likely matchups need the live banzuke, which didn’t load.</p>'; return; }
+
+    host.innerHTML = '<p class="empty">Working out who he is likely to meet…</p>';
+    /* the sweep is synchronous and ~300ms, so yield first or the click that
+       opened the profile appears to hang */
+    setTimeout(function(){
+      var rows = likelySchedule(r.n);
+      if (!rows || !rows.some(function(x){ return x.opp; })){
+        host.innerHTML = '<p class="empty">The matchmaking model couldn’t place him on a card.</p>';
+        return;
+      }
+
+      host.innerHTML =
+        '<p class="lm-note">Projected by the same matchmaking model the simulator uses, over ' +
+        TK_RUNS + ' runs of the basho. <b>Seen</b> is how often that pairing came up — day one is ' +
+        'near-certain, later days depend on how everyone is doing.</p>' +
+        '<table class="lm"><thead><tr><th>Day</th><th>Likely opponent</th><th>Seen</th>' +
+        '<th>Head to head</th></tr></thead><tbody>' +
+        rows.map(function(row){
+          if (!row.opp) return '<tr><td>' + row.day + '</td><td colspan="3" class="lm-none">no bout projected</td></tr>';
+          var o = find(row.opp) || {};
+          var lv = liveOf(row.opp) || {};
+          return '<tr data-opp="' + esc(row.opp) + '"><td>' + row.day + '</td>' +
+            '<td><a href="rikishi.html?n=' + encodeURIComponent(row.opp) + '&from=' +
+              esc(String(qs().get("from") || "rikishi")) + '">' + esc(row.opp) + '</a>' +
+              (lv.code ? ' <span class="lm-rank">' + esc(lv.code) + '</span>' : '') + '</td>' +
+            '<td class="lm-pct">' + row.pct + '%</td>' +
+            '<td class="lm-h2h" data-for="' + esc(row.opp) + '">…</td></tr>';
+        }).join("") + '</tbody></table>';
+
+      var seen = {};
+      var jobs = rows.filter(function(x){ return x.opp; }).map(function(row){
+        return function(){
+          if (seen[row.opp]) return Promise.resolve();
+          seen[row.opp] = 1;
+          var oppId = apiId(find(row.opp) || {});
+          var cells = host.querySelectorAll('.lm-h2h[data-for="' + CSS.escape(row.opp) + '"]');
+          if (!oppId){ cells.forEach(function(c){ c.textContent = "—"; }); return Promise.resolve(); }
+          return h2hFor(meId, oppId).then(function(h){
+            cells.forEach(function(c){
+              if (!h || !h.total){ c.textContent = "never met"; c.className = "lm-h2h lm-new"; return; }
+              /* green when he leads the series, red when he trails — the
+                 number is right there too, so colour is never the only tell */
+              var cls = h.a > h.b ? "lm-up" : (h.a < h.b ? "lm-down" : "lm-even");
+              c.className = "lm-h2h " + cls;
+              c.textContent = h.a + "–" + h.b;
+            });
+          });
+        };
+      });
+      inSeries(jobs, 4);
+    }, 30);
   }
 
   /* ---------- router ---------- */

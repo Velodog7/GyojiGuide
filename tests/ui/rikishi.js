@@ -15,8 +15,11 @@ async function open(b, q){
     if(/\/matches$/.test(u))    return j(CAREER.matches);
     if(/ranks=true/.test(u))    return j(CAREER.profile);
     if(/\/matches\//.test(u)) { h2hUrls.push(u);
-      return j({rikishiWins:9, opponentWins:3, total:12,
-                matches:new Array(12).fill({}), kimariteWins:{}, kimariteLosses:{}}); }
+      /* a lead, a deficit, a level series and a first meeting, so the colour
+         rules all get exercised rather than just the green one */
+      const pat=[[9,3],[1,5],[3,3],[0,0]][h2hUrls.length%4];
+      return j({rikishiWins:pat[0], opponentWins:pat[1], total:pat[0]+pat[1],
+                matches:new Array(pat[0]+pat[1]).fill({}), kimariteWins:{}, kimariteLosses:{}}); }
     return j({});
   });
   await p.route('**script.google.com/**', r=>r.fulfill({contentType:'application/json',
@@ -39,7 +42,7 @@ async function open(b, q){
       basho: document.querySelectorAll('.basho').length,
       prose: document.querySelectorAll('.prose').length,
       title: document.title,
-      h2h: !!document.getElementById('h2hSel'),
+      h2h: !!document.getElementById('h2hBody'),
       lastLabels: [...document.querySelectorAll('.basho i')].filter(e=>/^last basho$/i.test(e.textContent)).length,
       firstBasho: (document.querySelector('.basho b')||{}).textContent,
       heroRec: ((document.querySelector('.hero__rank')||{}).textContent||'').split('· ')[1]?.replace(/ (this|last) basho/,'')
@@ -56,30 +59,50 @@ async function open(b, q){
         'hero '+r.heroRec+' vs history '+r.firstBasho);
     chk('the written form/injury notes appear', r.prose>=1, r.prose+' paragraphs');
     chk('the tab title is his name', /Hoshoryu/.test(r.title), r.title);
-    chk('head-to-head is offered', r.h2h);
+    chk('the likely-matchups section is present', r.h2h);
     chk('no page errors', errs.length===0, errs[0]||'');
     await ctx.close(); }
 
-  { const {ctx,p,h2hUrls} = await open(b, '?n=Hoshoryu');
-    await p.selectOption('#h2hSel','Onosato');
-    await p.waitForTimeout(1500);
-    const out = await p.textContent('#h2hOut');
-    chk('head-to-head resolves on demand', /9.3/.test(out||''), out);
-
-    /* The bug this exists for: the dossier's `pid` is the NSK PHOTO id, and
-       sumo-api answers it with HTTP 200 and every count zero — so the page
-       reported "no meetings on record" for every pair and nothing errored.
-       Asserting the response is not enough; assert which id went on the wire. */
-    const url = h2hUrls[h2hUrls.length-1] || '';
-    const pids = await p.evaluate(()=>{
-      const g = n => (GyojiGuide.rikishi(n)||{});
-      return { hosho: String(g('Hoshoryu').pid||''), onosato: String(g('Onosato').pid||'') };
+  /* ---- likely matchups ----
+     The model projects a CARD, so the assertions are about it being a card:
+     fifteen days, fifteen different men. Picking each day's most frequent
+     opponent independently produced repeats (Fujinokawa on 7 and again on 8),
+     which is a basho that cannot happen — nobody meets twice. */
+  { const {ctx,p,h2hUrls,errs} = await open(b, '?n=Hoshoryu');
+    await p.waitForTimeout(2500);
+    const r = await p.evaluate(()=>{
+      const rows=[...document.querySelectorAll('.lm tbody tr')];
+      return { n:rows.length,
+        days:rows.map(t=>t.children[0].textContent.trim()),
+        opps:rows.map(t=>(t.querySelector('a')||{}).textContent||null),
+        pcts:rows.map(t=>parseInt((t.querySelector('.lm-pct')||{}).textContent)||0),
+        classes:rows.map(t=>((t.querySelector('.lm-h2h')||{}).className||'').replace('lm-h2h ','')),
+        cells:rows.map(t=>((t.querySelector('.lm-h2h')||{}).textContent||'')) };
     });
-    chk('it asks sumo-api using the banzuke rikishi id',
-        /\/rikishi\/\d+\/matches\/\d+/.test(url), url);
-    chk('and never the dossier photo id',
-        !!url && url.indexOf(pids.hosho) < 0 && url.indexOf(pids.onosato) < 0,
-        'photo ids ' + JSON.stringify(pids) + ' in ' + url);
+    chk('all fifteen days are projected', r.n===15 && r.days[0]==='1' && r.days[14]==='15',
+        r.n+' rows');
+    const named = r.opps.filter(Boolean);
+    chk('every day names an opponent', named.length===15, named.length+' named');
+    chk('and nobody is met twice', new Set(named).size===15,
+        JSON.stringify(named.filter((v,i,a)=>a.indexOf(v)!==i)));
+    chk('day one is near-certain, later days less so', r.pcts[0] >= r.pcts[8],
+        'day1 '+r.pcts[0]+'% vs day9 '+r.pcts[8]+'%');
+
+    /* colour has to follow the record, and the record is written out too */
+    const pairs = r.cells.map((c,i)=>[c, r.classes[i]]);
+    const bad = pairs.filter(([c,cls])=>{
+      const m = c.match(/^(\d+)–(\d+)$/);
+      if (!m) return cls!=='lm-new';
+      const a=+m[1], b=+m[2];
+      return cls !== (a>b?'lm-up':a<b?'lm-down':'lm-even');
+    });
+    chk('a winning record is green, a losing one red', bad.length===0, JSON.stringify(bad.slice(0,3)));
+    chk('and the numbers are shown, so colour is never the only tell',
+        r.cells.every(c=>/^(\d+–\d+|never met|—)$/.test(c)), JSON.stringify(r.cells.slice(0,4)));
+
+    chk('one head-to-head request per opponent, not per day',
+        h2hUrls.length===15, h2hUrls.length+' requests for 15 distinct men');
+    chk('no page errors', errs.length===0, errs[0]||'');
     await ctx.close(); }
 
   { const {ctx,p,errs} = await open(b, '?n=NotARealMan');
@@ -191,11 +214,11 @@ async function open(b, q){
     await p.waitForTimeout(3500);
     const r = await p.evaluate(()=>({
       name:(document.querySelector('.hero__name')||{}).textContent,
-      h2h:!!document.getElementById('h2hSel'),
+      h2h:!!document.querySelector('.lm'),
       stats:document.querySelectorAll('.stat').length }));
     chk('with sumo-api down the profile still renders', r.name==='Hoshoryu' && r.stats>=5,
         r.name+' / '+r.stats+' stats');
-    chk('and head-to-head is withheld rather than shown broken', r.h2h===false, 'offered anyway');
+    chk('and the projected card is withheld rather than shown broken', r.h2h===false, 'a table was drawn anyway');
     chk('no page errors with the API down', errs.length===0, errs[0]||'');
     await ctx.close(); }
 
