@@ -99,6 +99,31 @@
   .h2h__out b{ color:var(--ink); font-size:1.1rem }
 
   .empty{ color:var(--muted); font-size:.92rem }
+  /* ── career charts ─────────────────────────────────────── */
+  .cc-tools{ display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; align-items:center; margin-bottom:12px }
+  .cc-range{ display:flex; gap:6px }
+  .cc-range button, .cc-tbtn{ background:var(--surface); border:1px solid var(--line); color:var(--muted);
+    border-radius:8px; padding:6px 11px; font:inherit; font-size:.8rem; cursor:pointer }
+  .cc-range button:hover, .cc-tbtn:hover{ border-color:var(--dim); color:var(--ink) }
+  .cc-range button.on{ background:var(--surface2); border-color:var(--gold); color:var(--gold) }
+  .cc-panel{ margin-bottom:10px }
+  .cc-panel h4{ margin:0 0 3px; font-size:.8rem; font-weight:600; color:var(--dim);
+    display:flex; justify-content:space-between; gap:10px; align-items:baseline }
+  .cc-panel h4 span{ color:var(--faint); font-size:.72rem; font-family:"IBM Plex Mono",monospace; font-weight:500 }
+  .cc-svg{ display:block; width:100%; height:auto; overflow:visible }
+  .cc-cap{ margin:3px 0 0; color:var(--faint); font-size:.72rem }
+  .cc-hint{ margin-top:8px; min-height:1.3em; color:var(--muted); font-size:.82rem;
+    font-family:"IBM Plex Mono",monospace }
+  .cc-hint b{ color:var(--ink) }
+  .cc-out{ color:var(--loss) }
+  .cc-table{ width:100%; border-collapse:collapse; margin-top:14px; font-size:.82rem;
+    font-family:"IBM Plex Mono",monospace }
+  .cc-table th, .cc-table td{ text-align:left; padding:5px 8px; border-bottom:1px solid var(--line) }
+  .cc-table th{ color:var(--faint); font-weight:500; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em }
+  .cc-table td{ color:var(--dim) }
+  .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0 0 0 0); white-space:nowrap; border:0 }
+
   @media (max-width:560px){
     .hero{ grid-template-columns:96px minmax(0,1fr); gap:13px }
     .hero__img{ max-width:96px }
@@ -326,7 +351,15 @@
     var lv = liveOf(r.n);
     if (!onBanzuke(r)) out.push('<span class="chip alert">Not on the current banzuke</span>');
     if (r.lk) out.push('<span class="chip alert">Kyūjō</span>');
-    if (r.lv === "out") out.push('<span class="chip alert">Out</span>');
+    /* `lv` carries four levels and is not decoration — projWins() reads it,
+       zeroing an "out" and docking 1.7 / 0.7 / 0.2 wins for high / mid / iron.
+       Only "out" was being rendered, so three quarters of the site's own
+       health judgement never reached the page it belongs on. */
+    var RISK = { out:  ["alert", "Out — expected to miss the basho"],
+                 high: ["alert", "High injury risk"],
+                 mid:  ["",      "Some injury risk"],
+                 iron: ["gold",  "Iron man — no days missed in six basho"] };
+    if (RISK[r.lv]) out.push('<span class="chip ' + RISK[r.lv][0] + '">' + esc(RISK[r.lv][1]) + '</span>');
     if (r.chg && r.chg.t && r.chg.d && r.chg.d !== "same")
       out.push('<span class="chip ' + (r.chg.d === "up" ? "up" : "down") + '">' + esc(r.chg.t) + '</span>');
     if (r.stable) out.push('<span class="chip">' + esc(r.stable) + ' stable</span>');
@@ -376,8 +409,11 @@
         '<span class="h2h__out" id="h2hOut"></span></div></div>';
     }
 
+    html += '<div class="sect" id="ccSect"><h3>Career</h3><div id="ccBody"></div></div>';
+
     view.innerHTML = html;
     document.title = r.n + " · Sumo Slapdown";
+    renderCareer(r);
 
     var sel = document.getElementById("h2hSel");
     if (sel) sel.onchange = function(){
@@ -392,6 +428,290 @@
                         ' <span style="color:var(--faint)">(' + h.total + ' meetings)</span>';
       }).catch(function(){ out.textContent = "couldn’t reach sumo-api"; });
     };
+  }
+
+  /* ── career charts ─────────────────────────────────────────────────────
+     Three questions, three panels, one shared basho axis: where he ranked,
+     how he scored, and how much he missed.
+
+     Two requests build all of it. rankHistory gives one row per basho with a
+     numeric rankValue that runs INVERTED — 101 Yokozuna, 201 Ozeki, 517
+     Maegashira 17, 1019 Jonokuchi — so it is really banzuke position, with a
+     division boundary every 100. The matches list gives every bout he ever
+     fought; grouping it by bashoId yields his record, and the shortfall
+     against a full card yields his absences (verified: 202605 comes back 0-2
+     with 13 absent, matching the dossier's "0-2-13").
+
+     One hue per panel and no green/red pair anywhere. Wins are a magnitude,
+     so they get a single colour and the kachi-koshi line does the work of
+     saying which basho were winning ones — colour is never the only channel,
+     and the worst pair for colour-blind readers never appears. */
+  var DIV_NAME = { 1:"Yokozuna", 2:"Ōzeki", 3:"Sekiwake", 4:"Komusubi", 5:"Maegashira",
+                   6:"Jūryō", 7:"Makushita", 8:"Sandanme", 9:"Jonidan", 10:"Jonokuchi" };
+  var DIV_SHORT = { 1:"Y", 2:"Ō", 3:"S", 4:"K", 5:"M", 6:"J", 7:"Ms", 8:"Sd", 9:"Jd", 10:"Jk" };
+  var BASHO_NAME = { "01":"Hatsu", "03":"Haru", "05":"Natsu", "07":"Nagoya", "09":"Aki", "11":"Kyūshū" };
+
+  function bashoLabel(id){
+    var y = String(id).slice(0,4), m = String(id).slice(4,6);
+    return (BASHO_NAME[m] || m) + " " + y;
+  }
+  function bashoShort(id){ return String(id).slice(2,4) + "’" + String(id).slice(0,2).slice(-2); }
+
+  var careerCache = {};
+  function fetchCareer(id){
+    if (careerCache[id]) return careerCache[id];
+    var base = "https://sumo-api.com/api/rikishi/" + encodeURIComponent(id);
+    careerCache[id] = Promise.all([
+      fetch(base + "?ranks=true").then(function(r){ return r.ok ? r.json() : null; }),
+      fetch(base + "/matches").then(function(r){ return r.ok ? r.json() : null; })
+    ]).then(function(pair){
+      var prof = pair[0] || {}, mat = pair[1] || {};
+      var rows = {};
+
+      (prof.rankHistory || []).forEach(function(h){
+        /* Mae-zumo (2000) and Banzuke-gai (3000) are not banzuke positions;
+           plotting them squashes the entire real career into the top inch. */
+        if (!h || Number(h.rankValue) >= 2000) return;
+        rows[h.bashoId] = { bashoId:h.bashoId, rankValue:Number(h.rankValue),
+                            rank:h.rank, w:0, l:0, bouts:0, division:"" };
+      });
+
+      /* Establish he was actually IN the bout before scoring it. Testing only
+         `winnerId === id` treats every unrecognised row as a loss, so if the
+         id were ever wrong the page would report a full career at 0% rather
+         than showing nothing — a silent wrong answer of exactly the kind the
+         head-to-head `pid` mixup already produced once. Not in the bout at
+         all → skip it, and the panels come back empty and obviously so. */
+      var me = String(id), seen = 0;
+      (mat.records || []).forEach(function(m){
+        var row = rows[m.bashoId];
+        if (!row) return;                       // a basho with no banzuke row
+        var isEast = String(m.eastId) === me, isWest = String(m.westId) === me;
+        if (!isEast && !isWest) return;
+        seen++;
+        row.bouts++;
+        row.division = row.division || m.division || "";
+        if (String(m.winnerId) === me) row.w++; else row.l++;
+      });
+      if (!seen) return [];                      // the id matched nothing
+
+      var out = Object.keys(rows).sort().map(function(k){ return rows[k]; });
+      out.forEach(function(row){
+        /* the salaried divisions fight fifteen; everyone below fights seven */
+        var div = Math.floor(row.rankValue / 100);
+        row.full = (div <= 6) ? 15 : 7;
+        row.absent = Math.max(0, row.full - row.bouts);
+        row.label = bashoLabel(row.bashoId);
+      });
+      return out;
+    }).catch(function(){ return null; });
+    return careerCache[id];
+  }
+
+  /* ---------- drawing ---------- */
+  var CC = { gold:"#d8b25a", loss:"#e2574c", grid:"#2a2e3a", ink:"#a7adbe", faint:"#6b7180" };
+
+  function svgEl(w, h, cls, label){
+    return '<svg class="' + cls + '" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h +
+           '" role="img" aria-label="' + esc(label) + '">';
+  }
+
+  function panelRank(series, w, h, pad){
+    var vals = series.map(function(d){ return d.rankValue; });
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    /* pad the domain out to whole divisions so the bands read as bands */
+    lo = Math.floor(lo / 100) * 100; hi = Math.ceil(hi / 100) * 100;
+    if (hi === lo) hi = lo + 100;
+    var iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+    /* Band centres, matching the bar panels exactly — these are small
+       multiples over one shared axis, so index i must land on the same x in
+       all three or the crosshair reads one basho and points at another. */
+    var step = iw / series.length;
+    var x = function(i){ return pad.l + i*step + step/2; };
+    var y = function(v){ return pad.t + (v - lo) / (hi - lo) * ih; };   // inverted by construction
+
+    var s = svgEl(w, h, "cc-svg", "Rank by basho");
+    /* Pointer events land on painted children only, so the empty space above
+       the marks is deaf without a capture layer. fill="transparent" is paint
+       with zero alpha — fill="none" is not and would not receive anything. */
+    s += '<rect class="cc-hit" x="'+pad.l+'" y="0" width="'+iw+'" height="'+h+'" fill="transparent"/>';
+
+    /* division bands, alternating, labelled at the left */
+    for (var b = Math.floor(lo/100); b < Math.ceil(hi/100); b++){
+      var y0 = y(b*100), y1 = y((b+1)*100);
+      if (b % 2 === 1) s += '<rect x="'+pad.l+'" y="'+y0.toFixed(1)+'" width="'+iw+'" height="'+(y1-y0).toFixed(1)+'" fill="#ffffff" opacity=".025"/>';
+      s += '<line x1="'+pad.l+'" x2="'+(pad.l+iw)+'" y1="'+y0.toFixed(1)+'" y2="'+y0.toFixed(1)+'" stroke="'+CC.grid+'" stroke-width="1"/>';
+      if (y1 - y0 > 13)
+        s += '<text x="'+(pad.l-6)+'" y="'+((y0+y1)/2+3.5).toFixed(1)+'" text-anchor="end" font-size="9.5" fill="'+CC.faint+'">'+
+             esc(DIV_SHORT[b] || "")+'</text>';
+    }
+
+    /* A real step: a rank is held for the whole basho and then jumps. Drawing
+       a diagonal between two basho would show him gliding through ranks he
+       never held. */
+    var d = "", half = step/2;
+    series.forEach(function(pt, i){
+      var py = y(pt.rankValue), l = x(i) - half, rgt = x(i) + half;
+      d += (i === 0 ? "M" : "L") + l.toFixed(1) + " " + py.toFixed(1);
+      d += "L" + rgt.toFixed(1) + " " + py.toFixed(1);
+      if (i < series.length - 1) d += "L" + rgt.toFixed(1) + " " + y(series[i+1].rankValue).toFixed(1);
+    });
+    s += '<path d="'+d+'" fill="none" stroke="'+CC.gold+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+
+    /* label only the extreme and the endpoint, never every point */
+    var bestI = 0;
+    series.forEach(function(pt,i){ if (pt.rankValue < series[bestI].rankValue) bestI = i; });
+    var last = series.length - 1;
+    [[bestI,"best"],[last,"now"]].forEach(function(pair){
+      var i = pair[0], pt = series[i];
+      s += '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(pt.rankValue).toFixed(1)+'" r="3.4" fill="'+CC.gold+'" stroke="#181a22" stroke-width="2"/>';
+    });
+    /* The best rank is usually the top of the plot, so a label placed above it
+       escapes the SVG (overflow is visible) and lands on the panel heading.
+       Flip it under the point when there is no room over it. */
+    var bp = series[bestI], by = y(bp.rankValue);
+    var above = by - pad.t > 14;
+    s += '<text x="'+Math.min(x(bestI)+7, w-pad.r-4)+'" y="'+(above ? by-7 : by+13).toFixed(1)+
+         '" font-size="10" fill="'+CC.ink+'" text-anchor="'+(bestI > series.length*0.7 ? "end" : "start")+'">'+
+         esc(bp.rank)+'</text>';
+    return s + '</svg>';
+  }
+
+  function panelBars(series, w, h, pad, key, colour, maxOverride, threshold, label){
+    var iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+    var max = maxOverride || Math.max(1, Math.max.apply(null, series.map(function(d){ return d[key]; })));
+    var step = iw / series.length;
+    var bw = Math.max(1.5, Math.min(18, step - 2));           // a 2px gap between bars
+    var y = function(v){ return pad.t + ih - (v / max) * ih; };
+    var s = svgEl(w, h, "cc-svg", label);
+    /* Pointer events land on painted children only, so the empty space above
+       the marks is deaf without a capture layer. fill="transparent" is paint
+       with zero alpha — fill="none" is not and would not receive anything. */
+    s += '<rect class="cc-hit" x="'+pad.l+'" y="0" width="'+iw+'" height="'+h+'" fill="transparent"/>';
+
+    /* Tick the threshold itself rather than a meaningless midpoint — the
+       reader wants to know where 8 is, not where 7.5 is. */
+    var ticks = threshold ? [0, threshold, max] : [0, max/2, max];
+    ticks.forEach(function(v){
+      s += '<line x1="'+pad.l+'" x2="'+(pad.l+iw)+'" y1="'+y(v).toFixed(1)+'" y2="'+y(v).toFixed(1)+'" stroke="'+CC.grid+'" stroke-width="1"/>';
+      s += '<text x="'+(pad.l-6)+'" y="'+(y(v)+3.5).toFixed(1)+'" text-anchor="end" font-size="9.5" fill="'+CC.faint+'">'+v+'</text>';
+    });
+
+    series.forEach(function(d, i){
+      var v = d[key]; if (!v) return;
+      var bx = pad.l + i*step + (step - bw)/2, by = y(v), bh = pad.t + ih - by;
+      var r = Math.min(3, bw/2);
+      s += '<rect x="'+bx.toFixed(1)+'" y="'+by.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+bh.toFixed(1)+
+           '" rx="'+r.toFixed(1)+'" fill="'+colour+'" opacity="'+(threshold && v < threshold ? ".6" : "1")+'"/>';
+    });
+
+    /* The threshold is a threshold, so it is the one dashed line here. Its
+       label lives in the caption, not floating in the plot — at phone width
+       the bars reach both edges and any in-plot label lands on top of one. */
+    if (threshold){
+      s += '<line x1="'+pad.l+'" x2="'+(pad.l+iw)+'" y1="'+y(threshold).toFixed(1)+'" y2="'+y(threshold).toFixed(1)+
+           '" stroke="'+CC.gold+'" stroke-width="1.5" stroke-dasharray="4 3" opacity=".85"/>';
+    }
+    return s + '</svg>';
+  }
+
+  function xAxis(series, w, pad){
+    var iw = w - pad.l - pad.r, step = iw / series.length;
+    var s = svgEl(w, 18, "cc-svg cc-axis", "Basho");
+    var every = Math.max(1, Math.ceil(series.length / 8));
+    series.forEach(function(d, i){
+      if (i % every) return;
+      var cx = pad.l + i*step + step/2;
+      var MON = { "01":"Jan", "03":"Mar", "05":"May", "07":"Jul", "09":"Sep", "11":"Nov" };
+      var bid = String(d.bashoId);
+      s += '<text x="'+cx.toFixed(1)+'" y="12" text-anchor="middle" font-size="9.5" fill="'+CC.faint+'">'+
+           esc((MON[bid.slice(4,6)] || bid.slice(4,6)) + " " + bid.slice(2,4))+'</text>';
+    });
+    return s + '</svg>';
+  }
+
+  function careerTable(series){
+    var rows = series.slice().reverse().map(function(d){
+      return '<tr><td>'+esc(d.label)+'</td><td>'+esc(d.rank||"")+'</td><td>'+d.w+'–'+d.l+
+             (d.absent ? '–'+d.absent : '')+'</td><td>'+d.absent+'</td></tr>';
+    }).join("");
+    return '<table class="cc-table"><caption class="sr-only">Rank, record and days absent by basho</caption>' +
+      '<thead><tr><th>Basho</th><th>Rank</th><th>Record</th><th>Absent</th></tr></thead><tbody>' +
+      rows + '</tbody></table>';
+  }
+
+  function renderCareer(r){
+    var host = document.getElementById("ccBody");
+    if (!host) return;
+    var id = apiId(r);
+    if (!id){ host.innerHTML = '<p class="empty">Career history needs the live banzuke, which didn’t load.</p>'; return; }
+
+    host.innerHTML = '<p class="empty">Reading his career…</p>';
+    fetchCareer(id).then(function(series){
+      if (!series || !series.length){
+        host.innerHTML = '<p class="empty">No career history came back for him.</p>'; return;
+      }
+      var state = { n: 24, table: false };
+
+      function paint(){
+        var win = state.n ? series.slice(-state.n) : series;
+        var w = Math.max(280, host.clientWidth || 640);
+        var padL = 30, pad = { l:padL, r:10, t:8, b:6 };
+
+        var careerW = series.reduce(function(a,d){ return a + d.w; }, 0);
+        var careerL = series.reduce(function(a,d){ return a + d.l; }, 0);
+        var pct = (careerW + careerL) ? Math.round(careerW/(careerW+careerL)*100) : 0;
+
+        host.innerHTML =
+          '<div class="cc-tools">' +
+            '<div class="cc-range" role="group" aria-label="How far back">' +
+              [[12,"12 basho"],[24,"24 basho"],[0,"Career"]].map(function(o){
+                return '<button type="button" data-n="'+o[0]+'"'+(state.n===o[0]?' class="on" aria-pressed="true"':' aria-pressed="false"')+'>'+o[1]+'</button>';
+              }).join("") +
+            '</div>' +
+            '<button type="button" class="cc-tbtn" id="ccToggle" aria-pressed="'+(state.table?'true':'false')+'">'+
+              (state.table ? "Hide table" : "Show table")+'</button>' +
+          '</div>' +
+
+          '<div class="cc-panel"><h4>Rank<span>'+esc(win[0].label)+' → '+esc(win[win.length-1].label)+'</span></h4>' +
+            panelRank(win, w, 128, pad) + '</div>' +
+          '<div class="cc-panel"><h4>Wins per basho<span>career '+careerW+'–'+careerL+' · '+pct+'%</span></h4>' +
+            panelBars(win, w, 88, pad, "w", CC.gold, 15, 8, "Wins by basho") +
+            '<p class="cc-cap">Dashed line: 8 wins — kachi-koshi. Dimmed bars are losing records.</p></div>' +
+          '<div class="cc-panel"><h4>Days absent<span>'+series.reduce(function(a,d){return a+d.absent;},0)+' career days missed</span></h4>' +
+            panelBars(win, w, 66, pad, "absent", CC.loss, 15, 0, "Days absent by basho") + '</div>' +
+          xAxis(win, w, pad) +
+          '<div class="cc-hint" id="ccHint">Hover a basho for the detail.</div>' +
+          (state.table ? careerTable(win) : "");
+
+        host.querySelectorAll(".cc-range button").forEach(function(btn){
+          btn.onclick = function(){ state.n = Number(btn.dataset.n); paint(); };
+        });
+        var tg = document.getElementById("ccToggle");
+        if (tg) tg.onclick = function(){ state.table = !state.table; paint(); };
+
+        /* one crosshair for all three panels — they share an x, so a single
+           readout beats three separate tooltips */
+        var hint = document.getElementById("ccHint");
+        var iw = w - pad.l - pad.r, step = iw / win.length;
+        host.querySelectorAll(".cc-svg").forEach(function(sv){
+          sv.addEventListener("mousemove", function(ev){
+            var box = sv.getBoundingClientRect();
+            var i = Math.floor(((ev.clientX - box.left) * (w / box.width) - pad.l) / step);
+            if (i < 0 || i >= win.length) return;
+            var d = win[i];
+            hint.innerHTML = '<b>'+esc(d.label)+'</b> · '+esc(d.rank||"")+' · '+
+              d.w+'–'+d.l+(d.absent ? '–'+d.absent : '')+
+              (d.absent ? ' · <span class="cc-out">'+d.absent+' absent</span>' : '');
+          });
+          sv.addEventListener("mouseleave", function(){ hint.textContent = "Hover a basho for the detail."; });
+        });
+      }
+
+      paint();
+      var t = null;
+      window.addEventListener("resize", function(){ clearTimeout(t); t = setTimeout(paint, 180); });
+    });
   }
 
   /* ---------- router ---------- */
