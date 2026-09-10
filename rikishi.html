@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rikishi · Sumo Slapdown</title>
+<meta name="description" content="Every sekitori on the current banzuke — rank, record, form, injuries, career figures and head-to-head.">
+<link rel="preload" as="script" href="gg-nav.js">
+<link rel="preload" as="script" href="gg-auth.js">
+<link rel="preload" as="image" href="SumoSlapdown-logowide.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@700;900&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#000; --ink:#f1f2f6; --muted:#878da0; --gold:#d8b25a;
+         --sun:#d8b25a; --red:#e23b2e; --line:#2a2e3a; --dim:#a7adbe; --faint:#6b7180;
+         --surface:#181a22; --surface2:#20232d; --win:#5bbf7a; --loss:#e2574c; }
+  *{ box-sizing:border-box }
+  html,body{ margin:0 }
+  body{ background:var(--bg); color:var(--ink); font-family:"Space Grotesk",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased; min-height:100vh; display:flex; flex-direction:column }
+  a{ color:inherit }
+  .wrap{ max-width:1180px; margin:0 auto; padding:18px 16px 60px; width:100% }
+
+  /* ── directory ─────────────────────────────────────────── */
+  .dir-head{ display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; justify-content:space-between; margin:6px 0 18px }
+  .dir-head h1{ font-family:"Zen Kaku Gothic New",system-ui,sans-serif; font-weight:900;
+                font-size:clamp(1.4rem,3.4vw,2rem); margin:0; letter-spacing:.01em }
+  .dir-head p{ margin:4px 0 0; color:var(--muted); font-size:.9rem }
+  .find{ position:relative; flex:0 1 300px; min-width:0 }
+  .find input{ width:100%; background:var(--surface); border:1px solid var(--line); color:var(--ink);
+               border-radius:9px; padding:9px 11px; font:inherit; font-size:.92rem }
+  .find input:focus{ outline:0; border-color:var(--gold) }
+
+  .band{ margin:22px 0 10px; display:flex; align-items:baseline; gap:10px }
+  .band h2{ font-family:"Zen Kaku Gothic New",system-ui,sans-serif; font-size:1.02rem; margin:0; color:var(--gold); letter-spacing:.02em }
+  .band span{ color:var(--faint); font-size:.78rem; font-family:"IBM Plex Mono",monospace }
+  .grid{ display:grid; gap:10px; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)) }
+
+  .rk{ display:flex; gap:10px; align-items:center; text-decoration:none; background:var(--surface);
+       border:1px solid var(--line); border-radius:11px; padding:9px 10px; transition:border-color .12s, background .12s }
+  .rk:hover{ border-color:var(--gold); background:var(--surface2) }
+  .rk__img{ width:44px; height:44px; border-radius:8px; object-fit:cover; object-position:top center;
+            background:var(--surface2); flex:none }
+  .rk__b{ min-width:0 }
+  .rk__n{ display:block; font-weight:700; font-size:.95rem; line-height:1.2; overflow-wrap:anywhere }
+  .rk__m{ display:block; color:var(--muted); font-size:.76rem; font-family:"IBM Plex Mono",monospace; margin-top:1px }
+  .rk__m b{ color:var(--dim); font-weight:600 }
+  .rk.gone{ opacity:.55 }
+
+  /* ── profile ───────────────────────────────────────────── */
+  .back{ display:inline-flex; align-items:center; gap:6px; color:var(--muted); text-decoration:none;
+         font-size:.85rem; margin-bottom:14px }
+  .back:hover{ color:var(--ink) }
+
+  .hero{ display:grid; grid-template-columns:minmax(0,150px) minmax(0,1fr); gap:18px; align-items:start;
+         border-bottom:1px solid var(--line); padding-bottom:20px }
+  .hero__img{ width:100%; max-width:150px; aspect-ratio:.62; object-fit:cover; object-position:top center;
+              border-radius:12px; background:var(--surface2) }
+  .hero__kanji{ font-family:"Zen Kaku Gothic New",system-ui,sans-serif; font-weight:900;
+                font-size:clamp(1.7rem,5vw,2.6rem); line-height:1.05; color:var(--gold) }
+  .hero__name{ font-family:"Zen Kaku Gothic New",system-ui,sans-serif; font-weight:900;
+               font-size:clamp(1.35rem,4vw,2rem); margin:2px 0 0; line-height:1.1 }
+  .hero__rank{ margin-top:7px; font-size:1rem; color:var(--dim) }
+  .hero__rank b{ color:var(--ink) }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:11px }
+  .chip{ font-size:.74rem; font-family:"IBM Plex Mono",monospace; padding:3px 8px; border-radius:99px;
+         border:1px solid var(--line); color:var(--dim); background:var(--surface) }
+  .chip.up{ color:var(--win); border-color:color-mix(in srgb,var(--win) 40%,var(--line)) }
+  .chip.down{ color:var(--loss); border-color:color-mix(in srgb,var(--loss) 40%,var(--line)) }
+  .chip.alert{ color:var(--red); border-color:color-mix(in srgb,var(--red) 45%,var(--line)) }
+  .chip.gold{ color:var(--gold); border-color:color-mix(in srgb,var(--gold) 45%,var(--line)) }
+
+  .sect{ margin-top:26px }
+  .sect h3{ font-family:"Zen Kaku Gothic New",system-ui,sans-serif; font-size:.98rem; margin:0 0 10px;
+            color:var(--gold); letter-spacing:.02em }
+  .prose{ margin:0; color:var(--dim); font-size:.94rem; line-height:1.55; max-width:68ch }
+  .prose + .prose{ margin-top:9px }
+  .prose.warn{ color:#f0c9c4 }
+
+  .stats{ display:grid; gap:9px; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)) }
+  .stat{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:10px 11px }
+  .stat dt{ color:var(--faint); font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; margin:0 }
+  .stat dd{ margin:4px 0 0; font-size:1.02rem; font-weight:700; font-family:"IBM Plex Mono",monospace }
+  .stat dd small{ font-size:.72rem; color:var(--muted); font-weight:500; margin-left:3px }
+
+  .basho-row{ display:flex; flex-wrap:wrap; gap:8px }
+  .basho{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:9px 12px; min-width:104px }
+  .basho i{ display:block; font-style:normal; color:var(--faint); font-size:.7rem; text-transform:uppercase; letter-spacing:.05em }
+  .basho b{ display:block; font-family:"IBM Plex Mono",monospace; font-size:1.02rem; margin-top:3px }
+  .basho b.kachi{ color:var(--win) } .basho b.make{ color:var(--loss) }
+
+  /* head-to-head */
+  .h2h{ display:flex; flex-wrap:wrap; gap:9px; align-items:center }
+  .h2h select{ background:var(--surface); border:1px solid var(--line); color:var(--ink);
+               border-radius:9px; padding:8px 10px; font:inherit; font-size:.9rem; max-width:100% }
+  .h2h select:focus{ outline:0; border-color:var(--gold) }
+  .h2h__out{ font-family:"IBM Plex Mono",monospace; font-size:.95rem; color:var(--dim) }
+  .h2h__out b{ color:var(--ink); font-size:1.1rem }
+
+  .empty{ color:var(--muted); font-size:.92rem }
+  @media (max-width:560px){
+    .hero{ grid-template-columns:96px minmax(0,1fr); gap:13px }
+    .hero__img{ max-width:96px }
+  }
+</style>
+<script src="gg-config.js"></script><script src="gg-account.js"></script>
+</head>
+<body>
+<script src="gg-mawashi.js"></script><script src="gg-notify.js"></script><script src="gg-auth.js"></script><script src="gg-nav.js"></script>
+
+<div class="wrap">
+  <div id="view" aria-live="polite"><p class="empty">Loading the banzuke…</p></div>
+</div>
+
+<script src="gg-dossier.js" defer></script>
+<script src="gg-rikishi.js" defer></script>
+<script src="gg-roster.js" defer></script>
+<script src="taiko-radio.js" defer></script>
+
+<script>
+/* ── rikishi.html ───────────────────────────────────────────────────────────
+   One page, two views: a directory of everyone on the banzuke, and a profile.
+
+   Nothing here invents data. The curated dossier in gg-dossier.js already
+   carries rank, stable, birthplace, measurements, career W-L, debut, career
+   high, Elo, grade, signature techniques, the last three basho, and hand-
+   written form and injury notes — it was simply never given a page of its own,
+   only scout cards inside analysis.html. The live banzuke from GGRoster is
+   layered on top so the rank and record are current rather than as-written.
+
+   The one network call beyond that is head-to-head, and it happens only when
+   somebody asks for a specific opponent. */
+(function () {
+  var view = document.getElementById("view");
+  var GG = window.GyojiGuide || {};
+  var LIVE = null;                       // name -> live banzuke row, once loaded
+  var STARTED = false;                   // has the current basho actually begun?
+
+  function esc(s){ return String(s == null ? "" : s)
+    .replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function qs(){ try { return new URLSearchParams(location.search); } catch(e){ return { get:function(){return null;} }; } }
+
+  /* ---------- data ---------- */
+  function all(){
+    var list = (window.GyojiGuide && GyojiGuide.RIKISHI) || (typeof R !== "undefined" ? R : []);
+    return list || [];
+  }
+  function find(name){
+    if (!name) return null;
+    if (GG.rikishi) { var hit = GG.rikishi(name); if (hit) return hit; }
+    var key = String(name).toLowerCase();
+    return all().filter(function(r){ return String(r.n).toLowerCase() === key; })[0] || null;
+  }
+  function photo(n){ return "images/rikishi/" + n + ".webp"; }
+
+  /* The dossier's `rank`/`live` were true when written. GGRoster has today's. */
+  function liveOf(n){ return (LIVE && LIVE[n]) || null; }
+  function rankText(r){
+    var lv = liveOf(r.n);
+    if (lv && lv.rankStr) return lv.rankStr;
+    return (r.rank || "") + (r.num ? " " + r.num : "") + (r.side ? " " + (r.side === "E" ? "East" : "West") : "");
+  }
+  /* Two different records live here and conflating them is a lie either way.
+     GGRoster only returns a record once a basho has actually started (it nulls
+     0-0 rows rather than passing them off as results), so that one — and only
+     that one — may be called "this basho". The dossier's is the most recent
+     completed tournament. */
+  function liveRecord(r){
+    var lv = liveOf(r.n);
+    return (STARTED && lv && lv.record) ? lv.record.replace(/-/g, "–") : "";
+  }
+  function pastRecord(r){
+    return r.live ? String(r.live).replace(/-/g, "–") : "";
+  }
+  function recordText(r){ return liveRecord(r) || pastRecord(r); }
+  function onBanzuke(r){ return !LIVE || !!liveOf(r.n); }
+
+  /* The dossier writes rk as tier PLUS number — "M1", "J14" — while GGRoster
+     normalises to a bare tier letter and a separate num. Everything that sorts
+     or groups has to agree on one shape, so it comes through here. */
+  function tierOf(r){
+    var lv = liveOf(r.n);
+    if (lv && lv.tier) return lv.tier;
+    return String(r.rk || "M").charAt(0).toUpperCase();
+  }
+  function numOf(r){
+    var lv = liveOf(r.n);
+    if (lv && lv.num != null) return lv.num;
+    var m = String(r.rk || "").match(/\d+/);
+    return m ? Number(m[0]) : (Number(r.num) || 0);
+  }
+  function sideOf(r){
+    var lv = liveOf(r.n);
+    return String((lv && lv.side) || r.side || "e").charAt(0).toLowerCase();
+  }
+
+  /* ---------- directory ---------- */
+  var BANDS = [
+    { key:"sanyaku", label:"Sanyaku",   jp:"三役",   test:function(r){ return /^[YOSK]$/.test(r.rk); } },
+    { key:"maegashira", label:"Maegashira", jp:"前頭", test:function(r){ return r.rk === "M"; } },
+    { key:"juryo", label:"Jūryō", jp:"十両", test:function(r){ return r.rk === "J"; } }
+  ];
+  var TIER_ORDER = { Y:0, O:1, S:2, K:3, M:4, J:5 };
+  function sortKey(r){
+    var tier = tierOf(r);
+    return (TIER_ORDER[tier] == null ? 9 : TIER_ORDER[tier]) * 1000 +
+           numOf(r) * 2 + (sideOf(r) === "w" ? 1 : 0);
+  }
+
+  function card(r){
+    var gone = !onBanzuke(r);
+    /* Only the live record goes on a card. Between basho the dossier still
+       holds the last tournament's, and "M1e · 9-6" next to a rank reads as a
+       running score for a basho that has not started. The profile says which
+       is which; a card has no room to. */
+    var rec = liveRecord(r);
+    return '<a class="rk' + (gone ? " gone" : "") + '" href="rikishi.html?n=' + encodeURIComponent(r.n) + '">' +
+      '<img class="rk__img" src="' + esc(photo(r.n)) + '" alt="" loading="lazy" width="44" height="44" ' +
+        'onerror="this.style.visibility=\'hidden\'">' +
+      '<span class="rk__b">' +
+        '<b class="rk__n">' + esc(r.n) + '</b>' +
+        '<span class="rk__m"><b>' + esc(shortRank(r)) + '</b>' + (rec ? " · " + esc(rec) : "") + '</span>' +
+      '</span></a>';
+  }
+  function shortRank(r){
+    var n = numOf(r);
+    return tierOf(r) + (n ? n : "") + sideOf(r);
+  }
+
+  function renderDirectory(filter){
+    var q = String(filter || "").trim().toLowerCase();
+    var men = all().slice().sort(function(a,b){ return sortKey(a) - sortKey(b); });
+    if (q) men = men.filter(function(r){
+      return String(r.n).toLowerCase().indexOf(q) >= 0 ||
+             String(r.kanji || "").indexOf(q) >= 0 ||
+             String(r.stable || "").toLowerCase().indexOf(q) >= 0 ||
+             String(r.from || "").toLowerCase().indexOf(q) >= 0;
+    });
+
+    var html = '<div class="dir-head">' +
+      '<div><h1>Rikishi</h1><p>' + men.length + ' of ' + all().length +
+        ' sekitori · rank, record, form and career</p></div>' +
+      '<label class="find"><input id="find" type="search" placeholder="Search name, kanji, stable, birthplace" ' +
+        'value="' + esc(filter || "") + '" autocomplete="off"></label></div>';
+
+    var shown = 0;
+    BANDS.forEach(function(band){
+      var group = men.filter(function(r){ return band.test({ rk: tierOf(r) }); });
+      if (!group.length) return;
+      shown += group.length;
+      html += '<div class="band"><h2>' + band.label + '</h2><span>' + band.jp + ' · ' + group.length + '</span></div>' +
+              '<div class="grid">' + group.map(card).join("") + '</div>';
+    });
+    if (!shown) html += '<p class="empty">Nobody matches that.</p>';
+
+    view.innerHTML = html;
+    var box = document.getElementById("find");
+    if (box) {
+      var t = null;
+      box.oninput = function(){
+        clearTimeout(t);
+        var v = box.value;
+        t = setTimeout(function(){
+          var at = box.selectionStart;
+          renderDirectory(v);
+          var again = document.getElementById("find");
+          if (again) { again.focus(); try { again.setSelectionRange(at, at); } catch(e){} }
+        }, 140);
+      };
+    }
+  }
+
+  /* ---------- profile ---------- */
+  function statBlock(r){
+    var out = [];
+    function add(label, value, note){
+      if (value == null || value === "") return;
+      out.push('<div class="stat"><dt>' + esc(label) + '</dt><dd>' + esc(value) +
+               (note ? '<small>' + esc(note) + '</small>' : "") + '</dd></div>');
+    }
+    if (liveRecord(r)) add("This basho", liveRecord(r));
+    else if (pastRecord(r)) add("Last basho", pastRecord(r));
+    if (r.cw != null && r.cl != null) add("Career", r.cw + "–" + r.cl,
+      (r.cw + r.cl) ? Math.round(r.cw / (r.cw + r.cl) * 100) + "%" : "");
+    add("Career high", r.high);
+    add("Debut", r.debut);
+    if (r.age) add("Age", r.age);
+    if (r.ht && r.wt) add("Build", r.ht + "cm", r.wt + "kg");
+    if (r.elo) add("Elo", r.elo);
+    if (r.grade) add("Grade", r.grade);
+    return out.length ? '<dl class="stats">' + out.join("") + '</dl>' : "";
+  }
+
+  /* `live` is the most recent basho actually fought; `rec` holds the THREE
+     BEFORE it, not including it (analysis.html derives its labels the same way,
+     from FINISHED_BASHO_ID minus one). Treating rec[0] as "last basho" put two
+     different figures under that heading on the same screen — the hero saying
+     7-7-1 and the history saying 0-2-13. One continuous run instead. */
+  function bashoBlock(r){
+    var run = [];
+    if (pastRecord(r)) run.push(pastRecord(r));
+    (r.rec || []).forEach(function(v){ run.push(String(v).replace(/-/g, "–")); });
+    if (!run.length) return "";
+    return '<div class="basho-row">' + run.map(function(v, i){
+      var parts = String(v).split("–").map(Number);
+      var w = parts[0], l = parts[1];
+      var cls = (w > l) ? "kachi" : (w < l) ? "make" : "";
+      return '<div class="basho"><i>' + (i === 0 ? "Last basho" : (i + 1) + " basho ago") + '</i>' +
+             '<b class="' + cls + '">' + esc(v) + '</b></div>';
+    }).join("") + '</div>';
+  }
+
+  function chips(r){
+    var out = [];
+    var lv = liveOf(r.n);
+    if (!onBanzuke(r)) out.push('<span class="chip alert">Not on the current banzuke</span>');
+    if (r.lk) out.push('<span class="chip alert">Kyūjō</span>');
+    if (r.lv === "out") out.push('<span class="chip alert">Out</span>');
+    if (r.chg && r.chg.t && r.chg.d && r.chg.d !== "same")
+      out.push('<span class="chip ' + (r.chg.d === "up" ? "up" : "down") + '">' + esc(r.chg.t) + '</span>');
+    if (r.stable) out.push('<span class="chip">' + esc(r.stable) + ' stable</span>');
+    if (r.from) out.push('<span class="chip">' + esc(r.from) + '</span>');
+    (r.sig || []).forEach(function(s){ out.push('<span class="chip gold">' + esc(s) + '</span>'); });
+    return out.length ? '<div class="chips">' + out.join("") + '</div>' : "";
+  }
+
+  function renderProfile(r){
+    var rec = recordText(r);
+    var html = '<a class="back" href="rikishi.html">← All rikishi</a>' +
+      '<div class="hero">' +
+        '<img class="hero__img" src="' + esc(photo(r.n)) + '" alt="' + esc(r.n) + '" ' +
+          'onerror="this.style.visibility=\'hidden\'">' +
+        '<div>' +
+          (r.kanji ? '<div class="hero__kanji">' + esc(r.kanji) + '</div>' : "") +
+          '<h1 class="hero__name">' + esc(r.n) + '</h1>' +
+          '<div class="hero__rank"><b>' + esc(rankText(r)) + '</b>' +
+            (liveRecord(r) ? ' · ' + esc(liveRecord(r)) + ' this basho'
+                           : (pastRecord(r) ? ' · ' + esc(pastRecord(r)) + ' last basho' : "")) + '</div>' +
+          chips(r) +
+        '</div>' +
+      '</div>';
+
+    if (r.form || r.inj || r.note) {
+      html += '<div class="sect"><h3>Form</h3>';
+      if (r.form) html += '<p class="prose">' + esc(r.form) + '</p>';
+      if (r.inj)  html += '<p class="prose warn">' + esc(r.inj) + '</p>';
+      if (r.note) html += '<p class="prose">' + esc(r.note) + '</p>';
+      html += '</div>';
+    }
+
+    var stats = statBlock(r);
+    if (stats) html += '<div class="sect"><h3>By the numbers</h3>' + stats + '</div>';
+
+    var basho = bashoBlock(r);
+    if (basho) html += '<div class="sect"><h3>Recent basho</h3>' + basho + '</div>';
+
+    /* Head-to-head is the one thing here that costs a request, so it is asked
+       for rather than loaded: pick an opponent and it fetches that pair only. */
+    if (r.pid) {
+      var opts = all().filter(function(o){ return o.n !== r.n && o.pid; })
+        .sort(function(a,b){ return sortKey(a) - sortKey(b); })
+        .map(function(o){ return '<option value="' + esc(o.n) + '">' + esc(o.n) + '</option>'; }).join("");
+      html += '<div class="sect"><h3>Head to head</h3><div class="h2h">' +
+        '<select id="h2hSel" aria-label="Opponent"><option value="">Choose an opponent…</option>' + opts + '</select>' +
+        '<span class="h2h__out" id="h2hOut"></span></div></div>';
+    }
+
+    view.innerHTML = html;
+    document.title = r.n + " · Sumo Slapdown";
+
+    var sel = document.getElementById("h2hSel");
+    if (sel) sel.onchange = function(){
+      var out = document.getElementById("h2hOut");
+      var opp = find(sel.value);
+      if (!opp || !opp.pid) { out.textContent = ""; return; }
+      out.textContent = "…";
+      if (!window.GGRoster || !GGRoster.headToHead) { out.textContent = "unavailable"; return; }
+      GGRoster.headToHead(r.pid, opp.pid).then(function(h){
+        if (!h) { out.textContent = "no meetings on record"; return; }
+        out.innerHTML = '<b>' + h.a + '–' + h.b + '</b> to ' + esc(r.n) +
+                        ' <span style="color:var(--faint)">(' + h.total + ' meetings)</span>';
+      }).catch(function(){ out.textContent = "couldn’t reach sumo-api"; });
+    };
+  }
+
+  /* ---------- router ---------- */
+  function route(){
+    var name = qs().get("n");
+    if (!all().length) { view.innerHTML = '<p class="empty">The rikishi dossier didn’t load.</p>'; return; }
+    if (!name) { document.title = "Rikishi · Sumo Slapdown"; renderDirectory(""); return; }
+    var r = find(name);
+    if (!r) {
+      view.innerHTML = '<a class="back" href="rikishi.html">← All rikishi</a>' +
+        '<p class="empty">No rikishi called “' + esc(name) + '” on this banzuke.</p>';
+      return;
+    }
+    renderProfile(r);
+  }
+
+  /* The live banzuke makes ranks and records current, but the page is useful
+     without it — render immediately from the dossier, then repaint if and when
+     sumo-api answers. */
+  function start(){
+    route();
+    if (!window.GGRoster || !GGRoster.load) return;
+    GGRoster.load().then(function(res){
+      if (!res || !res.ok || !res.ranks) return;
+      LIVE = res.ranks;
+      STARTED = !!res.started;
+      route();
+    }).catch(function(){});
+  }
+
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", start, { once:true });
+  else start();
+
+  window.addEventListener("popstate", route);
+})();
+</script>
+</body>
+</html>
