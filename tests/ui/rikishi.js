@@ -5,19 +5,22 @@ async function open(b, q){
   const ctx = await b.newContext({viewport:{width:1280,height:1000}});
   const p = await ctx.newPage();
   const errs=[]; p.on('pageerror',e=>errs.push(String(e).split('\n')[0].slice(0,160)));
+  const h2hUrls = [];
   await p.route('**sumo-api.com/**', r=>{
     const u=r.request().url();
     const j=o=>r.fulfill({contentType:'application/json',body:JSON.stringify(o)});
     if(/banzuke\/Makuuchi/i.test(u)) return j(LIVE.mak);
     if(/banzuke\/Juryo/i.test(u))    return j(LIVE.jur);
-    if(/\/matches\//.test(u))        return j({rikishiWins:7, opponentWins:3, total:10});
+    if(/\/matches\//.test(u)) { h2hUrls.push(u);
+      return j({rikishiWins:9, opponentWins:3, total:12,
+                matches:new Array(12).fill({}), kimariteWins:{}, kimariteLosses:{}}); }
     return j({});
   });
   await p.route('**script.google.com/**', r=>r.fulfill({contentType:'application/json',
     body:'{"ok":true,"users":[],"results":[],"meta":{"basho":"Aki 2026","lastDay":0}}'}));
   await p.goto('http://127.0.0.1:8902/rikishi.html'+(q||''),{waitUntil:'domcontentloaded'});
   await p.waitForTimeout(3500);
-  return {ctx,p,errs};
+  return {ctx,p,errs,h2hUrls};
 }
 (async ()=>{
   const b = await chromium.launch();
@@ -66,11 +69,26 @@ async function open(b, q){
     chk('no page errors', errs.length===0, errs[0]||'');
     await ctx.close(); }
 
-  { const {ctx,p} = await open(b, '?n=Hoshoryu');
+  { const {ctx,p,h2hUrls} = await open(b, '?n=Hoshoryu');
     await p.selectOption('#h2hSel','Onosato');
-    await p.waitForTimeout(1200);
+    await p.waitForTimeout(1500);
     const out = await p.textContent('#h2hOut');
-    chk('head-to-head resolves on demand', /7.3/.test(out||''), out);
+    chk('head-to-head resolves on demand', /9.3/.test(out||''), out);
+
+    /* The bug this exists for: the dossier's `pid` is the NSK PHOTO id, and
+       sumo-api answers it with HTTP 200 and every count zero — so the page
+       reported "no meetings on record" for every pair and nothing errored.
+       Asserting the response is not enough; assert which id went on the wire. */
+    const url = h2hUrls[h2hUrls.length-1] || '';
+    const pids = await p.evaluate(()=>{
+      const g = n => (GyojiGuide.rikishi(n)||{});
+      return { hosho: String(g('Hoshoryu').pid||''), onosato: String(g('Onosato').pid||'') };
+    });
+    chk('it asks sumo-api using the banzuke rikishi id',
+        /\/rikishi\/\d+\/matches\/\d+/.test(url), url);
+    chk('and never the dossier photo id',
+        !!url && url.indexOf(pids.hosho) < 0 && url.indexOf(pids.onosato) < 0,
+        'photo ids ' + JSON.stringify(pids) + ' in ' + url);
     await ctx.close(); }
 
   { const {ctx,p,errs} = await open(b, '?n=NotARealMan');
@@ -84,6 +102,25 @@ async function open(b, q){
     await p.waitForTimeout(500);
     const n = await p.evaluate(()=>document.querySelectorAll('.rk').length);
     chk('search filters by birthplace', n>0 && n<73, n+' of 73');
+    await ctx.close(); }
+
+  /* No live banzuke means no sumo-api id, so head-to-head cannot be offered at
+     all. It must be absent rather than present-and-broken. */
+  { const ctx = await b.newContext();
+    const p = await ctx.newPage();
+    const errs=[]; p.on('pageerror',e=>errs.push(String(e).split('\n')[0].slice(0,160)));
+    await p.route('**sumo-api.com/**', r=>r.abort());
+    await p.route('**script.google.com/**', r=>r.fulfill({contentType:'application/json',body:'{"ok":true}'}));
+    await p.goto('http://127.0.0.1:8902/rikishi.html?n=Hoshoryu',{waitUntil:'domcontentloaded'});
+    await p.waitForTimeout(3500);
+    const r = await p.evaluate(()=>({
+      name:(document.querySelector('.hero__name')||{}).textContent,
+      h2h:!!document.getElementById('h2hSel'),
+      stats:document.querySelectorAll('.stat').length }));
+    chk('with sumo-api down the profile still renders', r.name==='Hoshoryu' && r.stats>=5,
+        r.name+' / '+r.stats+' stats');
+    chk('and head-to-head is withheld rather than shown broken', r.h2h===false, 'offered anyway');
+    chk('no page errors with the API down', errs.length===0, errs[0]||'');
     await ctx.close(); }
 
   const bad=T.filter(x=>!x).length;

@@ -154,6 +154,16 @@
   }
   function photo(n){ return "images/rikishi/" + n + ".webp"; }
 
+  /* The dossier's `pid` is the NSK photo id — it is what analysis.html builds
+     sumo.or.jp portrait URLs from, and it is NOT a sumo-api rikishi id. Passing
+     it to /rikishi/{id}/matches/{id} returns HTTP 200 with every count zero, so
+     head-to-head reported "no meetings on record" for every pair rather than
+     failing loudly. The id sumo-api wants rides on the banzuke rows. */
+  function apiId(r){
+    var lv = liveOf(r.n);
+    return (lv && lv.rikishiId) || null;
+  }
+
   /* The dossier's `rank`/`live` were true when written. GGRoster has today's. */
   function liveOf(n){ return (LIVE && LIVE[n]) || null; }
   function rankText(r){
@@ -357,8 +367,8 @@
 
     /* Head-to-head is the one thing here that costs a request, so it is asked
        for rather than loaded: pick an opponent and it fetches that pair only. */
-    if (r.pid) {
-      var opts = all().filter(function(o){ return o.n !== r.n && o.pid; })
+    if (apiId(r)) {
+      var opts = all().filter(function(o){ return o.n !== r.n && apiId(o); })
         .sort(function(a,b){ return sortKey(a) - sortKey(b); })
         .map(function(o){ return '<option value="' + esc(o.n) + '">' + esc(o.n) + '</option>'; }).join("");
       html += '<div class="sect"><h3>Head to head</h3><div class="h2h">' +
@@ -373,10 +383,10 @@
     if (sel) sel.onchange = function(){
       var out = document.getElementById("h2hOut");
       var opp = find(sel.value);
-      if (!opp || !opp.pid) { out.textContent = ""; return; }
+      if (!opp || !apiId(opp)) { out.textContent = ""; return; }
       out.textContent = "…";
       if (!window.GGRoster || !GGRoster.headToHead) { out.textContent = "unavailable"; return; }
-      GGRoster.headToHead(r.pid, opp.pid).then(function(h){
+      GGRoster.headToHead(apiId(r), apiId(opp)).then(function(h){
         if (!h) { out.textContent = "no meetings on record"; return; }
         out.innerHTML = '<b>' + h.a + '–' + h.b + '</b> to ' + esc(r.n) +
                         ' <span style="color:var(--faint)">(' + h.total + ' meetings)</span>';
