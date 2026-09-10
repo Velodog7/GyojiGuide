@@ -134,6 +134,58 @@
   .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
     clip:rect(0 0 0 0); white-space:nowrap; border:0 }
 
+  /* honours — headline counts, so stat tiles rather than a one-bar chart */
+  .hn-tiles{ display:flex; flex-wrap:wrap; gap:8px }
+  /* sized to their own content, not stretched: three tiles across a desktop
+     column would otherwise put a single digit in the middle of 500px */
+  .hn-tile{ flex:0 1 auto; min-width:124px; background:var(--surface);
+            border:1px solid var(--line); border-radius:10px; padding:9px 11px }
+  .hn-tile.hn-yusho{ border-color:color-mix(in srgb,var(--gold) 45%,var(--line)) }
+  .hn-n{ font-family:"IBM Plex Mono",monospace; font-size:1.5rem; font-weight:600; color:var(--ink);
+         line-height:1.05 }
+  .hn-tile.hn-yusho .hn-n{ color:var(--gold) }
+  .hn-k{ font-size:.82rem; font-weight:600; color:var(--dim); margin-top:1px }
+  .hn-s{ font-size:.72rem; color:var(--faint) }
+  .hn-none{ color:var(--muted); font-size:.85rem; margin:0 }
+  .hn-career, .hn-divs{ display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:9px;
+    font-size:.8rem; color:var(--muted); font-family:"IBM Plex Mono",monospace }
+  .hn-career b{ color:var(--ink); font-weight:600 }
+  .hn-divs{ gap:6px 12px; color:var(--faint); margin-top:5px }
+  .hn-divs b{ color:var(--dim) }
+
+  /* how he wins — HTML bars, not SVG: six rows with two-part labels reflow for
+     free, the counts stay selectable text, and a label can never be clipped by
+     a short bar the way a stacked segment's would be */
+  .km-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:14px 22px }
+  .km-panel h4{ margin:0 0 7px; font-size:.8rem; font-weight:600; color:var(--dim);
+    display:flex; justify-content:space-between; gap:10px; align-items:baseline }
+  .km-panel h4 span{ color:var(--faint); font-size:.72rem; font-weight:500;
+    font-family:"IBM Plex Mono",monospace }
+  .km-bars{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px }
+  .km-bars li{ display:grid; grid-template-columns:minmax(0,1fr) 64px; gap:2px 10px; align-items:baseline }
+  .km-lab{ min-width:0; font-size:.8rem; color:var(--dim) }
+  .km-lab b{ font-weight:600; color:var(--ink) }
+  .km-lab span{ color:var(--faint); font-size:.72rem }
+  .km-track{ grid-column:1; height:9px; background:var(--surface2); border-radius:5px; overflow:hidden }
+  .km-track i{ display:block; height:100%; border-radius:0 5px 5px 0; min-width:3px }
+  .km-n{ grid-row:1 / span 2; grid-column:2; text-align:right; align-self:center;
+    font-family:"IBM Plex Mono",monospace; font-size:.95rem; font-weight:600; color:var(--ink) }
+  .km-n span{ display:block; font-size:.7rem; font-weight:500; color:var(--faint) }
+  .km-table td:nth-child(3), .km-table td:nth-child(4),
+  .km-table th:nth-child(3), .km-table th:nth-child(4){ text-align:right }
+
+  /* rivals — records, so the number is always the primary tell and the colour
+     only ever agrees with it */
+  .rv-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px 22px }
+  .rv-grid h4{ margin:0 0 6px; font-size:.8rem; font-weight:600; color:var(--dim) }
+  .rv-list{ list-style:none; margin:0; padding:0 }
+  .rv-list li{ display:flex; justify-content:space-between; gap:12px; align-items:baseline;
+    padding:5px 0; border-bottom:1px solid var(--line) }
+  .rv-list li:last-child{ border-bottom:0 }
+  .rv-list a{ color:var(--ink); text-decoration:none; border-bottom:1px solid transparent }
+  .rv-list a:hover{ border-bottom-color:var(--gold); color:var(--gold) }
+  .rv-list b{ font-family:"IBM Plex Mono",monospace; font-size:.86rem; font-weight:600 }
+
   @media (max-width:560px){
     .hero{ grid-template-columns:96px minmax(0,1fr); gap:13px }
     .hero__img{ max-width:96px }
@@ -351,6 +403,12 @@
     var stats = statBlock(r);
     if (stats) html += '<div class="sect"><h3>By the numbers</h3>' + stats + '</div>';
 
+    /* High on the page, because it is the first thing anyone wants to know
+       about a wrestler they have not heard of. Each of these sections deletes
+       itself if its request comes back empty, so a heading never sits over an
+       apology. */
+    html += '<div class="sect" id="hnSect"><h3>Honours</h3><div id="hnBody"></div></div>';
+
     var basho = bashoBlock(r);
     if (basho) html += '<div class="sect"><h3>Recent basho</h3>' + basho + '</div>';
 
@@ -358,11 +416,16 @@
        which opponents he is going to GET, so the model answers that instead. */
     html += '<div class="sect" id="h2hSect"><h3>Likely matchups</h3><div id="h2hBody"></div></div>';
     html += '<div class="sect" id="ccSect"><h3>Career</h3><div id="ccBody"></div></div>';
+    html += '<div class="sect" id="kmSect"><h3>How he wins and loses</h3><div id="kmBody"></div></div>';
+    html += '<div class="sect" id="rvSect"><h3>Rivals</h3><div id="rvBody"></div></div>';
 
     view.innerHTML = html;
-    document.title = r.n + " · Sumo Slapdown";
+    describe(r);
+    renderHonours(r);
     renderCareer(r);
     renderLikely(r);
+    renderTechniques(r);
+    renderRivals(r);
   }
 
   /* ── career charts ─────────────────────────────────────────────────────
@@ -417,18 +480,33 @@
          than showing nothing — a silent wrong answer of exactly the kind the
          head-to-head `pid` mixup already produced once. Not in the bout at
          all → skip it, and the panels come back empty and obviously so. */
-      var me = String(id), seen = 0;
+      var me = String(id), seen = 0, mine = [];
       (mat.records || []).forEach(function(m){
-        var row = rows[m.bashoId];
-        if (!row) return;                       // a basho with no banzuke row
         var isEast = String(m.eastId) === me, isWest = String(m.westId) === me;
         if (!isEast && !isWest) return;
         seen++;
+
+        /* Every bout he fought, kept for the technique and rivalry panels.
+           Gathered BEFORE the banzuke-row check below on purpose: a basho with
+           no row — mae-zumo, or one rankHistory happens not to carry — is not
+           on the chart, but those bouts still happened and still belong in his
+           technique history. Only eastShikona/westShikona are read for the
+           opponent; `winnerJp` is sometimes an <img> tag rather than a name,
+           and nothing from this feed should be within reach of innerHTML. */
+        mine.push({ bashoId: m.bashoId, day: Number(m.day) || 0,
+                    division: m.division || "",
+                    opp: String((isEast ? m.westShikona : m.eastShikona) || ""),
+                    oppId: Number(isEast ? m.westId : m.eastId) || 0,
+                    won: String(m.winnerId) === me,
+                    kimarite: String(m.kimarite || "").toLowerCase() });
+
+        var row = rows[m.bashoId];
+        if (!row) return;                       // a basho with no banzuke row
         row.bouts++;
         row.division = row.division || m.division || "";
         if (String(m.winnerId) === me) row.w++; else row.l++;
       });
-      if (!seen) return [];                      // the id matched nothing
+      if (!seen) return { series: [], records: [] };   // the id matched nothing
 
       var out = Object.keys(rows).sort().map(function(k){ return rows[k]; });
       out.forEach(function(row){
@@ -438,7 +516,7 @@
         row.absent = Math.max(0, row.full - row.bouts);
         row.label = bashoLabel(row.bashoId);
       });
-      return out;
+      return { series: out, records: mine };
     }).catch(function(){ return null; });
     return careerCache[id];
   }
@@ -582,7 +660,8 @@
     if (!id){ host.innerHTML = '<p class="empty">Career history needs the live banzuke, which didn’t load.</p>'; return; }
 
     host.innerHTML = '<p class="empty">Reading his career…</p>';
-    fetchCareer(id).then(function(series){
+    fetchCareer(id).then(function(career){
+      var series = career && career.series;
       if (!series || !series.length){
         host.innerHTML = '<p class="empty">No career history came back for him.</p>'; return;
       }
@@ -647,6 +726,397 @@
       var t = null;
       window.addEventListener("resize", function(){ clearTimeout(t); t = setTimeout(paint, 180); });
     });
+  }
+
+  /* ── honours ───────────────────────────────────────────────────────────
+     `/stats` is a small, separate document from the two the career charts
+     read, and it holds the things a career is actually remembered for: yūshō,
+     the three sanshō, and how much of the career was spent hurt.
+
+     It is NOT reconciled against the career charts on purpose. `/stats` counts
+     258 matches for Onosato where `/matches` returns 261 records; the two
+     disagree about forfeits and drawn bouts. Each panel is therefore computed
+     from ONE source and says so, rather than adding figures from both and
+     producing a total that matches neither. */
+  var SANSHO = [
+    ["Shukun-sho", "Shukun-shō", "Outstanding Performance"],
+    ["Kanto-sho",  "Kantō-shō",  "Fighting Spirit"],
+    ["Gino-sho",   "Ginō-shō",   "Technique"]
+  ];
+  var statsCache = {};
+  function fetchStats(id){
+    if (statsCache[id]) return statsCache[id];
+    statsCache[id] = fetch("https://sumo-api.com/api/rikishi/" + encodeURIComponent(id) + "/stats")
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .catch(function(){ return null; });
+    return statsCache[id];
+  }
+
+  function divLine(byDiv){
+    if (!byDiv) return "";
+    var keys = Object.keys(byDiv).filter(function(k){ return Number(byDiv[k]) > 0; });
+    if (!keys.length) return "";
+    /* highest division first — the object arrives alphabetical, which puts
+       Jonokuchi above Makuuchi and reads like a demotion */
+    var ORDER = ["Makuuchi","Juryo","Makushita","Sandanme","Jonidan","Jonokuchi"];
+    var PRETTY = { Juryo:"Jūryō", Makushita:"Makushita", Sandanme:"Sandanme",
+                   Jonidan:"Jonidan", Jonokuchi:"Jonokuchi", Makuuchi:"Makuuchi" };
+    keys.sort(function(a,b){
+      var ia = ORDER.indexOf(a), ib = ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    return keys.map(function(k){
+      return '<span class="hn-div"><b>' + byDiv[k] + '</b> ' + esc(PRETTY[k] || k) + '</span>';
+    }).join("");
+  }
+
+  function renderHonours(r){
+    var host = document.getElementById("hnBody");
+    if (!host) return;
+    var id = apiId(r);
+    if (!id){ host.innerHTML = '<p class="empty">Career honours need the live banzuke, which didn’t load.</p>'; return; }
+
+    host.innerHTML = '<p class="empty">Reading his record book…</p>';
+    fetchStats(id).then(function(s){
+      var sect = document.getElementById("hnSect");
+      if (!s || !s.totalMatches){
+        /* Nothing to show is not the same as a broken panel. Drop the whole
+           section rather than leave a heading over an apology. */
+        if (sect) sect.remove();
+        return;
+      }
+
+      var prizes = SANSHO.filter(function(p){ return Number((s.sansho || {})[p[0]]) > 0; });
+      var tiles = "";
+      if (Number(s.yusho) > 0)
+        tiles += '<div class="hn-tile hn-yusho"><div class="hn-n">' + s.yusho + '</div>' +
+                 '<div class="hn-k">Yūshō</div><div class="hn-s">' +
+                 esc(Object.keys(s.yushoByDivision || {}).map(function(d){
+                   return (d === "Juryo" ? "Jūryō" : d) + " " + s.yushoByDivision[d];
+                 }).join(" · ")) + '</div></div>';
+      prizes.forEach(function(p){
+        tiles += '<div class="hn-tile"><div class="hn-n">' + s.sansho[p[0]] + '</div>' +
+                 '<div class="hn-k">' + esc(p[1]) + '</div><div class="hn-s">' + esc(p[2]) + '</div></div>';
+      });
+
+      var w = Number(s.totalWins) || 0, l = Number(s.totalLosses) || 0;
+      var pct = (w + l) ? Math.round(w / (w + l) * 100) : 0;
+
+      host.innerHTML =
+        (tiles ? '<div class="hn-tiles">' + tiles + '</div>'
+               : '<p class="hn-none">No yūshō or sanshō yet.</p>') +
+        '<div class="hn-career">' +
+          '<span><b>' + s.basho + '</b> basho</span>' +
+          '<span><b>' + w + '–' + l + '</b> ' + pct + '%</span>' +
+          '<span><b>' + (Number(s.totalAbsences) || 0) + '</b> days missed</span>' +
+        '</div>' +
+        (divLine(s.bashoByDivision) ? '<div class="hn-divs">' + divLine(s.bashoByDivision) + '</div>' : "");
+    });
+  }
+
+  /* ── how he wins, and how he loses ─────────────────────────────────────
+     The winning move of every bout is on the record, and the career charts
+     already pull all of them to count wins per basho — they were being thrown
+     away after the tally. So this panel costs no extra request at all.
+
+     Three things this does that a naive count would get wrong:
+
+     1. `fusen` is a forfeit and `hansoku` a disqualification. Neither is a
+        technique and neither happened on the dohyō, so they are pulled out of
+        the split and reported separately. Onosato has four fusen wins; folded
+        in, they would sit above tsukidashi in his top techniques.
+     2. The five hiwaza — isamiashi, koshikudake, fumidashi, tsukihiza,
+        tsukite — are the OPPONENT's mistake, not the winner's move. They get
+        their own row rather than being scattered through the families, so
+        "won by the other man stepping out" never reads as a technique he owns.
+     3. The families are the NSK's own six, not a folk grouping. Which means
+        hatakikomi sits under tokushu-waza where a fan might expect a "pulling"
+        bucket — so every technique is also listed by name in the table, where
+        its family is spelled out.
+
+     Anything the map does not know falls into "Other" AND is named in the
+     table. A new kimarite added by the Association degrades to an honest
+     "Other" row instead of being silently dropped or silently misfiled. */
+  var KIMARITE_FAMILY = (function(){
+    var m = {};
+    function add(fam, names){ names.forEach(function(n){ m[n] = fam; }); }
+    add("kihon",   ["abisetaoshi","oshidashi","oshitaoshi","tsukidashi","tsukitaoshi",
+                    "yorikiri","yoritaoshi"]);
+    add("nage",    ["dashinage","ipponzeoi","kakenage","koshinage","kotenage","kubinage",
+                    "nichonage","shitatedashinage","shitatenage","sukuinage","tsukaminage",
+                    "uwatedashinage","uwatenage","yaguranage"]);
+    add("kake",    ["ashitori","chongake","kawazugake","kekaeshi","ketaguri","kirikaeshi",
+                    "komatasukui","kozumatori","mitokorozeme","nimaigeri","omata","sotogake",
+                    "sotokomata","susoharai","susotori","tsumatori","uchigake","watashikomi",
+                    /* sorite — backward body drops. Three in the whole database and
+                       none in a modern career; a row of their own would always be
+                       empty, so they ride with the other leg-and-body attacks. */
+                    "izori","tasukizori","tsutaezori"]);
+    add("hineri",  ["gasshohineri","harimanage","kainahineri","katasukashi","kotehineri",
+                    "kubihineri","makiotoshi","osakate","sakatottari","shitatehineri",
+                    "sotomuso","tokkurinage","tottari","tsukiotoshi","uchimuso","uwatehineri",
+                    "zubuneri"]);
+    add("tokushu", ["amiuchi","hatakikomi","hikiotoshi","hikkake","kimedashi","kimetaoshi",
+                    "okurigake","okurihikiotoshi","okurinage","okuridashi","okuritaoshi",
+                    "okuritsuridashi","okuritsuriotoshi","sabaori","sokubiotoshi","tsuridashi",
+                    "tsuriotoshi","ushiromotare","utchari","waridashi","yobikaeshi","yobimodoshi"]);
+    add("hiwaza",  ["fumidashi","isamiashi","koshikudake","tsukihiza","tsukite"]);
+    add("nobout",  ["fusen","hansoku","hikiwake","itamiwake"]);
+    return m;
+  })();
+
+  var FAMILIES = [
+    { k:"kihon",   ja:"Kihon-waza",   en:"force-out & push-out" },
+    { k:"nage",    ja:"Nage-te",      en:"throws" },
+    { k:"hineri",  ja:"Hineri-te",    en:"twists & twist-downs" },
+    { k:"kake",    ja:"Kake-te",      en:"trips & leg attacks" },
+    { k:"tokushu", ja:"Tokushu-waza", en:"special techniques" },
+    { k:"hiwaza",  ja:"Hiwaza",       en:"opponent’s own error" },
+    { k:"unrec",   ja:"Unrecorded",   en:"the finish was never published" },
+    { k:"other",   ja:"Other",        en:"not in the technique list" }
+  ];
+
+  /* A blank kimarite is not an unknown technique — it is a real bout whose
+     finish the Association never published. Mae-zumo is never given one, and
+     neither is a day-16 championship playoff (Aonishiki beat Atamifuji in the
+     Nagoya 2026 playoff; that row comes back with an empty kimarite and a real
+     winner). Both count as wins and losses, so they stay in the totals, but
+     filing them under "Other" would claim a move was used that nobody recorded. */
+  function famOf(k){ return !k ? "unrec" : (KIMARITE_FAMILY[k] || "other"); }
+
+  /* Romaji as the Association writes it, for the handful common enough that a
+     bare transliteration would be the only thing on screen. Everything else
+     shows as-is — an honest transliteration beats a guessed macron. */
+  var KIM_PRETTY = { yorikiri:"yorikiri", oshidashi:"oshidashi", hatakikomi:"hatakikomi",
+                     yoritaoshi:"yoritaoshi", oshitaoshi:"oshitaoshi", tsukiotoshi:"tsukiotoshi",
+                     hikiotoshi:"hikiotoshi", uwatenage:"uwatenage", shitatenage:"shitatenage",
+                     okuridashi:"okuridashi", tsukidashi:"tsukidashi", sukuinage:"sukuinage",
+                     katasukashi:"katasukashi", tsuridashi:"tsuridashi", kotenage:"kotenage",
+                     fusen:"fusen (forfeit)", hansoku:"hansoku (foul)",
+                     hikiwake:"hikiwake (draw)", itamiwake:"itamiwake (injury draw)" };
+  function kimName(k){ return KIM_PRETTY[k] || k || "unrecorded"; }
+
+  function techSplit(records){
+    var fam = {}, tech = {}, off = { w:0, l:0 }, tot = { w:0, l:0 };
+    FAMILIES.forEach(function(f){ fam[f.k] = { w:0, l:0 }; });
+    (records || []).forEach(function(m){
+      var k = String(m.kimarite || "").toLowerCase();
+      var f = famOf(k);
+      var side = m.won ? "w" : "l";
+      (tech[k] = tech[k] || { w:0, l:0, fam:f })[side]++;
+      if (f === "nobout"){ off[side]++; return; }   // never happened on the dohyo
+      fam[f][side]++;
+      tot[side]++;
+    });
+    return { fam: fam, tech: tech, off: off, tot: tot };
+  }
+
+  /* Plain HTML bars rather than SVG. Six rows with long two-part labels reflow
+     for free this way, the counts are real selectable text, and the labels can
+     never be clipped by a short bar — which is the failure a stacked segment
+     would have had here, where kihon-waza is two-thirds of every career and
+     everything else is a sliver.
+
+     One hue per panel, as everywhere else on this page. Wins and losses are
+     never on one axis together: darkening the gold enough to sit beside the
+     red in a shared chart collapses the pair under deuteranopia, and the
+     lightness gap is exactly what keeps them apart. Two panels, no legend
+     needed — each heading names its one series. */
+  function famPanel(split, side, colour, title){
+    var rows = FAMILIES.map(function(f){
+      var c = split.fam[f.k] || { w:0, l:0 };
+      return { f:f, n: c[side], both: c.w + c.l };
+    }).filter(function(row){ return row.both > 0; });
+
+    /* Shared order across both panels — sorted by how often the family shows
+       up at all — so a row sits at the same height in each and the two can be
+       read against one another. Sorting each panel independently would make
+       the top row of one mean nothing about the top row of the other. */
+    rows.sort(function(a, b){ return b.both - a.both || a.f.k.localeCompare(b.f.k); });
+
+    var total = split.tot[side];
+    var max = rows.reduce(function(a, row){ return Math.max(a, row.n); }, 0) || 1;
+    if (!total) return '<div class="km-panel"><h4>' + esc(title) + '</h4>' +
+      '<p class="empty">Nothing recorded.</p></div>';
+
+    return '<div class="km-panel"><h4>' + esc(title) + '<span>' + total + '</span></h4>' +
+      '<ul class="km-bars">' + rows.map(function(row){
+        var pct = Math.round(row.n / total * 100);
+        return '<li>' +
+          '<div class="km-lab"><b>' + esc(row.f.ja) + '</b> <span>' + esc(row.f.en) + '</span></div>' +
+          /* a family he has never been beaten by keeps its row — that absence is
+             the interesting part — but draws no bar. The minimum width that
+             keeps a count of 1 visible would otherwise render zero as a stub,
+             which reads as "hardly ever" rather than "never". */
+          '<div class="km-track">' + (row.n
+            ? '<i style="width:' + (row.n / max * 100).toFixed(1) + '%;background:' + colour + '"></i>'
+            : '') + '</div>' +
+          '<div class="km-n">' + row.n + '<span>' + pct + '%</span></div>' +
+        '</li>';
+      }).join("") + '</ul></div>';
+  }
+
+  function techTable(split){
+    var names = Object.keys(split.tech).sort(function(a, b){
+      var A = split.tech[a], B = split.tech[b];
+      return (B.w + B.l) - (A.w + A.l) || a.localeCompare(b);
+    });
+    var byKey = {};
+    FAMILIES.forEach(function(f){ byKey[f.k] = f.ja; });
+    byKey.nobout = "—";
+    byKey.unrec = "Unrecorded";
+    return '<table class="cc-table km-table">' +
+      '<caption class="sr-only">Every recorded finishing move, with wins and losses</caption>' +
+      '<thead><tr><th>Kimarite</th><th>Family</th><th>Won by</th><th>Lost to</th></tr></thead><tbody>' +
+      names.map(function(k){
+        var t = split.tech[k];
+        return '<tr><td>' + esc(kimName(k)) + '</td><td>' + esc(byKey[t.fam] || "Other") +
+               '</td><td>' + (t.w || "—") + '</td><td>' + (t.l || "—") + '</td></tr>';
+      }).join("") + '</tbody></table>';
+  }
+
+  function renderTechniques(r){
+    var host = document.getElementById("kmBody");
+    if (!host) return;
+    var id = apiId(r);
+    if (!id){ host.innerHTML = '<p class="empty">Technique history needs the live banzuke, which didn’t load.</p>'; return; }
+
+    host.innerHTML = '<p class="empty">Counting how he finishes…</p>';
+    fetchCareer(id).then(function(career){
+      var recs = career && career.records;
+      var sect = document.getElementById("kmSect");
+      if (!recs || !recs.length){ if (sect) sect.remove(); return; }
+
+      var split = techSplit(recs);
+      var state = { table: false };
+
+      function paint(){
+        host.innerHTML =
+          '<div class="km-grid">' +
+            famPanel(split, "w", CC.gold, "Won by") +
+            famPanel(split, "l", CC.loss, "Lost to") +
+          '</div>' +
+          '<p class="cc-cap">' + (split.tot.w + split.tot.l) + ' bouts decided on the dohyō' +
+            (split.off.w || split.off.l
+              ? ', plus ' + split.off.w + ' won and ' + split.off.l +
+                ' lost by forfeit or foul, which are left out of the split above'
+              : '') + '.</p>' +
+          '<div class="cc-tools"><button type="button" class="cc-tbtn" id="kmToggle" aria-pressed="' +
+            (state.table ? "true" : "false") + '">' +
+            (state.table ? "Hide every technique" : "Show every technique") + '</button></div>' +
+          (state.table ? techTable(split) : "");
+        var tg = document.getElementById("kmToggle");
+        if (tg) tg.onclick = function(){ state.table = !state.table; paint(); };
+      }
+      paint();
+    });
+  }
+
+  /* ── who he owns, and who owns him ─────────────────────────────────────
+     Also free: the same career records carry the opponent of every bout.
+
+     A rivalry needs repetition. One meeting is a result, not a record, so
+     anything under three is left out entirely rather than shown as a
+     meaningless 1–0 — and the note says so, because "no rivals" and "nobody
+     he has met three times" are different statements. */
+  var RIVAL_MIN = 3;
+  function rivalSplit(records){
+    var by = {};
+    (records || []).forEach(function(m){
+      if (!m.opp) return;
+      var o = by[m.opp] = by[m.opp] || { n:m.opp, w:0, l:0 };
+      m.won ? o.w++ : o.l++;
+    });
+    var all = Object.keys(by).map(function(k){ return by[k]; })
+      .filter(function(o){ return o.w + o.l >= RIVAL_MIN; });
+    var owns = all.filter(function(o){ return o.w > o.l; })
+      .sort(function(a,b){ return (b.w-b.l) - (a.w-a.l) || b.w - a.w; });
+    var owned = all.filter(function(o){ return o.l > o.w; })
+      .sort(function(a,b){ return (b.l-b.w) - (a.l-a.w) || b.l - a.l; });
+    return { owns: owns.slice(0, 6), owned: owned.slice(0, 6), pool: all.length };
+  }
+
+  function rivalList(rows, cls, empty){
+    if (!rows.length) return '<p class="empty">' + esc(empty) + '</p>';
+    var from = String(qs().get("from") || "rikishi");
+    return '<ul class="rv-list">' + rows.map(function(o){
+      var known = !!find(o.n);
+      var label = known
+        ? '<a href="rikishi.html?n=' + encodeURIComponent(o.n) + '&from=' + esc(from) + '">' + esc(o.n) + '</a>'
+        : esc(o.n);
+      return '<li>' + label + '<b class="' + cls + '">' + o.w + '–' + o.l + '</b></li>';
+    }).join("") + '</ul>';
+  }
+
+  function renderRivals(r){
+    var host = document.getElementById("rvBody");
+    if (!host) return;
+    var id = apiId(r);
+    if (!id){ host.innerHTML = '<p class="empty">Rivalries need the live banzuke, which didn’t load.</p>'; return; }
+
+    host.innerHTML = '<p class="empty">Looking up his rivals…</p>';
+    fetchCareer(id).then(function(career){
+      var recs = career && career.records;
+      var sect = document.getElementById("rvSect");
+      if (!recs || !recs.length){ if (sect) sect.remove(); return; }
+
+      var s = rivalSplit(recs);
+      if (!s.pool){
+        host.innerHTML = '<p class="empty">He has not met anyone ' + RIVAL_MIN +
+          ' times yet — too early for a rivalry.</p>';
+        return;
+      }
+      host.innerHTML =
+        '<div class="rv-grid">' +
+          '<div><h4>He owns</h4>' +
+            rivalList(s.owns, "lm-up", "Nobody he has met " + RIVAL_MIN + " times is behind him.") + '</div>' +
+          '<div><h4>They own him</h4>' +
+            rivalList(s.owned, "lm-down", "Nobody he has met " + RIVAL_MIN + " times is ahead of him.") + '</div>' +
+        '</div>' +
+        '<p class="cc-cap">Career meetings, from ' + s.pool + ' opponent' + (s.pool === 1 ? "" : "s") +
+        ' he has faced at least ' + RIVAL_MIN + ' times. Even records are left out.</p>';
+    });
+  }
+
+  /* ── what a link to this page says it is ───────────────────────────────
+     Every profile shipped the directory's description, so seventy-odd pages
+     told Google and every chat client the same thing about themselves. Each
+     man now describes himself, with the portrait as the preview image and a
+     canonical URL that names the query string as part of the page's identity.
+
+     Worth knowing where this stops: this runs in the browser. Google renders
+     JavaScript and will see it; most chat and social unfurlers do not, and
+     will keep reading the static tags in the file. Fixing that needs
+     prerendering at the edge, not more client-side code. */
+  var SITE = "https://sumoslapdown.com";
+  function meta(sel, attr, val, key){
+    var el = document.head.querySelector(sel);
+    if (!el){
+      el = document.createElement(sel.indexOf("link") === 0 ? "link" : "meta");
+      el.setAttribute(attr, key);
+      document.head.appendChild(el);
+    }
+    el.setAttribute(sel.indexOf("link") === 0 ? "href" : "content", val);
+  }
+  function describe(r){
+    var bits = [rankText(r)];
+    var rec = liveRecord(r) ? liveRecord(r) + " this basho"
+            : (pastRecord(r) ? pastRecord(r) + " last basho" : "");
+    if (rec) bits.push(rec);
+    if (r.stable) bits.push(r.stable + " stable");
+    if (r.from) bits.push("from " + r.from);
+    var desc = r.n + " — " + bits.join(", ") +
+      ". Career record, rank history, likely matchups and how he wins.";
+
+    document.title = r.n + " · Sumo Slapdown";
+    meta('meta[name="description"]', "name", desc, "description");
+    meta('meta[property="og:title"]', "property", r.n + " · Sumo Slapdown", "og:title");
+    meta('meta[property="og:description"]', "property", desc, "og:description");
+    meta('meta[property="og:type"]', "property", "profile", "og:type");
+    meta('meta[property="og:url"]', "property", SITE + "/rikishi.html?n=" + encodeURIComponent(r.n), "og:url");
+    meta('meta[property="og:image"]', "property", photo(r.n), "og:image");
+    meta('meta[name="twitter:card"]', "name", "summary", "twitter:card");
+    meta('link[rel="canonical"]', "rel", SITE + "/rikishi.html?n=" + encodeURIComponent(r.n), "canonical");
   }
 
   /* ── likely matchups ───────────────────────────────────────────────────
