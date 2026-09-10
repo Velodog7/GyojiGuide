@@ -139,9 +139,13 @@ t('the old dmUnread route still works for tabs opened before the deploy', ()=>{
   assert.ok(r.ok && r.unread === base + 1, JSON.stringify(r));
 });
 
-t('the version was bumped', ()=>{
+/* Pinning the literal made this fail on every later deploy — it tested the
+   changelog, not the code. What the version has to BE is a dated marker the
+   live `?action=version` check can compare against the file you deployed. */
+t('the version is a dated marker', ()=>{
   const c = world();
-  assert.strictEqual(c.BACKEND_VERSION, '2026-09-09-whatsnew');
+  assert.ok(/^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/.test(c.BACKEND_VERSION),
+    'not a dated version string: ' + c.BACKEND_VERSION);
 });
 
 console.log('\n'+pass+' passed, '+fail+' failed');

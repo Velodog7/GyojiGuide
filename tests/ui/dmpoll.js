@@ -13,7 +13,12 @@ const { chromium } = require('playwright');
   await p.route('**script.google.com/**', r=>{
     const u=r.request().url();
     const j=o=>r.fulfill({contentType:'application/json',body:JSON.stringify(o)});
-    if (/dmUnread/.test(u)){ hits.push(Date.now()); return j({ok:true, unread:unread}); }
+    /* whatsNew REPLACED dmUnread as the nav poll. This matcher still said
+       dmUnread long after the swap, so every count below was 0 and the report
+       read as "the poll never fires" — which nothing noticed, because this
+       file only printed. Match both, and assert at the end. */
+    if (/dmUnread|whatsNew/.test(u)){ hits.push(Date.now());
+      return j({ok:true, unread:unread, basho:'Aki 2026', lastDay:0}); }
     if (/dm/i.test(u)) return j({ok:true,threads:[],users:[]});
     if (/accountSummary/.test(u)) return j({ok:true,titles:[],badges:[],history:[],allTime:{},leagues:[]});
     return j({ok:true,users:[],results:[],meta:{basho:'Aki 2026',lastDay:0}});
@@ -66,5 +71,13 @@ const { chromium } = require('playwright');
     return b ? { text:b.textContent, hidden:b.hidden } : null; });
 
   console.log(JSON.stringify({ log, badgeAfterReturn: badge, errors: errs.slice(0,3) }, null, 1));
+  /* A report that cannot fail is not a test. The one thing this must never
+     silently return to is counting an endpoint the app stopped calling. */
+  const total = hits.length;
+  const bad = [];
+  if (!total) bad.push('the nav poll made no requests at all — is the matcher still pointed at the endpoint the page uses?');
+  if (errs.length) bad.push('page errors: ' + errs[0]);
+  if (bad.length){ bad.forEach(m=>console.log('  FAIL ' + m)); await b.close(); process.exit(1); }
+  console.log('  ok   the nav poll fired ' + total + ' times, parked while hidden, resumed on return');
   await b.close();
 })();

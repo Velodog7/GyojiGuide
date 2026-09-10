@@ -212,6 +212,15 @@
     if (res && res.ok) dataOnce = null;
     return res;
   };
+  /* name only — never posts the team, so it still works during a basho */
+  GG.saveName = async function (name) {
+    var a = GG.account.get();
+    if (!a) return { ok: false, error: "Sign in first." };
+    var n = String(name || "").trim() || a.handle;
+    var res = await GG.apiPost({ action: "saveName", handle: a.handle, auth: a.auth, name: n });
+    if (res && res.ok) { a.name = n; GG.account.set(a); dataOnce = null; }
+    return res;
+  };
   GG.saveAvatar = async function (design) {
     var a = GG.account.get();
     if (!a) return { ok: false, error: "Sign in first." };

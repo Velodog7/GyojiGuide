@@ -290,11 +290,39 @@
   function tabHidden(){
     return typeof document !== "undefined" && document.visibilityState === "hidden";
   }
+  /* The OS bridge is the ONLY reason to poll a tab nobody is looking at, so it
+     is also the gate. Without it the poll parks while hidden (right: a
+     background tab that can only ever raise a toast on your return has no
+     reason to spend a request). With it, parking silently defeated the whole
+     feature — detection only ever ran while visible, so push() never saw a
+     hidden tab and the browser notification could not fire for mail or for a
+     new day. Opted in, we keep looking, four times slower. */
+  function osBridgeLive(){
+    var N = GG.notify;
+    try { return !!(N && N.osWanted() && N.osPermission() === "granted"); }
+    catch (e) { return false; }
+  }
+  function navParked(){ return tabHidden() && !osBridgeLive(); }
+  function navEvery(){ return tabHidden() ? 180000 : 45000; }
   function wireNavVisibility(){
     if (navVisWired || typeof document === "undefined" || !document.addEventListener) return;
     navVisWired = true;
     document.addEventListener("visibilitychange", function(){
-      if (!tabHidden() && acct()) pollNavUnread();
+      if (!acct()) return;
+      /* Coming back: ask now — whatever arrived while you were away is the
+         first thing you want. */
+      if (!tabHidden()) { pollNavUnread(); return; }
+      /* Going away, opted out: stop the loop until you return. */
+      if (navParked()) {
+        if (navUnreadTimer){ clearTimeout(navUnreadTimer); navUnreadTimer = null; }
+        return;
+      }
+      /* Going away, opted in: keep looking, but re-arm at the slower cadence
+         rather than firing here — a tab switch is not news, and someone who
+         flips between tabs all afternoon would otherwise spend a request on
+         every flip. */
+      if (navUnreadTimer){ clearTimeout(navUnreadTimer); }
+      navUnreadTimer = setTimeout(pollNavUnread, navEvery());
     });
   }
   /* One loop, not several. Clearing navUnreadTimer isn't enough on its own:
@@ -326,7 +354,13 @@
        the next tournament can't read as fifteen days going backwards. */
     var day = Number(res.lastDay || 0) || 0;
     var basho = String(res.basho || "");
-    if (day > 0 && N.rose("day:" + basho, day)) {
+    /* rose() ALWAYS gets called, including at day 0, because the first call for
+       a key only seeds the baseline and says nothing. Guarding the call behind
+       `day > 0` meant a tab opened before the basho never seeded — so day 1,
+       the one everybody is waiting for, arrived as a first sighting and was
+       silent. Seed on 0; announce on the rise. */
+    var moved = N.rose("day:" + basho, day);
+    if (day > 0 && moved) {
       N.push({ key:"day", tag:"gg-day",
                title: "Day " + day + " results are in",
                body: basho + " \u00b7 standings have moved.",
@@ -339,7 +373,7 @@
     if (navUnreadTimer){ clearTimeout(navUnreadTimer); navUnreadTimer = null; }
     if (!acct() || !(GG.whatsNew || GG.dmUnread)) return;
     wireNavVisibility();
-    if (tabHidden()) return;                 // parked until the tab comes back
+    if (navParked()) return;                 // parked until the tab comes back
     try {
       /* whatsNew replaced dmUnread here: the same single request now also
          carries the basho day, so results notifications cost no extra call.
@@ -355,7 +389,7 @@
       announce(res, n);
     } catch (e){}
     if (mine !== navPollSeq) return;
-    if (acct() && !tabHidden()) navUnreadTimer = setTimeout(pollNavUnread, 45000);   // re-check every 45s
+    if (acct() && !navParked()) navUnreadTimer = setTimeout(pollNavUnread, navEvery());
   }
 
   /* Browser notifications, opt-in.

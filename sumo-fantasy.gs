@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-09-whatsnew';
+var BACKEND_VERSION = '2026-09-10-savename';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -301,6 +301,7 @@ function doPost(e) {
     if (body.action === 'login')    return json(login(body));
     if (body.action === 'changeHandle') return json(changeHandle(body));
     if (body.action === 'save')     return json(saveTeam(body));
+    if (body.action === 'saveName') return json(saveName(body));
     if (body.action === 'saveAvatar') return json(saveAvatar(body));
     if (body.action === 'createLeague') return json(createLeague(body));
     if (body.action === 'joinLeague')   return json(joinLeague(body));
@@ -546,6 +547,38 @@ function saveTeam(body) {
         var name = String(body.name || v[r][1] || handle).trim().slice(0, 60);
         sh.getRange(r + 1, 1, 1, 5).setValues([[String(v[r][0]), name, auth, JSON.stringify(body.team || {}), new Date().toISOString()]]);
         return { ok: true, updated: true, handle: handle };
+      }
+    }
+    return { ok: false, error: 'No account with that handle \u2014 create one first.' };
+  } finally {
+    unlock_(lock);
+  }
+}
+
+/* Rename without posting a team.
+
+   The account panel saved the display name by calling `save`, which writes the
+   name and the team in one row write — so the moment day 1 locked teams,
+   changing your name failed, with a message about teams that had nothing to do
+   with what you'd asked for. A name is not a team: this writes the name column
+   and nothing else, leaves the team and its updated stamp alone, and is never
+   locked by a running basho. */
+function saveName(body) {
+  var handle = cleanHandle(body.handle);
+  var auth = String(body.auth || '');
+  var name = String(body.name || '').trim().slice(0, 60);
+  if (!name) return { ok: false, error: 'Pick a display name.' };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
+    var v = sh.getDataRange().getValues();
+    var key = handle.toLowerCase();
+    for (var r = 1; r < v.length; r++) {
+      if (String(v[r][0]).trim().toLowerCase() === key) {
+        if (String(v[r][2] || '') !== auth) return { ok: false, error: 'Not authorised for this handle.' };
+        sh.getRange(r + 1, 2).setValue(name);
+        return { ok: true, name: name };
       }
     }
     return { ok: false, error: 'No account with that handle \u2014 create one first.' };

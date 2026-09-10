@@ -1450,7 +1450,9 @@ $("acctSave").onclick = async () => {
   acctViewStatus("Saving…");
   if (hasAPI()) {
     try {
-      const res = await apiPost({ action:"save", handle:acct.handle, name:n, auth:acct.auth, team });
+      /* saveName, not save: "save" writes the name and the team together, so
+         during a basho a rename was refused for touching a locked team. */
+      const res = await apiPost({ action:"saveName", handle:acct.handle, name:n, auth:acct.auth });
       if (!(res && res.ok)) { acctViewStatus(res && res.error ? res.error : "Couldn't save.", "err"); return; }
     } catch (e) { acctViewStatus("Network error — saved on this device.", "err"); }
   }
