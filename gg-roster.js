@@ -64,6 +64,63 @@
     return (MONTH_NAME[id.slice(4)] || id.slice(4)) + " " + id.slice(0, 4);
   }
 
+  /* The basho before this one. Banzuke ids are YYYYMM on the six odd months, so
+     stepping back is minus two months with a year wrap — no date arithmetic and
+     no dependence on today, which matters because the id we are stepping back
+     from was itself found by walking backwards until a banzuke was published. */
+  function prevBashoId(id) {
+    /* Shape-check the whole id rather than trusting parseInt, which happily
+       reads "20xx09" as the year 20 and would answer "2007" — a basho id that
+       looks plausible enough to fetch and is nonsense. */
+    if (!/^\d{6}$/.test(String(id))) return "";
+    var y = parseInt(String(id).slice(0, 4), 10), m = parseInt(String(id).slice(4, 6), 10);
+    if (m < 1 || m > 12) return "";
+    m -= 2; if (m < 1) { m += 12; y -= 1; }
+    return "" + y + (m < 10 ? "0" + m : m);
+  }
+
+  /* Lower is better, mirroring sumo-api's own rankValue scheme: one division
+     every hundred, position within it after. Only the ORDER is ever used, so
+     the absolute numbers do not need to match theirs.
+
+     Side is deliberately NOT part of it. M5e does outrank M5w, but nobody calls
+     that a promotion, and counting it as one would print "▼ M5→M5" — a pill
+     that contradicts itself. */
+  var TIER_STEP = { Y: 0, O: 1, S: 2, K: 3, M: 4, J: 5 };
+  function rankOrdinal(w) {
+    var t = TIER_STEP[w.tier];
+    return (t === undefined ? 9 : t) * 100 + (w.num || 0);
+  }
+
+  /* What changed for this banzuke, computed by diffing two banzuke.
+
+     Not from each man's rankHistory, because the bulk /rikishis endpoint that
+     carries it returns only the first hundred rikishi by id and ignores `skip`
+     entirely — it echoes the value back and sends the same rows. More than five
+     hundred men, Onosato and Aonishiki among them, cannot be reached through it
+     at all, so a pill built that way is correct for whoever happens to fall in
+     that window and silently stale for everyone else.
+
+     The banzuke has no such cap, and it is the same document the rank printed
+     beside the pill comes from — so the two can never disagree. */
+  function attachChange(ranks, prev) {
+    var name, cur, was, a, b;
+    for (name in ranks) {
+      if (!Object.prototype.hasOwnProperty.call(ranks, name)) continue;
+      cur = ranks[name]; was = prev[name];
+      if (!was) {
+        /* Absent from BOTH divisions last time, so he was Makushita or below.
+           Whether that is a debut or a return is not knowable from two banzuke,
+           and this label does not guess at it. */
+        cur.chg = { d: "new", t: "up to sekitori", from: "", to: cur.rk };
+        continue;
+      }
+      a = rankOrdinal(was); b = rankOrdinal(cur);
+      cur.chg = { d: b < a ? "up" : (b > a ? "down" : "same"),
+                  t: was.rk + "\u2192" + cur.rk, from: was.rk, to: cur.rk };
+    }
+  }
+
   // "Maegashira 5 West" / "Yokozuna 1 East" / "Juryo 3 East" -> structured rank
   function deriveFromRank(rankStr, divisionHint) {
     var s = String(rankStr || "").trim();
@@ -137,9 +194,30 @@
             if (!started) all.forEach(function (w) { w.record = null; w.wins = null; w.losses = null; });
             var ranks = {};
             all.forEach(function (w) { ranks[w.name] = w; });
-            return { ok: true, live: true, bashoId: id, label: label(id), ranks: ranks,
-                     started: started, upcoming: !started,
-                     count: { makuuchi: mak.length, juryo: jur.length } };
+            function done(changed) {
+              return { ok: true, live: true, bashoId: id, label: label(id), ranks: ranks,
+                       started: started, upcoming: !started, change: !!changed,
+                       count: { makuuchi: mak.length, juryo: jur.length } };
+            }
+            /* Opt-in: two more requests, and only analysis.html wants them.
+               Every other page reads ranks and records only, and should not pay
+               for a rank-change pill it does not draw. */
+            if (!opts.change) return done(false);
+            var pid = prevBashoId(id);
+            if (!pid) return done(false);
+            return Promise.all([fetchBanzuke(pid, "Makuuchi"), fetchBanzuke(pid, "Juryo")])
+              .then(function (pp) {
+                /* Same published-banzuke floor as above. A thin or missing
+                   previous banzuke means no pill at all — absent beats
+                   present-and-wrong, and a wrong one here reads as a demotion
+                   for a man who was just promoted. */
+                if (pp[0].length < 20 || pp[1].length < 10) return done(false);
+                var prev = {};
+                pp[0].concat(pp[1]).forEach(function (w) { prev[w.name] = w; });
+                attachChange(ranks, prev);
+                return done(true);
+              })
+              .catch(function () { return done(false); });
           }
           return tryNext();                    // published-but-empty (future basho) → walk back
         })
@@ -256,31 +334,92 @@
     }
     return b;
   }
+  /* The bulk endpoint returns AT MOST a hundred rikishi, lowest id first, and
+     cannot be paged past that: `skip` is echoed back in the response and then
+     ignored, `offset` returns nothing, and every sort parameter answers 400.
+     As of Aki 2026 that reaches 53 of the 70 sekitori — Onosato (8850) and
+     Aonishiki (8854) are among the seventeen it cannot.
+
+     The old code asked for limit=1000, got 100, read that as a short final page
+     and stopped, so those seventeen silently kept whatever the calling page had
+     bundled. So: the bulk call is a cheap first pass, and anyone still wanted
+     afterwards is fetched by id. Callers have those ids already — they ride on
+     the banzuke rows load() hands back. */
+  var BULK_CAP = 100;
+  var LOOKUP_WIDTH = 4;
+
+  function bioById(name, id){
+    var url = API_BASE + "/rikishi/" + encodeURIComponent(id) +
+              "?ranks=true&measurements=true&shikonas=true";
+    return fetch(url, { headers: { "Accept": "application/json" } })
+      .then(function (res) { if (!res.ok) throw new Error("rikishi " + res.status); return res.json(); })
+      .then(function (e) {
+        if (!e || !e.shikonaEn) return null;
+        /* The id came from the banzuke row for this name, so they should agree.
+           Checking costs nothing and catches an id pointing at the wrong man —
+           which is exactly how head-to-head once shipped reading a photo id and
+           got a confident, wrong answer for every pair. */
+        if (String(e.shikonaEn).toLowerCase() !== String(name).toLowerCase()) return null;
+        return parseBio(e);
+      })
+      .catch(function () { return null; });
+  }
+
+  /* a few at a time: seventeen parallel requests at sumo-api is rude, and the
+     caller repaints when the whole batch lands either way */
+  function inSeries(jobs, width) {
+    var i = 0;
+    function next() { return i >= jobs.length ? Promise.resolve() : jobs[i++]().then(next); }
+    var lanes = [], k;
+    for (k = 0; k < Math.min(width, jobs.length); k++) lanes.push(next());
+    return Promise.all(lanes);
+  }
+
+  /* bios({ names, ids, maxLookups }) ->
+       { ok, count, byName, bulk, lookedUp, missing:[names] }
+     `ids` is optional {name: rikishiId}; without it this is the bulk pass alone
+     and `missing` names everyone it could not reach, rather than pretending. */
   function bios(opts){
-    opts=opts||{};
-    var want=null; if(opts.names&&opts.names.length){ want={}; opts.names.forEach(function(n){ want[String(n).toLowerCase()]=1; }); }
-    var byName={}, found=0, maxPages=opts.maxPages||6, limit=1000;
-    function page(skip,p){
-      if(p>maxPages) return finish();
-      var url=API_BASE+"/rikishis?limit="+limit+"&skip="+skip+"&measurements=true&ranks=true&shikonas=true";
-      return fetch(url,{headers:{"Accept":"application/json"}})
-        .then(function(res){ if(!res.ok) throw new Error("rikishis "+res.status); return res.json(); })
-        .then(function(data){
-          var recs=data.records||[];
-          recs.forEach(function(e){ var name=e.shikonaEn; if(!name) return; if(want&&!want[name.toLowerCase()]) return; if(!byName[name]){ byName[name]=parseBio(e); found++; } });
-          var total=data.total||0;
-          if(want&&found>=Object.keys(want).length) return finish();
-          if(recs.length<limit||(skip+limit)>=total) return finish();
-          return page(skip+limit,p+1);
+    opts = opts || {};
+    var names = (opts.names && opts.names.length) ? opts.names.slice() : null;
+    var want = null;
+    if (names){ want = {}; names.forEach(function(n){ want[String(n).toLowerCase()] = 1; }); }
+    var ids = opts.ids || {};
+    var byName = {}, bulk = 0, lookedUp = 0;
+
+    var url = API_BASE + "/rikishis?limit=" + BULK_CAP + "&measurements=true&ranks=true&shikonas=true";
+    return fetch(url, { headers: { "Accept": "application/json" } })
+      .then(function (res) { if (!res.ok) throw new Error("rikishis " + res.status); return res.json(); })
+      .then(function (data) {
+        (data.records || []).forEach(function (e) {
+          var name = e.shikonaEn; if (!name) return;
+          if (want && !want[name.toLowerCase()]) return;
+          if (!byName[name]) { byName[name] = parseBio(e); bulk++; }
         });
-    }
-    function finish(){ return { ok:true, count:Object.keys(byName).length, byName:byName }; }
-    return Promise.resolve().then(function(){ return page(0,1); }).catch(function(e){ return { ok:false, error:String(e) }; });
+      })
+      .catch(function () { /* bulk unreachable — the per-id pass still stands */ })
+      .then(function () {
+        if (!names) return null;
+        var missing = names.filter(function (n) { return !byName[n] && ids[n]; });
+        var cap = (opts.maxLookups == null) ? 40 : opts.maxLookups;
+        var jobs = missing.slice(0, cap).map(function (n) {
+          return function () {
+            return bioById(n, ids[n]).then(function (b) { if (b) { byName[n] = b; lookedUp++; } });
+          };
+        });
+        return inSeries(jobs, LOOKUP_WIDTH);
+      })
+      .then(function () {
+        return { ok: true, count: Object.keys(byName).length, bulk: bulk, lookedUp: lookedUp,
+                 byName: byName,
+                 missing: names ? names.filter(function (n) { return !byName[n]; }) : [] };
+      })
+      .catch(function (e) { return { ok: false, error: String(e) }; });
   }
 
   window.GGRoster = {
     load: load, bios: bios, applyTo: applyTo, headToHead: headToHead,
     bashoCandidates: bashoCandidates, deriveFromRank: deriveFromRank, label: label,
-    _fetchBanzuke: fetchBanzuke
+    prevBashoId: prevBashoId, _fetchBanzuke: fetchBanzuke
   };
 })();

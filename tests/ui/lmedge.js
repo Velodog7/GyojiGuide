@@ -122,8 +122,14 @@ const table = p => p.evaluate(()=>{
     const n = tr.getAttribute('data-opp');
     if (out[n]) return;
     const e = tr.querySelector('.lm-edge');
+    const hc = tr.querySelector('.lm-h2h');
+    const sub = hc && hc.querySelector('.lm-sub');
     out[n] = {
-      h2h: (tr.querySelector('.lm-h2h')||{}).textContent,
+      /* the record only — .lm-sub carries its percentage and would otherwise
+         run straight into it as "3–925% of 12 meetings" */
+      h2h: hc ? (hc.firstChild ? String(hc.firstChild.textContent).trim() : '') : null,
+      h2hSub: sub ? sub.textContent.trim() : null,
+      edgeSub: (e && e.querySelector('.lm-sub')) ? e.querySelector('.lm-sub').textContent.trim() : null,
       word: e && e.querySelector('b') ? e.querySelector('b').textContent : null,
       cls:  e && e.querySelector('b') ? e.querySelector('b').className : null,
       pct:  e && e.querySelector('.lm-ep') ? e.querySelector('.lm-ep').textContent : null,
@@ -201,6 +207,10 @@ const settle = p => p.waitForTimeout(3500);
         JSON.stringify(t['Hoshoryu'])+' expected Tough '+pct(exp));
     chk('and the head-to-head cell agrees with it', (t['Hoshoryu']||{}).h2h === '3–9',
         (t['Hoshoryu']||{}).h2h);
+    chk('the record also states what it comes to, and over how many meetings',
+        (t['Hoshoryu']||{}).h2hSub === '25% of 12 meetings', (t['Hoshoryu']||{}).h2hSub);
+    chk('and the edge says which rating it started from',
+        (t['Hoshoryu']||{}).edgeSub === 'from 50% on rating', (t['Hoshoryu']||{}).edgeSub);
     await ctx.close();
   }
   {
@@ -212,6 +222,38 @@ const settle = p => p.waitForTimeout(3500);
     chk('losing once to a much weaker man leaves him still favoured',
         t['Ura'] && t['Ura'].word === 'Favoured' && t['Ura'].pct === pct(exp),
         JSON.stringify(t['Ura'])+' expected Favoured '+pct(exp));
+    await ctx.close();
+  }
+
+  /* ---- the two rows that read as broken, now showing their working ----
+     Reported by Sean: "i see an 0-6 head to head but the % is 25% or 3-0 with
+     even 56%". Both are the blend behaving, and both were unreadable because
+     the rating half of the sum was nowhere on screen. */
+  {
+    const {ctx,p} = await open(b, { h2h: { 19: [0,6] } });   // Hoshoryu, rated level
+    await settle(p);
+    const t = await table(p);
+    const r = t['Hoshoryu'] || {};
+    chk('0–6 against an equally rated man reads Tough 25%',
+        r.word === 'Tough' && r.pct === '25%', JSON.stringify(r));
+    chk('  and the row now shows both halves: 0% of 6, from 50% on rating',
+        r.h2hSub === '0% of 6 meetings' && r.edgeSub === 'from 50% on rating',
+        JSON.stringify({h2h:r.h2hSub, edge:r.edgeSub}));
+    await ctx.close();
+  }
+  {
+    const {ctx,p} = await open(b, { h2h: { 8854: [3,0] } });  // Aonishiki, rated far above
+    await settle(p);
+    const t = await table(p);
+    const r = t['Aonishiki'] || {};
+    const exp = blend(pElo(ME.elo, 2900), 3, 0);
+    chk('3–0 against a much stronger man does not become Favoured',
+        r.word === word(exp) && r.pct === pct(exp),
+        JSON.stringify(r)+' expected '+word(exp)+' '+pct(exp));
+    chk('  and the row says why: the rating had him at ' + pct(pElo(ME.elo, 2900)),
+        r.edgeSub === 'from ' + pct(pElo(ME.elo, 2900)) + ' on rating', r.edgeSub);
+    chk('  with the record shown as 100% of 3 meetings',
+        r.h2hSub === '100% of 3 meetings', r.h2hSub);
     await ctx.close();
   }
 
@@ -254,7 +296,12 @@ const settle = p => p.waitForTimeout(3500);
         n: cells.length,
         wordless: cells.filter(c=>!c.querySelector('b') && !c.querySelector('.lm-none')).length,
         classes: [...new Set(cells.map(c=>{ const b=c.querySelector('b'); return b?b.className:'dash'; }))],
-        header: [...document.querySelectorAll('#h2hBody table.lm thead th')].map(t=>t.textContent),
+        /* the label only; each th now carries a <span> saying what its percentage
+         is a percentage of */
+      header: [...document.querySelectorAll('#h2hBody table.lm thead th')]
+        .map(t=>String(t.firstChild ? t.firstChild.textContent : t.textContent).trim()),
+      headerSubs: [...document.querySelectorAll('#h2hBody table.lm thead th span')]
+        .map(x=>x.textContent.trim()),
         spans: [...document.querySelectorAll('#h2hBody .lm-none[colspan]')].map(c=>c.getAttribute('colspan'))
       };
     });
@@ -263,8 +310,15 @@ const settle = p => p.waitForTimeout(3500);
     chk('the three verdicts use the page’s existing up/even/down classes',
         shape.classes.every(c=>/^(lm-up|lm-even|lm-down|dash)$/.test(c)), JSON.stringify(shape.classes));
     chk('the column is headed', JSON.stringify(shape.header) ===
-        JSON.stringify(['Day','Likely opponent','Seen','Head to head','Edge']),
+        JSON.stringify(['Day','Likely opponent','Bout','Head to head','Edge']),
         JSON.stringify(shape.header));
+    /* two percentages sat side by side meaning completely different things and
+       nothing on the page said so. Each header now names what its number is a
+       percentage OF. */
+    chk('and each percentage says what it is a percentage of',
+        JSON.stringify(shape.headerSubs) ===
+        JSON.stringify(['chance of the pairing','career meetings','chance he wins']),
+        JSON.stringify(shape.headerSubs));
     chk('and a day with no projected bout still spans the whole row',
         shape.spans.every(s=>s === '4'), JSON.stringify(shape.spans));
     await ctx.close();

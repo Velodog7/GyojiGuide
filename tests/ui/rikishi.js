@@ -77,7 +77,18 @@ async function open(b, q){
         opps:rows.map(t=>(t.querySelector('a')||{}).textContent||null),
         pcts:rows.map(t=>parseInt((t.querySelector('.lm-pct')||{}).textContent)||0),
         classes:rows.map(t=>((t.querySelector('.lm-h2h')||{}).className||'').replace('lm-h2h ','')),
-        cells:rows.map(t=>((t.querySelector('.lm-h2h')||{}).textContent||'')) };
+        /* the record only. The cell now also carries a .lm-sub line spelling out
+           what it comes to as a percentage, and reading the whole textContent
+           runs the two together as "1–517% of 6 meetings". */
+        cells:rows.map(t=>{
+          const c = t.querySelector('.lm-h2h');
+          if (!c) return '';
+          return String(c.firstChild ? c.firstChild.textContent : c.textContent).trim();
+        }),
+        subs:rows.map(t=>{
+          const x = t.querySelector('.lm-h2h .lm-sub');
+          return x ? x.textContent.trim() : null;
+        }) };
     });
     chk('all fifteen days are projected', r.n===15 && r.days[0]==='1' && r.days[14]==='15',
         r.n+' rows');
@@ -97,6 +108,16 @@ async function open(b, q){
       return cls !== (a>b?'lm-up':a<b?'lm-down':'lm-even');
     });
     chk('a winning record is green, a losing one red', bad.length===0, JSON.stringify(bad.slice(0,3)));
+    /* and the record says what it comes to, so the Edge beside it can be seen
+       to sit between that and the rating rather than contradicting both */
+    const subBad = r.cells.map((c,i)=>[c, r.subs[i]]).filter(([c,sub])=>{
+      const m = c.match(/^(\d+)–(\d+)$/);
+      if (!m) return sub !== null;                 // "never met" carries no percentage
+      const a=+m[1], b=+m[2];
+      return sub !== Math.round(a/(a+b)*100)+'% of '+(a+b)+(a+b===1?' meeting':' meetings');
+    });
+    chk('and each record states its own percentage and sample size',
+        subBad.length===0, JSON.stringify(subBad.slice(0,3)));
     chk('and the numbers are shown, so colour is never the only tell',
         r.cells.every(c=>/^(\d+–\d+|never met|—)$/.test(c)), JSON.stringify(r.cells.slice(0,4)));
 

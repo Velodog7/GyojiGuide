@@ -1097,7 +1097,7 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
     if (num <= 12) return "m9_12";
     return "m13_16";
   }
-  GGRoster.load().then(function(res){
+  GGRoster.load({ change: true }).then(function(res){
     if (!res || !res.ok){ show("warn", "Showing saved data \u2014 couldn\u2019t reach sumo-api for a live update."); return; }
     /* ---- who left, who arrived ----------------------------------------
        A banzuke doesn't just reshuffle: men drop out of the salaried ranks
@@ -1130,6 +1130,13 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
       var w = res.ranks[r.n];
       if (!w){ return; }
       r.rk = w.rk; r.side = w.sideCap; r.num = w.num; r.tier = bucketOf(w.tier, w.num); r.d = w.div;
+      /* The pill now comes from the same two banzuke as the rank above it, so
+         it cannot say "O\u2192S" beside a card headed Ozeki. Null when the
+         previous banzuke could not be read: no pill at all beats one claiming a
+         demotion for a man who was promoted. snapshotRanks() has already run and
+         taken what it needs from the BUNDLED chg, which describes an older move
+         (previous \u2192 finished basho) and is a different pair entirely. */
+      r.chg = w.chg || null;
       var word = WORD[w.tier] || "Maegashira";
       r.rank = (w.tier === "M" || w.tier === "J") ? (word + " " + w.num) : word;
       /* Records ONLY from a basho that has actually been fought. A banzuke is
@@ -1154,9 +1161,17 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
     show(arrived.length || departed.length ? "warn" : "live", note);
 
     /* Enrich each card's biographical + career fields from sumo-api's rikishi
-       records (one bulk call). Editorial fields \u2014 form, inj, lv, grade, elo,
-       eloPk, sig, note \u2014 are deliberately left as curated. */
-    GGRoster.bios({ names: R.map(function(r){ return r.n; }) }).then(function(bio){
+       records. Editorial fields \u2014 form, inj, lv, grade, elo, eloPk, sig,
+       note \u2014 are deliberately left as curated.
+
+       Hand over the banzuke ids as well as the names. The bulk endpoint tops
+       out at a hundred rikishi and cannot be paged, so roughly seventeen of the
+       seventy on the card are unreachable through it — including the yokozuna.
+       With ids, bios() looks those up individually instead of quietly leaving
+       them on whatever this page had bundled. */
+    var BIO_IDS = {};
+    R.forEach(function(r){ var w = res.ranks[r.n]; if (w && w.rikishiId) BIO_IDS[r.n] = w.rikishiId; });
+    GGRoster.bios({ names: R.map(function(r){ return r.n; }), ids: BIO_IDS }).then(function(bio){
       if (!bio || !bio.ok) return;
       R.forEach(function(r){
         var b = bio.byName[r.n]; if (!b) return;
@@ -1176,7 +1191,11 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
         if (b.debut) r.debut = b.debut;
         if (b.kanji) r.kanji = b.kanji;
         if (b.high) r.high = b.high;
-        if (b.chg) r.chg = b.chg;
+        /* b.chg deliberately NOT taken. It is built from the /rikishis bulk
+           endpoint, which returns only the first hundred rikishi by id and
+           ignores paging — so it was right for whoever fell inside that window
+           and stale for the several hundred who did not. The live banzuke diff
+           above covers everyone on the card. */
       });
       try { renderCards(); if (typeof renderTiers === "function") renderTiers(); } catch(e){}
     });

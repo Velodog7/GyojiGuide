@@ -107,9 +107,16 @@
   .lm-h2h{ font-family:"IBM Plex Mono",monospace; font-weight:600; width:7em }
   /* the word does the work; the percentage qualifies it and the colour only
      ever agrees with the two of them */
-  .lm-edge{ width:9em; white-space:nowrap }
-  .lm-edge b{ font-weight:600 }
+  .lm-edge{ width:10em }
+  .lm-edge b{ font-weight:600; white-space:nowrap }
   .lm-ep{ font-family:"IBM Plex Mono",monospace; font-size:.8rem; color:var(--faint) }
+  /* the working, under the answer: small, dim, and never the only place a
+     number appears */
+  .lm-sub{ display:block; font-family:"Space Grotesk",system-ui,sans-serif;
+           font-size:.68rem; font-weight:500; color:var(--faint); letter-spacing:.01em }
+  .lm-h2h .lm-sub{ color:var(--faint) }
+  .lm thead th span{ display:block; font-weight:400; font-size:.66rem; letter-spacing:.02em;
+                     color:var(--faint); text-transform:none; margin-top:1px }
   .lm-up{ color:var(--win) } .lm-down{ color:var(--loss) }
   .lm-even{ color:var(--dim) } .lm-new{ color:var(--faint); font-weight:500 }
   .lm-none{ color:var(--faint) }
@@ -194,6 +201,10 @@
   @media (max-width:560px){
     .hero{ grid-template-columns:96px minmax(0,1fr); gap:13px }
     .hero__img{ max-width:96px }
+    /* the header glosses cost five lines of a narrow screen and repeat what the
+       note directly above already says at length — drop them here, keep the
+       per-row working, which is the part that cannot be got from the note */
+    .lm thead th span{ display:none }
   }
 </style>
 <script src="gg-config.js"></script><script src="gg-account.js"></script>
@@ -1295,11 +1306,16 @@
     var met = h && h.total ? h : null;
     if (!mine || !his){
       if (!met) return null;             // nothing to go on, and we do not pretend
-      return { p: (EDGE_PRIOR * 0.5 + h.a) / (EDGE_PRIOR + h.a + h.b), basis: "record" };
+      return { p: (EDGE_PRIOR * 0.5 + h.a) / (EDGE_PRIOR + h.a + h.b),
+               basis: "record", rating: null };
     }
     var p = 1 / (1 + Math.pow(10, (his - mine) / 400));
-    if (!met) return { p: p, basis: "rating" };
-    return { p: (EDGE_PRIOR * p + h.a) / (EDGE_PRIOR + h.a + h.b), basis: "both" };
+    if (!met) return { p: p, basis: "rating", rating: p };
+    /* `rating` is carried through so the cell can show where the number
+       started. Without it a row prints "0–6" beside "25%" with nothing on
+       screen connecting the two, which is exactly how this read as broken. */
+    return { p: (EDGE_PRIOR * p + h.a) / (EDGE_PRIOR + h.a + h.b),
+             basis: "both", rating: p };
   }
 
   /* Three words, not five. The model is a rating plus a handful of meetings;
@@ -1315,8 +1331,15 @@
   function edgeCell(e){
     if (!e) return '<span class="lm-none">—</span>';
     var l = edgeLabel(e.p);
+    /* One line of working under the verdict. A reader who sees "Tough 25%"
+       against an 0–6 record cannot tell where 25% came from; "from 50% on
+       rating" says it in four words, and the three figures on the row — 0%,
+       50%, 25% — then visibly sit in order instead of contradicting. */
+    var sub = e.basis === "both"   ? "from " + Math.round(e.rating * 100) + "% on rating"
+            : e.basis === "rating" ? "on rating, never met"
+            :                        "on their record alone";
     return '<b class="' + l.cls + '">' + l.word + '</b> <span class="lm-ep">' +
-           Math.round(e.p * 100) + '%</span>';
+           Math.round(e.p * 100) + '%</span><span class="lm-sub">' + sub + '</span>';
   }
   var EDGE_WHY = { rating:"on current rating alone — they have never met",
                    record:"on their record alone — no rating for one of them",
@@ -1339,13 +1362,21 @@
       }
 
       host.innerHTML =
-        '<p class="lm-note">Projected by the same matchmaking model the simulator uses, over ' +
-        TK_RUNS + ' runs of the basho. <b>Seen</b> is how often that pairing came up — day one is ' +
-        'near-certain, later days depend on how everyone is doing. <b>Edge</b> is his estimated ' +
-        'chance of winning that bout, from current rating and adjusted by their head-to-head ' +
-        'where they have one.</p>' +
-        '<table class="lm"><thead><tr><th>Day</th><th>Likely opponent</th><th>Seen</th>' +
-        '<th>Head to head</th><th>Edge</th></tr></thead><tbody>' +
+        '<p class="lm-note">Projected by running the simulator\u2019s matchmaking model over the ' +
+        'whole basho ' + TK_RUNS + ' times.</p>' +
+        '<p class="lm-note"><b>Bout</b> and <b>Edge</b> are percentages of different things. ' +
+        '<b>Bout</b> is how often this pairing came up across those runs \u2014 day one is ' +
+        'near-certain because the card is set by rank, later days depend on how everyone is ' +
+        'doing. <b>Edge</b> is his chance of winning it.</p>' +
+        '<p class="lm-note">Edge starts from the two men\u2019s ratings, then their head-to-head ' +
+        'moves it \u2014 weighted by how many times they have actually met, so one meeting nudges ' +
+        'it and a long series takes it over. That is why a <b>3\u20130 record against a much ' +
+        'stronger man can still come out near even</b>, and why <b>0\u20136 against an equal ' +
+        'does not read as zero</b>. Each Edge shows the rating it started from.</p>' +
+        '<table class="lm"><thead><tr><th>Day</th><th>Likely opponent</th>' +
+        '<th>Bout<span>chance of the pairing</span></th>' +
+        '<th>Head to head<span>career meetings</span></th>' +
+        '<th>Edge<span>chance he wins</span></th></tr></thead><tbody>' +
         rows.map(function(row){
           if (!row.opp) return '<tr><td>' + row.day + '</td><td colspan="4" class="lm-none">no bout projected</td></tr>';
           var o = find(row.opp) || {};
@@ -1377,7 +1408,12 @@
                  number is right there too, so colour is never the only tell */
               var cls = h.a > h.b ? "lm-up" : (h.a < h.b ? "lm-down" : "lm-even");
               c.className = "lm-h2h " + cls;
-              c.textContent = h.a + "–" + h.b;
+              /* the record and what it comes to as a percentage — the figure a
+                 reader computes in their head anyway, and the one the Edge
+                 beside it has to be seen to sit between */
+              c.innerHTML = h.a + "–" + h.b + '<span class="lm-sub">' +
+                Math.round(h.a / (h.a + h.b) * 100) + '% of ' + (h.a + h.b) +
+                (h.a + h.b === 1 ? ' meeting' : ' meetings') + '</span>';
             });
             /* the rating-only estimate is already on screen; fold the series in.
                Nothing moves for a pair who have never met, which is most of
