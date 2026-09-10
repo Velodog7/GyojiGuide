@@ -26,7 +26,7 @@ const T=[]; const chk=(n,ok,x)=>{T.push(ok);console.log((ok?'  ok   ':'  FAIL ')
     const links=[...document.querySelectorAll('.act.profile')];
     return { n:links.length, cards:document.querySelectorAll('#cards .card').length,
              first:links[0] && links[0].getAttribute('href'),
-             text:links[0] && decodeURIComponent(String(links[0].getAttribute('href')).split('n=')[1]||'') };
+             text:links[0] && decodeURIComponent(new URLSearchParams(String(links[0].getAttribute('href')).split('?')[1]||'').get('n')||'') };
   });
   chk('every scout card carries a Profile button', info.n>0 && info.n===info.cards,
       info.n+' links / '+info.cards+' cards');

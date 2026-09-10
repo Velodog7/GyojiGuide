@@ -22,32 +22,6 @@
   a{ color:inherit }
   .wrap{ max-width:1180px; margin:0 auto; padding:18px 16px 60px; width:100% }
 
-  /* ── directory ─────────────────────────────────────────── */
-  .dir-head{ display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; justify-content:space-between; margin:6px 0 18px }
-  .dir-head h1{ font-family:"Zen Kaku Gothic New",system-ui,sans-serif; font-weight:900;
-                font-size:clamp(1.4rem,3.4vw,2rem); margin:0; letter-spacing:.01em }
-  .dir-head p{ margin:4px 0 0; color:var(--muted); font-size:.9rem }
-  .find{ position:relative; flex:0 1 300px; min-width:0 }
-  .find input{ width:100%; background:var(--surface); border:1px solid var(--line); color:var(--ink);
-               border-radius:9px; padding:9px 11px; font:inherit; font-size:.92rem }
-  .find input:focus{ outline:0; border-color:var(--gold) }
-
-  .band{ margin:22px 0 10px; display:flex; align-items:baseline; gap:10px }
-  .band h2{ font-family:"Zen Kaku Gothic New",system-ui,sans-serif; font-size:1.02rem; margin:0; color:var(--gold); letter-spacing:.02em }
-  .band span{ color:var(--faint); font-size:.78rem; font-family:"IBM Plex Mono",monospace }
-  .grid{ display:grid; gap:10px; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)) }
-
-  .rk{ display:flex; gap:10px; align-items:center; text-decoration:none; background:var(--surface);
-       border:1px solid var(--line); border-radius:11px; padding:9px 10px; transition:border-color .12s, background .12s }
-  .rk:hover{ border-color:var(--gold); background:var(--surface2) }
-  .rk__img{ width:44px; height:44px; border-radius:8px; object-fit:cover; object-position:top center;
-            background:var(--surface2); flex:none }
-  .rk__b{ min-width:0 }
-  .rk__n{ display:block; font-weight:700; font-size:.95rem; line-height:1.2; overflow-wrap:anywhere }
-  .rk__m{ display:block; color:var(--muted); font-size:.76rem; font-family:"IBM Plex Mono",monospace; margin-top:1px }
-  .rk__m b{ color:var(--dim); font-weight:600 }
-  .rk.gone{ opacity:.55 }
-
   /* ── profile ───────────────────────────────────────────── */
   .back{ display:inline-flex; align-items:center; gap:6px; color:var(--muted); text-decoration:none;
          font-size:.85rem; margin-bottom:14px }
@@ -166,6 +140,17 @@
     .replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
   function qs(){ try { return new URLSearchParams(location.search); } catch(e){ return { get:function(){return null;} }; } }
 
+  /* Where the reader came from, so "back" means back. The Rikishi tab and the
+     Banzuke tab both open profiles, and dumping everyone on Banzuke would make
+     one of those two journeys lose its place every time. */
+  var BACKS = { rikishi: ["analysis.html#rikishi", "All rikishi"],
+                browse:  ["analysis.html#browse",  "Banzuke"] };
+  function backLink(){
+    var from = String(qs().get("from") || "rikishi");
+    var b = BACKS[from] || BACKS.rikishi;
+    return '<a class="back" href="' + b[0] + '">\u2190 ' + esc(b[1]) + '</a>';
+  }
+
   /* ---------- data ---------- */
   function all(){
     var list = (window.GyojiGuide && GyojiGuide.RIKISHI) || (typeof R !== "undefined" ? R : []);
@@ -231,79 +216,11 @@
   }
 
   /* ---------- directory ---------- */
-  var BANDS = [
-    { key:"sanyaku", label:"Sanyaku",   jp:"三役",   test:function(r){ return /^[YOSK]$/.test(r.rk); } },
-    { key:"maegashira", label:"Maegashira", jp:"前頭", test:function(r){ return r.rk === "M"; } },
-    { key:"juryo", label:"Jūryō", jp:"十両", test:function(r){ return r.rk === "J"; } }
-  ];
   var TIER_ORDER = { Y:0, O:1, S:2, K:3, M:4, J:5 };
   function sortKey(r){
     var tier = tierOf(r);
     return (TIER_ORDER[tier] == null ? 9 : TIER_ORDER[tier]) * 1000 +
            numOf(r) * 2 + (sideOf(r) === "w" ? 1 : 0);
-  }
-
-  function card(r){
-    var gone = !onBanzuke(r);
-    /* Only the live record goes on a card. Between basho the dossier still
-       holds the last tournament's, and "M1e · 9-6" next to a rank reads as a
-       running score for a basho that has not started. The profile says which
-       is which; a card has no room to. */
-    var rec = liveRecord(r);
-    return '<a class="rk' + (gone ? " gone" : "") + '" href="rikishi.html?n=' + encodeURIComponent(r.n) + '">' +
-      '<img class="rk__img" src="' + esc(photo(r.n)) + '" alt="" loading="lazy" width="44" height="44" ' +
-        'onerror="this.style.visibility=\'hidden\'">' +
-      '<span class="rk__b">' +
-        '<b class="rk__n">' + esc(r.n) + '</b>' +
-        '<span class="rk__m"><b>' + esc(shortRank(r)) + '</b>' + (rec ? " · " + esc(rec) : "") + '</span>' +
-      '</span></a>';
-  }
-  function shortRank(r){
-    var n = numOf(r);
-    return tierOf(r) + (n ? n : "") + sideOf(r);
-  }
-
-  function renderDirectory(filter){
-    var q = String(filter || "").trim().toLowerCase();
-    var men = all().slice().sort(function(a,b){ return sortKey(a) - sortKey(b); });
-    if (q) men = men.filter(function(r){
-      return String(r.n).toLowerCase().indexOf(q) >= 0 ||
-             String(r.kanji || "").indexOf(q) >= 0 ||
-             String(r.stable || "").toLowerCase().indexOf(q) >= 0 ||
-             String(r.from || "").toLowerCase().indexOf(q) >= 0;
-    });
-
-    var html = '<div class="dir-head">' +
-      '<div><h1>Rikishi</h1><p>' + men.length + ' of ' + all().length +
-        ' sekitori · rank, record, form and career</p></div>' +
-      '<label class="find"><input id="find" type="search" placeholder="Search name, kanji, stable, birthplace" ' +
-        'value="' + esc(filter || "") + '" autocomplete="off"></label></div>';
-
-    var shown = 0;
-    BANDS.forEach(function(band){
-      var group = men.filter(function(r){ return band.test({ rk: tierOf(r) }); });
-      if (!group.length) return;
-      shown += group.length;
-      html += '<div class="band"><h2>' + band.label + '</h2><span>' + band.jp + ' · ' + group.length + '</span></div>' +
-              '<div class="grid">' + group.map(card).join("") + '</div>';
-    });
-    if (!shown) html += '<p class="empty">Nobody matches that.</p>';
-
-    view.innerHTML = html;
-    var box = document.getElementById("find");
-    if (box) {
-      var t = null;
-      box.oninput = function(){
-        clearTimeout(t);
-        var v = box.value;
-        t = setTimeout(function(){
-          var at = box.selectionStart;
-          renderDirectory(v);
-          var again = document.getElementById("find");
-          if (again) { again.focus(); try { again.setSelectionRange(at, at); } catch(e){} }
-        }, 140);
-      };
-    }
   }
 
   /* ---------- profile ---------- */
@@ -370,7 +287,7 @@
 
   function renderProfile(r){
     var rec = recordText(r);
-    var html = '<a class="back" href="rikishi.html">← All rikishi</a>' +
+    var html = backLink() +
       '<div class="hero">' +
         '<img class="hero__img" src="' + esc(photo(r.n)) + '" alt="' + esc(r.n) + '" ' +
           'onerror="this.style.visibility=\'hidden\'">' +
@@ -718,10 +635,13 @@
   function route(){
     var name = qs().get("n");
     if (!all().length) { view.innerHTML = '<p class="empty">The rikishi dossier didn’t load.</p>'; return; }
-    if (!name) { document.title = "Rikishi · Sumo Slapdown"; renderDirectory(""); return; }
+    /* The directory is the Rikishi tab on analysis.html now — keeping a second
+       copy here would be two things to maintain and two answers to "where is
+       the list". A bare rikishi.html is a bookmark from before that move. */
+    if (!name) { location.replace("analysis.html#rikishi"); return; }
     var r = find(name);
     if (!r) {
-      view.innerHTML = '<a class="back" href="rikishi.html">← All rikishi</a>' +
+      view.innerHTML = backLink() +
         '<p class="empty">No rikishi called “' + esc(name) + '” on this banzuke.</p>';
       return;
     }
