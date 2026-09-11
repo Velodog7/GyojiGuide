@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-10-restart';
+var BACKEND_VERSION = '2026-09-11-steady';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -905,9 +905,11 @@ function saveDraftBoard(body){
       if (String(v[r][0]) !== String(L.id) || String(v[r][1] || '').toLowerCase() !== key) continue;
       sh.getRange(r + 1, 1, 1, DBOARD_HEAD.length)
         .setValues([[L.id, u.handle, JSON.stringify(mak), JSON.stringify(jur), auto, when]]);
+      dsBust_(L.id);
       return { ok:true, saved:mak.length + jur.length, auto:auto, updated:when };
     }
     sh.appendRow([L.id, u.handle, JSON.stringify(mak), JSON.stringify(jur), auto, when]);
+    dsBust_(L.id);
     return { ok:true, saved:mak.length + jur.length, auto:auto, updated:when };
   } finally { unlock_(lock); }
 }
@@ -952,6 +954,7 @@ function joinLeague(body){
     if (!L) return { ok:false, error:'League not found.' };
     if (isMember(L.id, u.handle)) return { ok:true, id:L.id, already:true };
     sh_(SHEET_MEMBERS).appendRow([L.id, u.handle, new Date().toISOString()]);
+    dsBust_(L.id);
     return { ok:true, id:L.id, name:L.name };
   } finally { unlock_(lock); }
 }
@@ -1035,6 +1038,26 @@ function deleteRowsWhere_(sheetName, col, id){
   for (var r=v.length-1;r>=1;r--) if (String(v[r][col])===String(id)) sh.deleteRow(r+1);
 }
 
+/* The last n posts for one league, read from the bottom of the Messages sheet
+   in chunks instead of reading the whole sheet — the draft room asks for this
+   on every poll, and the sheet holds every league's posts for all time. Stops
+   once it has n, or after a few thousand rows (a league that quiet has nothing
+   worth showing in a live room anyway). Oldest first, like messagesOf. */
+function recentMessagesOf_(id, n){
+  var sh = sh_(SHEET_MESSAGES); if (!sh) return [];
+  var last = sh.getLastRow(), out = [], CH = 400, floor = Math.max(2, last - 4000 + 1);
+  for (var end = last; end >= floor && out.length < n; end -= CH){
+    var start = Math.max(floor, end - CH + 1);
+    var v = sh.getRange(start, 1, end - start + 1, 7).getValues();
+    for (var r = v.length - 1; r >= 0 && out.length < n; r--){
+      if (String(v[r][1]) !== String(id) || !String(v[r][0]).trim()) continue;
+      out.push({ id:String(v[r][0]), handle:String(v[r][2]), name:String(v[r][3]||v[r][2]),
+        body:String(v[r][4]||''), parentId:String(v[r][5]||''), created:String(v[r][6]||'') });
+    }
+  }
+  return out.reverse();
+}
+
 /* ---- message board ---- */
 function messagesOf(id){
   var v = sh_(SHEET_MESSAGES).getDataRange().getValues(), out=[];
@@ -1054,6 +1077,7 @@ function postMessage(body){
   try {
     var mid = newId('m_');
     sh_(SHEET_MESSAGES).appendRow([mid, L.id, u.handle, u.name, text, String(body.parentId||''), new Date().toISOString()]);
+    dsBust_(L.id);
     return { ok:true, id:mid };
   } finally { unlock_(lock); }
 }
@@ -1067,6 +1091,7 @@ function deleteMessage(body){
       var commish = L && L.commissioner.toLowerCase()===u.handle.toLowerCase();
       if (!owner && !commish) return { ok:false, error:'You can only delete your own posts.' };
       sh.deleteRow(r+1);
+      dsBust_(String(v[r][1]));
       return { ok:true };
     }
   }
@@ -1629,6 +1654,7 @@ function setDraftDate(body){
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     sh_(SHEET_LEAGUES).getRange(L.row, 13, 1, 2).setValues([[when, JSON.stringify(agree)]]);
+    dsBust_(L.id);
     return { ok:true, draftDate:when };
   } finally { unlock_(lock); }
 }
@@ -1646,6 +1672,7 @@ function agreeDraftDate(body){
     if (body.agree === false) delete agree[u.handle.toLowerCase()];
     else agree[u.handle.toLowerCase()] = true;
     sh_(SHEET_LEAGUES).getRange(L.row, 14, 1, 1).setValue(JSON.stringify(agree));
+    dsBust_(L.id);
     return { ok:true, agreed: body.agree !== false };
   } finally { unlock_(lock); }
 }
@@ -1694,6 +1721,7 @@ function startDraft(body){
     var first = draftTurn(order, rosterPlan(L2), 0);
     var deadline = deadlineFor_(L2, first.handle, boards);
     sh_(SHEET_LEAGUES).getRange(L.row, 17, 1, 3).setValues([[pickClock, deadline, JSON.stringify(defaultOrder)]]);
+    dsBust_(L.id);
     return { ok:true, order:order, rosterSize:rosterSize, benchSize:benchSize, farmSize:farmSize,
              pickClock:pickClock, deadline:deadline };
   } finally { unlock_(lock); }
@@ -1726,6 +1754,70 @@ function nextPickFromLog_(picks){
 }
 function draftRowStale_(L, picks){
   return nextPickFromLog_(picks) !== Number(L.draftPickIdx || 0);
+}
+/* THE TRIPWIRE. A healthy pick log has exactly one pick per pick number and
+   every wrestler at most once. The guards above should keep it that way; this
+   is the alarm for when something gets past them anyway. draftState runs it on
+   every full poll and, if it trips, pauses the draft on its own and hands the
+   commissioner the earliest pick to rewind to — so a fault costs one rewind
+   instead of being found eight picks later. */
+function draftIntegrity_(picks){
+  var byIdx = {}, byName = {}, fixFrom = null;
+  picks.forEach(function(p){
+    if (p.phase === 'redraft') return;
+    (byIdx[p.pickIndex] = byIdx[p.pickIndex] || []).push(p);
+    var k = String(p.rikishi).toLowerCase();
+    (byName[k] = byName[k] || []).push(p);
+  });
+  var turns = [], names = [];
+  Object.keys(byIdx).forEach(function(i){
+    var ps = byIdx[i]; if (ps.length < 2) return;
+    turns.push({ pick:Number(i), handle:ps[0].handle, names:ps.map(function(p){ return p.rikishi; }) });
+    if (fixFrom === null || Number(i) < fixFrom) fixFrom = Number(i);
+  });
+  Object.keys(byName).forEach(function(k){
+    var ps = byName[k]; if (ps.length < 2) return;
+    var idxs = ps.map(function(p){ return p.pickIndex; }).sort(function(a, b){ return a - b; });
+    names.push({ name:ps[0].rikishi, picks:idxs });
+    if (fixFrom === null || idxs[1] < fixFrom) fixFrom = idxs[1];    // keep the first, redo from the second
+  });
+  turns.sort(function(a, b){ return a.pick - b.pick; });
+  return { ok: !turns.length && !names.length, turns:turns, names:names, fixFrom:fixFrom };
+}
+
+/* =====================================================================
+   THE DRAFT-STATE SNAPSHOT
+   ---------------------------------------------------------------------
+   Every member's room polls draftState every few seconds, and a full answer
+   reads six sheets. On 10 Sept that load is what made the room crawl ("seems
+   to be slowing down", "did draft just crash?"). So the board part of the
+   answer — everything except presence and the server clock — is kept in
+   CacheService for a few seconds and shared by every poller.
+
+   A generation stamp keeps it honest. Every write that changes what the room
+   shows calls dsBust_(), which moves the generation on. A poller only serves a
+   snapshot stamped with the CURRENT generation, and only stores one if the
+   generation did not move while it was reading — so a slow poll can never put
+   an answer from before a pick back into the cache after it.
+
+   A snapshot is never served when there is work to do: an expired clock that
+   needs settling, or a tripped wire that needs pausing. Those always take the
+   full path. */
+var DS_CACHE_S = 3;
+function dsCache_(){ try { return CacheService.getScriptCache(); } catch (e) { return null; } }
+function dsGen_(id){
+  var c = dsCache_(); if (!c) return '';
+  try { return String(c.get('dsg:' + id) || '0'); } catch (e) { return ''; }
+}
+function dsBust_(id){
+  var c = dsCache_(); if (!c) return;
+  try { c.put('dsg:' + id, String(Date.now()) + ':' + Math.floor(Math.random() * 1e6), 21600); } catch (e) {}
+}
+function dsNeedsWork_(core){
+  if (!core || !core.league || core.league.draftStatus !== 'active') return false;
+  if (core.paused) return false;
+  if (core.alert) return true;
+  return !!core.deadline && new Date(core.deadline).getTime() <= Date.now();
 }
 
 function draftPicksOf(id){
@@ -1796,6 +1888,9 @@ function settleDraft_(L){
      against the real state. This is what stopped Gyoji taking five wrestlers at
      pick 22 of the Chanko Boogie draft. */
   if (draftRowStale_(L, picks)) return L;
+  /* Never auto-draft into a pick log that is already wrong — draftState's
+     tripwire will pause the draft and tell the commissioner. */
+  if (!draftIntegrity_(picks).ok) return L;
   var taken = {};
   picks.forEach(function(p){ taken[String(p.rikishi).toLowerCase()] = 1; });
   var plan = rosterPlan(L);
@@ -1836,6 +1931,7 @@ function settleDraft_(L){
   sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue(status);
   sh_(SHEET_LEAGUES).getRange(L.row, 10, 1, 2).setValues([[idx, nextTurn.phase]]);
   sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue(deadline);
+  dsBust_(L.id);
   return leagueRow(L.id);
 }
 
@@ -1881,35 +1977,58 @@ function presenceOf_(leagueId, handles){
 }
 
 function draftState(id, who){
+  /* The shared snapshot first (see THE DRAFT-STATE SNAPSHOT). */
+  var gen = dsGen_(id), cache = dsCache_();
+  if (cache && gen){
+    try {
+      var hit = cache.get('ds:' + id);
+      if (hit){
+        var snap = JSON.parse(hit);
+        if (snap && snap.gen === gen && !dsNeedsWork_(snap.core)) return draftStateFinish_(id, who, snap.core);
+      }
+    } catch (e) {}
+  }
+
   var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
   /* Anyone polling advances the clock. Only take the lock when there is
-     actually something overdue, so the common poll stays a plain read. */
-  if (L.draftStatus === 'active' && L.pickDeadline && new Date(L.pickDeadline).getTime() <= Date.now()){
+     actually something overdue, so the common poll stays a plain read — and
+     only wait a moment for it: whoever holds it is doing this same work, and a
+     poll parked for 15 seconds is one more request Apps Script has to keep
+     open while the room piles up behind it. */
+  if (L.draftStatus === 'active' && L.draftPaused == null && L.pickDeadline && new Date(L.pickDeadline).getTime() <= Date.now()){
     var lock = LockService.getScriptLock();
-    if (lock.tryLock(15000)){
+    if (lock.tryLock(1500)){
       try { freshen_(); L = settleDraft_(leagueRow(id)); } finally { unlock_(lock); }
     }
   }
   var picks = draftPicksOf(L.id);
+
+  /* The tripwire. Checked on every full poll; if the log is wrong and the
+     draft is still running, stop it before another pick lands on top. */
+  var integ = draftIntegrity_(picks);
+  if (!integ.ok && L.draftStatus === 'active' && L.draftPaused == null){
+    var lock = LockService.getScriptLock();
+    if (lock.tryLock(1500)){
+      try {
+        freshen_();
+        var L2 = leagueRow(id);
+        if (L2 && L2.draftStatus === 'active' && L2.draftPaused == null){ pauseRow_(L2); L = L2; }
+      } finally { unlock_(lock); }
+    }
+  }
+
   var turn = L.draftStatus === 'active' ? draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx) : { phase:L.draftStatus==='complete'?'done':'none' };
   var boards = L.mode === 'keepers' ? draftBoardsOf(L.id) : {};
   var onClock = boards[String(turn.handle || '').toLowerCase()];
 
   /* Presence and chat ride on this poll rather than getting pollers of their
-     own. The draft room already asks for this every few seconds; two more
-     requests per member per tick would treble the load on the busiest minute
-     of the league's fortnight for no extra freshness. */
-  /* membersOf returns bare handles, not objects. Display names come from one
-     read of the Users sheet rather than a findUser() per member — this runs on
-     every poll from every member. */
-  /* Every one of these is best-effort. The room and the chat are decoration on
-     a poll whose real job is the pick clock — a missing or empty sheet must
-     leave the draft working, not take it down with it. */
+     own. Every one of these is best-effort. The room and the chat are
+     decoration on a poll whose real job is the pick clock — a missing or empty
+     sheet must leave the draft working, not take it down with it. */
   var handles = [];
   try { handles = membersOf(L.id) || []; } catch (e) {}
   /* Deliberately NOT readUsers(): that parses every account's team JSON and
-     recomputes the whole rank ladder, and this runs on every poll from every
-     member. Two columns is all a name needs. */
+     recomputes the whole rank ladder. Two columns is all a name needs. */
   var nameBy = {};
   try {
     var us = sh_(SHEET_USERS), uv = us.getRange(1, 1, Math.max(1, us.getLastRow()), 2).getValues();
@@ -1919,19 +2038,16 @@ function draftState(id, who){
   var members = handles.map(function (h) {
     return { handle: h, name: nameBy[String(h).toLowerCase()] || h };
   });
-  var mine = String(who || '').trim();
-  if (mine && handles.some(function (h) { return String(h).toLowerCase() === mine.toLowerCase(); }))
-    touchPresence_(L.id, mine);
-  /* Only the tail: the draft room is a live conversation, and the whole board
-     could be hundreds of posts by the end of a season. */
+  /* Only the tail, read from the bottom of the sheet. */
   var chat = [];
-  try { chat = messagesOf(L.id).slice(-40); } catch (e) {}
+  try { chat = recentMessagesOf_(L.id, 40); } catch (e) {}
   var paused = L.draftStatus === 'active' && L.draftPaused != null;
-  return { ok:true, league:{ id:L.id, mode:L.mode, rosterSize:L.rosterSize, benchSize:L.benchSize, farmSize:L.farmSize,
+  var core = { ok:true, league:{ id:L.id, mode:L.mode, rosterSize:L.rosterSize, benchSize:L.benchSize, farmSize:L.farmSize,
                              draftStatus:L.draftStatus, draftOrder:L.draftOrder, pickClock:L.pickClock,
                              commissioner:L.commissioner },
-    /* frozen by the commissioner: no clock runs, no pick can be made, and
-       pausedLeft is what the man on the clock will have when it resumes */
+    /* frozen by the commissioner (or by the tripwire): no clock runs, no pick
+       can be made, and pausedLeft is what the man on the clock will have when
+       it resumes */
     paused: paused,
     pausedLeft: paused ? Math.round(L.draftPaused / 1000) : 0,
     /* while paused, the draft date doubles as the scheduled restart, with the
@@ -1939,6 +2055,9 @@ function draftState(id, who){
     restartAt: paused ? (L.draftDate || '') : '',
     restartAgreed: paused ? handles.filter(function (h) {
       return !!(L.draftAgree || {})[String(h).toLowerCase()]; }) : [],
+    /* a tripped wire: what is wrong with the pick log, and the earliest pick
+       a rewind has to go back to in order to clear it */
+    alert: integ.ok ? null : { turns:integ.turns, names:integ.names, fixFrom:integ.fixFrom },
     picks:picks, turn:turn, pickedNames:picks.map(function(p){ return p.rikishi; }),
     /* the clock, as the client needs to draw it: when this pick expires, how
        long the man on the clock was given, and whether he asked to be auto-drafted */
@@ -1946,9 +2065,30 @@ function draftState(id, who){
     clockSeconds: turn.handle ? clockFor_(L, turn.handle, boards) : 0,
     onClockAuto: !!(onClock && onClock.auto),
     members: members,
-    presence: presenceOf_(L.id, handles),
-    chat: chat,
-    serverNow: new Date().toISOString() };
+    chat: chat };
+
+  /* Store it only if nothing was written while we were reading. */
+  if (cache && gen && dsGen_(id) === gen){
+    try {
+      var blob = JSON.stringify({ gen:gen, core:core });
+      if (blob.length < 90000) cache.put('ds:' + id, blob, DS_CACHE_S);
+    } catch (e) {}
+  }
+  return draftStateFinish_(id, who, core);
+}
+/* The per-caller part of the answer: record who is asking (members only — the
+   handle arrives unauthenticated), then attach presence and the server clock,
+   which must never come out of a snapshot. */
+function draftStateFinish_(id, who, core){
+  var handles = (core.members || []).map(function (m) { return m.handle; });
+  var mine = String(who || '').trim();
+  if (mine && handles.some(function (h) { return String(h).toLowerCase() === mine.toLowerCase(); }))
+    touchPresence_(id, mine);
+  var out = {};
+  for (var k in core) out[k] = core[k];
+  out.presence = presenceOf_(id, handles);
+  out.serverNow = new Date().toISOString();
+  return out;
 }
 
 function makePick(body){
@@ -1970,8 +2110,11 @@ function makePick(body){
        no longer owns. */
     L = settleDraft_(L);
     if (L.draftStatus !== 'active') return { ok:false, error:'The draft is already complete.' };
-    if (draftRowStale_(L, draftPicksOf(L.id)))
+    var logNow = draftPicksOf(L.id);
+    if (draftRowStale_(L, logNow))
       return { ok:false, error:'The board just moved \u2014 give it a second and try again.' };
+    if (!draftIntegrity_(logNow).ok)
+      return { ok:false, error:'The pick log needs fixing first \u2014 the commissioner has been told.' };
     var turn = draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx);
     if (turn.phase === 'done') return { ok:false, error:'The draft is already complete.' };
     if (!turn.handle || turn.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'It\u2019s not your turn.' };
@@ -2001,6 +2144,7 @@ function makePick(body){
     var boardsNow = draftBoardsOf(L.id);
     var nextDeadline = (nextTurn.phase === 'done') ? '' : deadlineFor_(L, nextTurn.handle, boardsNow);
     sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue(nextDeadline);
+    dsBust_(L.id);
     return { ok:true, nextTurn:nextTurn, draftStatus:status, deadline:nextDeadline };
   } finally { unlock_(lock); }
 }
@@ -2044,17 +2188,25 @@ function pauseDraft(body){
        freezing, or pausing would become a way to rescue a missed turn. */
     L = settleDraft_(L);
     if (L.draftStatus !== 'active') return { ok:false, error:'The draft has just finished.' };
-    var boards = draftBoardsOf(L.id);
-    var turn = draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx);
-    var full = clockFor_(L, turn.handle, boards) * 1000;
-    var left = L.pickDeadline ? new Date(L.pickDeadline).getTime() - Date.now() : full;
-    left = Math.max(5000, Math.min(full, isNaN(left) ? full : left));   // never resume onto a 0-second clock
-    ensurePausedHead_();
-    sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue('');
-    sh_(SHEET_LEAGUES).getRange(L.row, 22).setValue(left);
-    clearSchedule_(L);
+    var left = pauseRow_(L);
     return { ok:true, paused:true, left:Math.round(left / 1000) };
   } finally { unlock_(lock); }
+}
+/* Freeze a running draft: park the time left, blank the deadline. Call inside
+   the lock. Shared by the commissioner's Pause and the tripwire. */
+function pauseRow_(L){
+  var boards = draftBoardsOf(L.id);
+  var turn = draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx);
+  var full = clockFor_(L, turn.handle, boards) * 1000;
+  var left = L.pickDeadline ? new Date(L.pickDeadline).getTime() - Date.now() : full;
+  left = Math.max(5000, Math.min(full, isNaN(left) ? full : left));   // never resume onto a 0-second clock
+  ensurePausedHead_();
+  sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue('');
+  sh_(SHEET_LEAGUES).getRange(L.row, 22).setValue(left);
+  clearSchedule_(L);
+  dsBust_(L.id);
+  L.draftPaused = left; L.pickDeadline = ''; L.draftDate = ''; L.draftAgree = {};
+  return left;
 }
 
 function resumeDraft(body){
@@ -2084,6 +2236,7 @@ function resumeDraft(body){
     sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue(deadline);
     sh_(SHEET_LEAGUES).getRange(L.row, 22).setValue('');
     clearSchedule_(L);
+    dsBust_(L.id);
     return { ok:true, paused:false, deadline:deadline, pickClock:clock };
   } finally { unlock_(lock); }
 }
@@ -2155,6 +2308,7 @@ function rewindDraft(body){
     sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue('');
     sh_(SHEET_LEAGUES).getRange(L.row, 22).setValue(clockFor_(L, turn.handle, boards) * 1000);
     clearSchedule_(L);
+    dsBust_(L.id);
     return { ok:true, removed:pickDel.length, toPick:to, turn:turn, paused:true,
              draftStatus:'active' };
   } finally { unlock_(lock); }

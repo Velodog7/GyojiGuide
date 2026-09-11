@@ -106,6 +106,31 @@ for a deploy that changes no code, so the string keeps meaning "this code".)
 that has no key. *Start a new basho* derives and writes it from the label typed
 in, so the two cannot disagree. Do not reintroduce a hand-edited id.
 
+### The draft room must survive a busy server
+
+10 Sept the room crawled, then looked dead. What is in place now:
+
+- **Snapshot.** The board part of `draftState` (everything but presence and
+  `serverNow`) is cached for `DS_CACHE_S` seconds under `ds:<id>`, stamped
+  with a generation `dsg:<id>`. **Any write that changes what the room shows
+  must call `dsBust_(leagueId)`** — picks, settle, pause/resume/rewind,
+  restart date/agreement, chat post/delete, draft board, join, startDraft. A
+  new write path that forgets it shows stale data for up to 3 s. A snapshot
+  is never served when a clock has expired or the tripwire has something to
+  do; those take the full path.
+- **No long lock waits on polls.** `draftState` uses `tryLock(1500)` and never
+  `waitLock`; `draftload.js` asserts it.
+- **Chat tail** comes from `recentMessagesOf_` (reads the bottom of the sheet),
+  never `messagesOf` on a poll.
+- **Tripwire.** `draftIntegrity_` flags a doubled pick number or a doubled
+  wrestler; `draftState` then auto-pauses (`pauseRow_`), `settleDraft_` and
+  `makePick` refuse, and the payload's `alert.fixFrom` is the pick to rewind to.
+- **Client.** One `draftState` request in flight at a time (timer ticks skip;
+  explicit polls queue), 20 s timeout, backoff 4→8→16→30 s with a "Connection
+  trouble" strip, and only the member on the clock polls at 1.2 s near a
+  deadline. `setInterval` returns a number, so the period lives in
+  `draftPollMs`, not on the timer.
+
 ### Keep writes off read paths
 
 `draftState` is polled every ~4s during a live draft and `leagueDetail` on every

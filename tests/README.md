@@ -28,6 +28,7 @@ whole point. Override the path with `GG_GS=/some/other/sumo-fantasy.gs`.
 | `champions.js` | champion awarding and trophies |
 | `clock.js` | the pick clock and server-side auto-draft |
 | `draftlock.js` | the `unlock_` flush discipline and one-pick-per-turn |
+| `draftload.js` | the shared draftState snapshot (busted by every write, never served with work to do), short lock waits, chat tail read, and the tripwire that auto-pauses a draft on a broken pick log |
 | `draftctl.js` | commissioner pause / resume / undo / rewind, and the stale-league-row guard (`draftRowStale_`) |
 | `teamlock.js` | `saveTeam` refused once a basho is under way |
 | `presence.js` | draft-room presence and chat carried on `draftState` |
@@ -65,7 +66,7 @@ the backend "returns" and can count the requests the page makes. Several assert
 the *absence* of a request — that a tap selects without drafting, that filtering
 never hits the network, that chat and presence add no poller of their own.
 
-Suites: `draftui`, `draftcards`, `draftroom`, `draftctlui`, `redraftui`, `keeperui`,
+Suites: `draftui`, `draftcards`, `draftroom`, `draftctlui`, `draftsteady`, `redraftui`, `keeperui`,
 `keepreload`, `setcards`, `teamlockui`, `bashopanel`, `bashoid`, `pinresetui`,
 `firstrun`, `homegame`, `rikishimod`, `mockdraft3`, `chartcases`, `dmpoll`,
 `smoke`.

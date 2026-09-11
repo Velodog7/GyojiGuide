@@ -600,6 +600,22 @@
   .lg-tick.warn{ color:var(--red) }
   .lg-tick.auto{ color:var(--dim) }
   .lg-tick.paused{ color:var(--faint) }
+  /* the server isn't answering — say so rather than freezing silently */
+  .lg-conn{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin:0 0 12px; padding:8px 12px;
+        border:1px solid rgba(var(--sun-rgb),.5); border-radius:10px; background:rgba(var(--sun-rgb),.08);
+        color:var(--ink); font-size:.85rem; line-height:1.45 }
+  .lg-conn b{ color:var(--sun) }
+  .lg-conn .btn{ margin:0 0 0 auto }
+  .lg-conn__dot{ width:8px; height:8px; border-radius:50%; background:var(--sun); flex:none;
+        animation:lgConnPulse 1.2s ease-in-out infinite }
+  @keyframes lgConnPulse{ 50%{ opacity:.25 } }
+  @media (prefers-reduced-motion:reduce){ .lg-conn__dot{ animation:none } }
+  /* the tripwire: the pick log is wrong and the draft stopped itself */
+  .lg-alert{ margin:0 0 12px; padding:10px 13px; border:1px solid var(--red); border-radius:10px;
+        background:rgba(226,59,46,.16); color:var(--ink); font-size:.88rem; line-height:1.5 }
+  .lg-alert b{ color:var(--red) }
+  .lg-alert ul{ margin:6px 0 8px 18px; padding:0 }
+  .lg-alert .btn{ margin:4px 8px 0 0 }
   /* the commissioner froze the draft — everyone sees this, and nobody can pick */
   .lg-paused{ margin:0 0 12px; padding:9px 13px; border:1px solid rgba(226,59,46,.45); border-radius:10px;
         background:rgba(226,59,46,.1); color:var(--ink); font-size:.88rem; line-height:1.45 }
@@ -2329,7 +2345,7 @@ function renderSchedPanel(lg, meCommish){
 /* ============================================================
    KEEPERS: draft room, rosters, trades, waivers (client)
    ============================================================ */
-let draftPollTimer = null;
+let draftPollTimer = null, draftPollMs = 0;
 /* The countdown is drawn from the server's deadline, not from a local timer:
    the server is the only clock that decides anything, and a browser whose
    clock is minutes off would otherwise show a number nobody else sees.
@@ -2352,6 +2368,7 @@ function fmtTick(sec){
   return m + ":" + String(r).padStart(2,"0");
 }
 function paintTick(){
+  paintConn();
   const el = $("lgTick"); if (!el) return;
   if (draftPausedLeft != null){
     el.textContent = "\u275a\u275a " + fmtTick(draftPausedLeft);
@@ -2371,10 +2388,11 @@ let redraftPollTimer = null;
 let keepPollTimer = null;
 /* does this league cut anyone at the roll-over? null in BOTH divisions means no */
 function keepLimited(lg){ return !!lg && (lg.keepMk != null || lg.keepJr != null); }
-function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } stopDraftTick();
+function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } draftPollMs = 0; stopDraftTick();
   draftSel = ""; draftSending = false; draftGridSig = ""; draftMsg = "";
   draftPool = []; draftHay = {}; draftFilter = ""; draftFlipped = {};
-  draftPausedLeft = null; cmSig = ""; pausedSig = ""; }
+  draftPausedLeft = null; cmSig = ""; pausedSig = ""; alertSig = "";
+  dpFails = 0; dpLastGood = 0; }
 /* Mirrors rosterPlan() in sumo-fantasy.gs. rosterSize keeps its original
    meaning — the ACTIVE Makuuchi cap — so a league saved before benches existed
    reads back as bench 0 / farm = active, exactly as it behaved before. */
@@ -2652,6 +2670,8 @@ async function renderKeepers(lg, meCommish){
     el.innerHTML = `<div class="lg-draftroom">
       <h4>Snake draft — live</h4>
       <div class="lg-draft-turn" id="lgDraftTurn"><span class="gg-spin"></span>Loading…</div>
+      <div class="lg-conn" id="lgConn" hidden role="status" aria-live="polite"></div>
+      <div class="lg-alert" id="lgAlert" hidden role="alert"></div>
       <div class="lg-paused" id="lgPaused" hidden></div>
       ${meCommish ? `<div class="lg-cmsh" id="lgCmsh">
         <span class="lg-cmsh__lab">Commissioner</span>
@@ -2703,9 +2723,9 @@ async function renderKeepers(lg, meCommish){
       find.oninput = ()=>{ draftFilter = find.value || "";
         paintDraftGrid(lg, lastDraftPhase, lastDraftMine, lastDraftBoard); };
     }
+    dpFails = 0; dpLastGood = 0; dpInflight = null; dpQueued = null; alertSig = "";
     await pollDraft(lg);
-    draftPollTimer = setInterval(()=>pollDraft(lg), 4000);
-    draftPollTimer._ms = 4000;
+    setDraftPollMs(lg, dpFails ? dpBackoffMs() : 4000);
     return;
   }
 
@@ -3333,6 +3353,39 @@ function draftNotify(lg, res, turn, meOnClock){
    the league's draft date is reused for it, with the same member sign-off the
    original date had. Rebuilt only when something in it changes, and never
    while the commissioner is typing a time into it. */
+/* The tripwire's alarm (see draftIntegrity_ in sumo-fantasy.gs). The server
+   has already paused the draft; this says what is wrong and, for the
+   commissioner, offers the one rewind that clears it. */
+let alertSig = "";
+function paintAlert(lg, res){
+  const el = $("lgAlert"); if (!el) return;
+  const a = res.alert;
+  if (!a){ if (!el.hidden){ el.hidden = true; el.innerHTML = ""; } alertSig = ""; return; }
+  const sig = JSON.stringify(a);
+  if (sig === alertSig && !el.hidden) return;
+  alertSig = sig;
+  const me = acct ? acct.handle.toLowerCase() : "";
+  const isCommish = !!me && me === String((res.league && res.league.commissioner) || lg.commissioner || "").toLowerCase();
+  const items = (a.turns || []).map(t=>`<li>Pick ${t.pick+1} was recorded ${t.names.length} times for ${esc(t.handle)}: ${t.names.map(esc).join(", ")}</li>`)
+    .concat((a.names || []).map(n=>`<li>${esc(n.name)} was drafted more than once (picks ${n.picks.map(i=>i+1).join(", ")})</li>`));
+  const to = (a.fixFrom == null ? 0 : a.fixFrom) + 1;
+  el.hidden = false;
+  el.innerHTML = `<b>The draft stopped itself.</b> The pick log has a problem, so no more picks can be made until it\u2019s fixed.`
+    + `<ul>${items.join("")}</ul>`
+    + (isCommish
+      ? `Rewind to pick ${to} to clear it \u2014 or to any earlier pick from the Rewind list below. The draft stays paused afterwards so you can restart when everyone\u2019s ready.<br>`
+        + `<button class="btn sm" id="lgAlertFix" type="button">Rewind to pick ${to}</button><span class="status" id="lgAlertStatus"></span>`
+      : `The commissioner has been told and can fix it with a rewind.`);
+  const fix = $("lgAlertFix");
+  if (fix) fix.onclick = async ()=>{
+    if (!confirm("Rewind the draft to pick " + to + "?\n\nThat pick and every pick after it are erased and those wrestlers go back in the pool. The draft stays paused so you can resume when everyone is ready.")) return;
+    fix.disabled = true;
+    let r=null; try { r = await GyojiGuide.rewindDraft(lg.id, to - 1); } catch(e){}
+    if (r && r.ok){ alertSig = ""; cmSig = ""; draftGridSig = ""; pausedSig = ""; await pollDraft(lg); }
+    else { fix.disabled = false; const st = $("lgAlertStatus"); if (st){ st.textContent = " " + ((r && r.error) || "Couldn\u2019t rewind \u2014 try again."); st.className = "status err"; } }
+  };
+}
+
 let pausedSig = "";
 function paintPaused(lg, res, meOnClock){
   const el = $("lgPaused"); if (!el) return;
@@ -3343,14 +3396,16 @@ function paintPaused(lg, res, meOnClock){
   const when = res.restartAt || "";
   const agreed = (res.restartAgreed || []).map(h=>String(h).toLowerCase());
   const members = res.members || [];
-  const sig = [when, agreed.join(","), meOnClock, isCommish, members.map(m=>m.handle).join(",")].join("|");
+  const sig = [when, agreed.join(","), meOnClock, isCommish, members.map(m=>m.handle).join(","), !!res.alert].join("|");
   const input = $("lgRestartInput");
   if (sig === pausedSig && !el.hidden) return;
   if (input && document.activeElement === input) return;
   pausedSig = sig;
   el.hidden = false;
   const iAgreed = agreed.indexOf(me) >= 0;
-  let html = `<b>Draft paused</b> by the commissioner. The clock is frozen and nobody can pick until it resumes.`
+  let html = (res.alert
+      ? `<b>Draft paused</b> because of the problem above. The clock is frozen and nobody can pick until it resumes.`
+      : `<b>Draft paused</b> by the commissioner. The clock is frozen and nobody can pick until it resumes.`)
     + (meOnClock ? ` You\u2019re up next.` : "");
   html += `<div class="lg-restart">`;
   if (when){
@@ -3475,9 +3530,78 @@ function wireDraftControls(lg){
   };
 }
 
-async function pollDraft(lg){
-  let res=null; try { res = await GyojiGuide.draftState(lg.id); } catch(e){}
-  if (!res || !res.ok) return;
+/* ---------- polling that survives a struggling server ----------
+   On 10 Sept the room crawled and then looked dead. Three client-side causes:
+   a slow answer never stopped the next 4-second timer from firing, so requests
+   stacked up behind each other; every member switched to 1.2-second polling
+   near a deadline; and a failed poll simply returned, leaving a frozen room
+   with no word of why.
+
+   Now: one request in flight at a time (a timer tick is skipped while one is
+   out; an explicit poll after an action waits its turn); only the member on
+   the clock polls fast; every poll gives up after 20s; failures back off
+   (4s, 8s, 16s, capped at 30s) instead of hammering; and a strip says what is
+   happening until the server answers again. */
+let dpInflight = null, dpQueued = null, dpFails = 0, dpLastGood = 0, dpLastErr = "", dpLg = null;
+let DP_TIMEOUT_MS = 20000;   // let, so a test can shorten it
+function dpBackoffMs(){ return Math.min(30000, 4000 * Math.pow(2, Math.max(0, dpFails - 1))); }
+/* setInterval hands back a plain number, so the period is kept alongside it
+   rather than as a property on it (the old draftPollTimer._ms never stuck,
+   which quietly rebuilt the timer on every poll). draftPollMs lives up by
+   draftPollTimer. */
+function setDraftPollMs(lg, ms){
+  if (draftPollTimer && draftPollMs === ms) return;
+  if (draftPollTimer) clearInterval(draftPollTimer);
+  draftPollTimer = setInterval(()=>{ if (!dpInflight) pollDraft(lg); }, ms);
+  draftPollMs = ms;
+}
+function pollDraft(lg){
+  dpLg = lg;
+  if (dpInflight){
+    if (!dpQueued) dpQueued = dpInflight.then(()=>{ dpQueued = null; return pollDraft(lg); });
+    return dpQueued;
+  }
+  dpInflight = pollDraftOnce(lg).catch(()=>{}).finally(()=>{ dpInflight = null; });
+  return dpInflight;
+}
+function paintConn(){
+  const el = $("lgConn"); if (!el) return;
+  const quiet = dpLastGood ? Math.round((Date.now() - dpLastGood) / 1000) : 0;
+  const trouble = dpFails > 0 || (dpLastGood && quiet >= 15);
+  if (!trouble){ if (!el.hidden){ el.hidden = true; el.innerHTML = ""; } return; }
+  el.hidden = false;
+  const next = Math.round((draftPollMs || 4000) / 1000);
+  const txt = `<span class="lg-conn__dot"></span><span><b>Connection trouble</b> \u2014 the server isn\u2019t answering`
+    + (dpLastErr ? ` (${esc(dpLastErr)})` : "") + `. Retrying every ${next}s`
+    + (dpLastGood ? ` \u00b7 last update ${fmtAgo(quiet)} ago` : "") + `.</span>`
+    + `<button class="btn ghost sm" id="lgConnRetry" type="button">Retry now</button>`;
+  /* only rebuild when the words change, so the button stays clickable */
+  if (el.dataset.txt === txt) return;
+  el.dataset.txt = txt; el.innerHTML = txt;
+  const b = $("lgConnRetry");
+  if (b) b.onclick = ()=>{ if (dpLg) pollDraft(dpLg); };
+}
+async function pollDraftOnce(lg){
+  let res=null, timer=null;
+  try {
+    res = await Promise.race([
+      GyojiGuide.draftState(lg.id),
+      new Promise(r=>{ timer = setTimeout(()=>r({ ok:false, error:"timed out" }), DP_TIMEOUT_MS); })
+    ]);
+  } catch(e){ res = { ok:false, error:"no connection" }; }
+  finally { clearTimeout(timer); }
+  if (curLeagueId !== lg.id) { stopDraftPolling(); return; }
+  if (!res || !res.ok){
+    /* A failed poll backs off and says so. It never throws the room away:
+       whatever was last drawn stays up, just marked as out of date. */
+    dpFails++;
+    dpLastErr = String((res && res.error) || "no answer").slice(0, 60);
+    if (draftPollTimer) setDraftPollMs(lg, dpBackoffMs());
+    paintConn();
+    return;
+  }
+  dpFails = 0; dpLastErr = ""; dpLastGood = Date.now();
+  paintConn();
   if (res.league.draftStatus !== "active") { lg.draftStatus = res.league.draftStatus; stopDraftPolling(); renderLeague(); return; }
   if (curLeagueId !== lg.id) { stopDraftPolling(); return; }
 
@@ -3503,21 +3627,20 @@ async function pollDraft(lg){
     : `<b>${esc(turn.handle||"—")}</b> is on the clock · Round ${turn.round} · ${phaseLab} phase`)
     + ((draftDeadline || paused) ? `<span class="lg-tick" id="lgTick"></span>` : "")
     + (draftAuto && !paused ? ` <span class="lg-locked-note" style="margin:0">auto-draft on</span>` : "");
+  paintAlert(lg, res);
   paintPaused(lg, res, !!meOnClock);
   paintDraftControls(lg, res);
   paintTick();
   draftNotify(lg, res, turn, meOnClock);
   if (!draftTick) draftTick = setInterval(paintTick, 1000);
-  /* Nothing settles until somebody asks, so once the deadline is close, ask
-     more often — otherwise an expired pick sits there for up to four seconds. */
-  if (draftDeadline && draftPollTimer){
-    const left = (new Date(draftDeadline).getTime() - (Date.now() + draftSkew)) / 1000;
-    const want = left <= 6 ? 1200 : 4000;
-    if (draftPollTimer._ms !== want){
-      clearInterval(draftPollTimer);
-      draftPollTimer = setInterval(()=>pollDraft(lg), want);
-      draftPollTimer._ms = want;
-    }
+  /* Nothing settles until somebody asks, so once the deadline is close the
+     member ON THE CLOCK asks more often. Only him: when the whole room did
+     this, a deadline meant every member firing a request every 1.2 seconds at
+     exactly the moment the server was busiest. Anyone else's 4-second poll
+     still settles an absentee's pick. */
+  if (draftPollTimer){
+    const left = draftDeadline ? (new Date(draftDeadline).getTime() - (Date.now() + draftSkew)) / 1000 : 1e9;
+    setDraftPollMs(lg, (meOnClock && !paused && left <= 6) ? 1200 : 4000);
   }
 
   const picked = new Set((res.pickedNames||[]).map(n=>n.toLowerCase()));
