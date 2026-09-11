@@ -613,6 +613,21 @@
         border-radius:8px; color:var(--ink); font:inherit; font-size:.82rem; padding:7px 9px }
   .lg-cmsh .status{ flex:1 1 100%; font-size:.8rem; margin:0 }
   .lg-cmsh .status:empty{ display:none }
+  .lg-cmsh__clock{ display:inline-flex; align-items:center; gap:6px; font-size:.8rem; color:var(--dim) }
+  .lg-cmsh__clock select{ flex:none }
+  /* the scheduled restart, inside the paused banner */
+  .lg-restart{ margin-top:9px; padding-top:9px; border-top:1px solid rgba(226,59,46,.25); display:flex; flex-direction:column; gap:8px }
+  .lg-restart__when b{ color:var(--sun) }
+  .lg-restart__tz{ color:var(--faint); font-size:.78rem }
+  .lg-restart__who{ display:flex; flex-wrap:wrap; gap:6px }
+  .lg-restart__chip{ font-size:.76rem; padding:2px 9px; border-radius:999px; border:1px solid var(--line2); color:var(--faint) }
+  .lg-restart__chip.yes{ border-color:rgba(67,192,138,.55); color:#7fd6ad }
+  .lg-restart__row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px }
+  .lg-restart__row .btn{ margin:0 }
+  .lg-restart__row input{ background:var(--surface-2); border:1px solid var(--line); border-radius:8px; color:var(--ink);
+        font:inherit; font-size:.84rem; padding:6px 9px; max-width:100%; color-scheme:dark }
+  .lg-restart__hint{ color:var(--dim); font-size:.8rem }
+  .lg-restart .status:empty{ display:none }
   .btn.danger{ background:none; color:var(--red); border:1px solid rgba(226,59,46,.55); box-shadow:none }
   .btn.danger:hover{ background:rgba(226,59,46,.12); color:var(--ink) }
 
@@ -2359,7 +2374,7 @@ function keepLimited(lg){ return !!lg && (lg.keepMk != null || lg.keepJr != null
 function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } stopDraftTick();
   draftSel = ""; draftSending = false; draftGridSig = ""; draftMsg = "";
   draftPool = []; draftHay = {}; draftFilter = ""; draftFlipped = {};
-  draftPausedLeft = null; cmSig = ""; }
+  draftPausedLeft = null; cmSig = ""; pausedSig = ""; }
 /* Mirrors rosterPlan() in sumo-fantasy.gs. rosterSize keeps its original
    meaning — the ACTIVE Makuuchi cap — so a league saved before benches existed
    reads back as bench 0 / farm = active, exactly as it behaved before. */
@@ -2641,6 +2656,12 @@ async function renderKeepers(lg, meCommish){
       ${meCommish ? `<div class="lg-cmsh" id="lgCmsh">
         <span class="lg-cmsh__lab">Commissioner</span>
         <button class="btn sm" id="lgCmPause" type="button">Pause draft</button>
+        <label class="lg-cmsh__clock" id="lgCmClockWrap" hidden title="The pick clock from here on. A new clock gives whoever is up a full clock when you resume.">Clock
+          <select id="lgCmClock">
+            <option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option>
+            <option value="600">10 min</option><option value="900">15 min</option><option value="1800">30 min</option>
+            <option value="3600">1 hour</option><option value="28800">8 hours</option>
+          </select></label>
         <button class="btn ghost sm" id="lgCmUndo" type="button">Undo last pick</button>
         <select id="lgCmRewindSel" aria-label="Rewind the draft to a pick"><option value="">Rewind to a pick\u2026</option></select>
         <button class="btn danger sm" id="lgCmRewind" type="button">Rewind</button>
@@ -2671,7 +2692,7 @@ async function renderKeepers(lg, meCommish){
     wireDraftBoard(lg);
     /* the room was just rebuilt: the grid is empty, so no cached signature */
     draftSel = ""; draftSending = false; draftGridSig = ""; draftMsg = "";
-    draftPool = []; draftHay = {}; draftFilter = ""; draftFlipped = {}; chatSig = "";
+    draftPool = []; draftHay = {}; draftFilter = ""; draftFlipped = {}; chatSig = ""; pausedSig = ""; cmSig = "";
     wireChat(lg);
     if (meCommish) wireDraftControls(lg);
     const find = $("lgDraftFind");
@@ -3308,6 +3329,75 @@ function draftNotify(lg, res, turn, meOnClock){
    Ported from the mock draft room. The server does the work (pauseDraft,
    resumeDraft, rewindDraft in sumo-fantasy.gs) and every member's next poll
    picks the change up, so these only ever send one request and then poll. */
+/* The paused banner, and — once the draft is paused — the scheduled restart:
+   the league's draft date is reused for it, with the same member sign-off the
+   original date had. Rebuilt only when something in it changes, and never
+   while the commissioner is typing a time into it. */
+let pausedSig = "";
+function paintPaused(lg, res, meOnClock){
+  const el = $("lgPaused"); if (!el) return;
+  if (!res.paused){ el.hidden = true; el.innerHTML = ""; pausedSig = ""; return; }
+  const me = acct ? acct.handle.toLowerCase() : "";
+  const commish = String((res.league && res.league.commissioner) || lg.commissioner || "").toLowerCase();
+  const isCommish = !!me && me === commish;
+  const when = res.restartAt || "";
+  const agreed = (res.restartAgreed || []).map(h=>String(h).toLowerCase());
+  const members = res.members || [];
+  const sig = [when, agreed.join(","), meOnClock, isCommish, members.map(m=>m.handle).join(",")].join("|");
+  const input = $("lgRestartInput");
+  if (sig === pausedSig && !el.hidden) return;
+  if (input && document.activeElement === input) return;
+  pausedSig = sig;
+  el.hidden = false;
+  const iAgreed = agreed.indexOf(me) >= 0;
+  let html = `<b>Draft paused</b> by the commissioner. The clock is frozen and nobody can pick until it resumes.`
+    + (meOnClock ? ` You\u2019re up next.` : "");
+  html += `<div class="lg-restart">`;
+  if (when){
+    html += `<div class="lg-restart__when">Restarts <b>${esc(fmtDraftDate(when))}</b> <span class="lg-restart__tz">(your time)</span> \u00b7 ${agreed.length}/${members.length || agreed.length} ready</div>`;
+    html += `<div class="lg-restart__who">` + members.map(m=>{
+      const ok = agreed.indexOf(String(m.handle).toLowerCase()) >= 0;
+      return `<span class="lg-restart__chip ${ok?"yes":""}">${ok?"\u2713":"\u00b7"} ${esc(m.name || m.handle)}</span>`;
+    }).join("") + `</div>`;
+    if (!isCommish && me) html += `<div class="lg-restart__row">` + (iAgreed
+      ? `<button class="btn ghost sm" id="lgRestartNo" type="button">I can\u2019t make it</button><span class="lg-restart__hint">You\u2019re in \u2713</span>`
+      : `<button class="btn sm" id="lgRestartYes" type="button">I\u2019ll be there</button>`) + `</div>`;
+  } else if (!isCommish){
+    html += `<div class="lg-restart__hint">The commissioner hasn\u2019t set a restart time yet.</div>`;
+  }
+  if (isCommish){
+    html += `<div class="lg-restart__row">
+        <input type="datetime-local" id="lgRestartInput" value="${toLocalInput(when)}" aria-label="Restart time">
+        <button class="btn sm" id="lgRestartSet" type="button">${when ? "Change restart time" : "Set restart time"}</button>
+        ${when ? `<button class="btn ghost sm" id="lgRestartClear" type="button">Clear</button>` : ""}
+      </div>
+      <div class="lg-restart__hint">Everyone sees it in their own time zone and can say they\u2019ll be there. The clock doesn\u2019t start on its own \u2014 press <b>Resume draft</b> when the room is ready.</div>`;
+  }
+  html += `<span class="status" id="lgRestartStatus"></span></div>`;
+  el.innerHTML = html;
+
+  const st = (m, err)=>{ const s=$("lgRestartStatus"); if (s){ s.textContent=m||""; s.className="status"+(err?" err":""); } };
+  const after = async r=>{ if (r && r.ok){ pausedSig = ""; await pollDraft(lg); } else st((r && r.error) || "Couldn\u2019t save that.", true); };
+  const set = $("lgRestartSet");
+  if (set) set.onclick = async ()=>{
+    const v = ($("lgRestartInput") || {}).value;
+    if (!v){ st("Pick a date and time first.", true); return; }
+    const t = new Date(v);
+    if (isNaN(t.getTime())){ st("That time doesn\u2019t look right.", true); return; }
+    set.disabled = true; st("Saving\u2026");
+    let r=null; try { r = await GyojiGuide.setDraftDate(lg.id, t.toISOString()); } catch(e){}
+    set.disabled = false; $("lgRestartInput") && $("lgRestartInput").blur(); after(r);
+  };
+  const clr = $("lgRestartClear");
+  if (clr) clr.onclick = async ()=>{ clr.disabled = true;
+    let r=null; try { r = await GyojiGuide.setDraftDate(lg.id, ""); } catch(e){} after(r); };
+  const yes = $("lgRestartYes"), no = $("lgRestartNo");
+  if (yes) yes.onclick = async ()=>{ yes.disabled = true;
+    let r=null; try { r = await GyojiGuide.agreeDraftDate(lg.id, true); } catch(e){} after(r); };
+  if (no) no.onclick = async ()=>{ no.disabled = true;
+    let r=null; try { r = await GyojiGuide.agreeDraftDate(lg.id, false); } catch(e){} after(r); };
+}
+
 let cmSig = "", cmBusy = false, cmPaused = false;
 function paintDraftControls(lg, res){
   const box = $("lgCmsh"); if (!box) return;
@@ -3315,6 +3405,13 @@ function paintDraftControls(lg, res){
   const pb = $("lgCmPause");
   if (pb && !cmBusy){ pb.textContent = cmPaused ? "Resume draft" : "Pause draft";
     pb.className = cmPaused ? "btn sm" : "btn ghost sm"; }
+  const cw = $("lgCmClockWrap"), cs = $("lgCmClock");
+  if (cw) cw.hidden = !cmPaused;
+  if (cs && !cs.dataset.touched && res.league && res.league.pickClock){
+    const v = String(res.league.pickClock);
+    if (![...cs.options].some(o=>o.value===v)) cs.insertAdjacentHTML("beforeend", `<option value="${esc(v)}">${esc(fmtTick(+v))}</option>`);
+    cs.value = v;
+  }
   const picks = res.picks || [];
   const undo = $("lgCmUndo"); if (undo && !cmBusy) undo.disabled = !picks.length;
   const rw = $("lgCmRewind"); if (rw && !cmBusy) rw.disabled = !picks.length;
@@ -3356,8 +3453,11 @@ function wireDraftControls(lg){
     await pollDraft(lg);
   };
   const pb = $("lgCmPause");
+  const cs = $("lgCmClock");
+  if (cs) cs.onchange = ()=>{ cs.dataset.touched = "1"; };
   if (pb) pb.onclick = ()=> cmPaused
-    ? run(()=>GyojiGuide.resumeDraft(lg.id), "Draft resumed \u2014 the clock is running.")
+    ? run(()=>GyojiGuide.resumeDraft(lg.id, cs ? +cs.value : null),
+          r=>"Draft resumed \u2014 the clock is running" + (r.pickClock ? " (" + fmtTick(+r.pickClock) + " a pick)." : "."))
     : run(()=>GyojiGuide.pauseDraft(lg.id), r=>"Draft paused with " + fmtTick(r.left || 0) + " left on the clock.");
   const undo = $("lgCmUndo");
   if (undo) undo.onclick = ()=>{
@@ -3403,14 +3503,7 @@ async function pollDraft(lg){
     : `<b>${esc(turn.handle||"—")}</b> is on the clock · Round ${turn.round} · ${phaseLab} phase`)
     + ((draftDeadline || paused) ? `<span class="lg-tick" id="lgTick"></span>` : "")
     + (draftAuto && !paused ? ` <span class="lg-locked-note" style="margin:0">auto-draft on</span>` : "");
-  const pausedEl = $("lgPaused");
-  if (pausedEl){
-    pausedEl.hidden = !paused;
-    pausedEl.innerHTML = paused
-      ? `<b>Draft paused</b> by the commissioner. The clock is frozen and nobody can pick until it resumes.`
-        + (meOnClock ? ` You\u2019re up next.` : "")
-      : "";
-  }
+  paintPaused(lg, res, !!meOnClock);
   paintDraftControls(lg, res);
   paintTick();
   draftNotify(lg, res, turn, meOnClock);

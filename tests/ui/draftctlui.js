@@ -15,7 +15,7 @@ const PICKS = [
   {pickIndex:3,round:2,phase:'makuuchi',handle:'sean',rikishi:'Gonoyama'},   // a logged double-pick
   {pickIndex:4,round:2,phase:'makuuchi',handle:'cy',rikishi:'Ura'},
 ];
-function mk(){ return { picks:PICKS.slice(), posts:[], paused:false, onClock:'sean' }; }
+function mk(){ return { picks:PICKS.slice(), posts:[], paused:false, onClock:'sean', restartAt:'', agreed:[] }; }
 
 function leaguePayload(me){
   return { ok:true,
@@ -40,15 +40,17 @@ async function open(b, S, me, vw){
     const j=o=>r.fulfill({contentType:'application/json',body:JSON.stringify(o)});
     if (req.method()==='POST'){
       let bd={}; try{ bd=JSON.parse(req.postData()||'{}'); }catch(e){}
-      if (/Draft$/.test(bd.action||'')) S.posts.push(bd);
+      if (/Draft|DraftDate$/.test(bd.action||'')) S.posts.push(bd);
       if (bd.action==='pauseDraft'){ S.paused=true; return j({ok:true,paused:true,left:95}); }
-      if (bd.action==='resumeDraft'){ S.paused=false; return j({ok:true,paused:false,deadline:new Date(Date.now()+95000).toISOString()}); }
+      if (bd.action==='resumeDraft'){ S.paused=false; S.restartAt=''; return j({ok:true,paused:false,deadline:new Date(Date.now()+95000).toISOString()}); }
       if (bd.action==='rewindDraft'){
         const to = bd.toPick===''||bd.toPick==null ? Math.max(...S.picks.map(x=>x.pickIndex)) : +bd.toPick;
         const n = S.picks.filter(x=>x.pickIndex>=to).length;
         S.picks = S.picks.filter(x=>x.pickIndex<to); S.paused=true;
         return j({ok:true,removed:n,toPick:to,paused:true,draftStatus:'active',turn:{round:1,phase:'makuuchi',handle:'sean'}});
       }
+      if (bd.action==='setDraftDate'){ S.restartAt=bd.draftDate; S.agreed=bd.draftDate?['sean']:[]; return j({ok:true,draftDate:bd.draftDate}); }
+      if (bd.action==='agreeDraftDate'){ S.agreed=(S.agreed||[]).filter(h=>h!==me); if (bd.agree) S.agreed.push(me); return j({ok:true,agreed:bd.agree}); }
       if (bd.action==='makePick'){ S.made=(S.made||[]).concat(bd.rikishi); return j({ok:false,error:'The commissioner has paused the draft.'}); }
       return j({ok:true});
     }
@@ -56,11 +58,12 @@ async function open(b, S, me, vw){
       inviteCode:'ABC',members:3,mode:'keepers',draftStatus:'active',isCommissioner:me==='sean'}]});
     if (/action=league/.test(url)) return j(leaguePayload(me));
     if (/action=draftState/.test(url)){
-      return j({ ok:true, league:{draftStatus:'active', draftOrder:['bo','cy','sean'], commissioner:'sean'},
+      return j({ ok:true, league:{draftStatus:'active', draftOrder:['bo','cy','sean'], commissioner:'sean', pickClock:300},
         turn:{round:2,phase:'makuuchi',handle:S.onClock,pickIdx:5},
         picks:S.picks, pickedNames:S.picks.map(x=>x.rikishi),
         members:[{handle:'sean',name:'SEAN'},{handle:'bo',name:'BO'},{handle:'cy',name:'CY'}],
         presence:{}, chat:[], paused:S.paused, pausedLeft:S.paused?95:0,
+        restartAt:S.paused?(S.restartAt||''):'', restartAgreed:S.paused?(S.agreed||[]):[],
         serverNow:new Date().toISOString(),
         deadline:S.paused?'':new Date(Date.now()+100000).toISOString(), clockSeconds:120, onClockAuto:false });
     }
@@ -154,6 +157,33 @@ const room = p => p.evaluate(()=>{
     chk('the result is reported', /rewound to pick 3/i.test(r.status), r.status);
     chk('and the draft comes back paused', /paused/i.test(r.banner));
 
+    /* schedule tomorrow's restart while paused */
+    let q = await p.evaluate(()=>({ input: !!document.getElementById('lgRestartInput'),
+      clockShown: !document.getElementById('lgCmClockWrap').hidden,
+      clock: document.getElementById('lgCmClock').value,
+      banner: document.getElementById('lgPaused').innerText }));
+    chk('paused: the commissioner gets a restart-time box', q.input);
+    chk('paused: and a pick-clock choice, seeded from the league clock', q.clockShown && q.clock==='300', q.clock);
+    await p.fill('#lgRestartInput','2026-09-11T19:00');
+    await poll(p); await p.waitForTimeout(200);      // a poll mid-typing must not wipe it
+    const kept = await p.evaluate(()=>document.getElementById('lgRestartInput').value);
+    chk('a poll does not wipe a half-entered time', kept==='2026-09-11T19:00', kept);
+    await p.click('#lgRestartSet'); await p.waitForTimeout(900);
+    const sd = S.posts.filter(x=>x.action==='setDraftDate').pop();
+    chk('Set restart time sends the time as an ISO instant', sd && sd.draftDate===new Date('2026-09-11T19:00').toISOString(), JSON.stringify(sd));
+    q = await p.evaluate(()=>document.getElementById('lgPaused').innerText);
+    chk('the banner shows the restart time and who is in', /Restarts/.test(q) && /1\/3 ready/.test(q) && /SEAN/.test(q), q.replace(/\s+/g,' ').slice(0,160));
+    await p.selectOption('#lgCmClock','900');
+    await poll(p); await p.waitForTimeout(200);
+    const cv = await p.evaluate(()=>document.getElementById('lgCmClock').value);
+    chk('the chosen clock survives a poll', cv==='900', cv);
+    await p.click('#lgCmPause'); await p.waitForTimeout(900);
+    const rs = S.posts.filter(x=>x.action==='resumeDraft').pop();
+    chk('Resume carries the new pick clock', rs && rs.pickClock===900, JSON.stringify(rs));
+    q = await p.evaluate(()=>({ banner: !document.getElementById('lgPaused').hidden,
+      clockShown: !document.getElementById('lgCmClockWrap').hidden }));
+    chk('running again: no banner, no clock choice', !q.banner && !q.clockShown, JSON.stringify(q));
+
     /* rewind with nothing chosen */
     const before = S.posts.length;
     await p.evaluate(()=>{ document.getElementById('lgCmRewindSel').value=''; });
@@ -172,6 +202,18 @@ const room = p => p.evaluate(()=>{
     chk('a member does not get the controls', !r.cmsh);
     chk('but does see the paused banner', /paused/i.test(r.banner), r.banner);
     chk('and cannot pick while paused, even on the clock', r.cards>0 && r.live===0, r.live+'/'+r.cards);
+    chk('a member gets no restart-time box', !(await p.evaluate(()=>!!document.getElementById('lgRestartInput'))));
+    let mb = await p.evaluate(()=>document.getElementById('lgPaused').innerText);
+    chk('with no time set, a member is told so', /hasn.t set a restart time/i.test(mb), mb.replace(/\s+/g,' ').slice(0,140));
+    S.restartAt = '2026-09-11T23:00:00.000Z'; S.agreed = ['sean'];
+    await poll(p); await p.waitForTimeout(400);
+    mb = await p.evaluate(()=>document.getElementById('lgPaused').innerText);
+    chk('once set, the member sees it', /Restarts/.test(mb) && /1\/3 ready/.test(mb), mb.replace(/\s+/g,' ').slice(0,140));
+    await p.click('#lgRestartYes'); await p.waitForTimeout(900);
+    const ag = S.posts.filter(x=>x.action==='agreeDraftDate').pop();
+    chk('"I\'ll be there" signs the member up', ag && ag.agree===true && S.agreed.includes('bo'), JSON.stringify(ag));
+    mb = await p.evaluate(()=>document.getElementById('lgPaused').innerText);
+    chk('and the banner updates', /2\/3 ready/.test(mb) && /in \u2713/.test(mb), mb.replace(/\s+/g,' ').slice(0,160));
     chk('no page errors (member)', errs.length===0, errs[0]||'');
     await ctx.close();
   }

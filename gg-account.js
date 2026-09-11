@@ -339,7 +339,8 @@
   /* commissioner draft controls. rewindDraft(id) undoes the last pick;
      rewindDraft(id, n) removes pick n (0-based) and everything after it. */
   GG.pauseDraft     = function (id){ return GG.apiPost(authed({ action:"pauseDraft", id:id })); };
-  GG.resumeDraft    = function (id){ return GG.apiPost(authed({ action:"resumeDraft", id:id })); };
+  GG.resumeDraft    = function (id, pickClock){ return GG.apiPost(authed({ action:"resumeDraft", id:id,
+                        pickClock:(pickClock == null ? "" : pickClock) })); };
   GG.rewindDraft    = function (id, toPick){ return GG.apiPost(authed({ action:"rewindDraft", id:id,
                         toPick:(toPick == null ? "" : toPick) })); };
   GG.proposeTrade   = function (id, toHandle, offer, request){ return GG.apiPost(authed({ action:"proposeTrade", id:id, toHandle:toHandle, offer:offer, request:request })); };

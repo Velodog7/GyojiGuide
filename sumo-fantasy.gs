@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-10-draftctl';
+var BACKEND_VERSION = '2026-09-10-restart';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -1934,6 +1934,11 @@ function draftState(id, who){
        pausedLeft is what the man on the clock will have when it resumes */
     paused: paused,
     pausedLeft: paused ? Math.round(L.draftPaused / 1000) : 0,
+    /* while paused, the draft date doubles as the scheduled restart, with the
+       same member sign-off the original date had */
+    restartAt: paused ? (L.draftDate || '') : '',
+    restartAgreed: paused ? handles.filter(function (h) {
+      return !!(L.draftAgree || {})[String(h).toLowerCase()]; }) : [],
     picks:picks, turn:turn, pickedNames:picks.map(function(p){ return p.rikishi; }),
     /* the clock, as the client needs to draw it: when this pick expires, how
        long the man on the clock was given, and whether he asked to be auto-drafted */
@@ -2047,6 +2052,7 @@ function pauseDraft(body){
     ensurePausedHead_();
     sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue('');
     sh_(SHEET_LEAGUES).getRange(L.row, 22).setValue(left);
+    clearSchedule_(L);
     return { ok:true, paused:true, left:Math.round(left / 1000) };
   } finally { unlock_(lock); }
 }
@@ -2060,10 +2066,25 @@ function resumeDraft(body){
     var L = c.L;
     if (L.draftStatus !== 'active') return { ok:false, error:'The draft isn\u2019t running.' };
     if (L.draftPaused == null) return { ok:true, paused:false, deadline:L.pickDeadline || '' };
-    var deadline = new Date(Date.now() + Math.max(5000, L.draftPaused)).toISOString();
+    /* The commissioner may restart on a different pick clock ("5 minutes wasn't
+       enough"). A new clock means a fresh, full clock for whoever is up; the
+       same clock means exactly the time he had left when it stopped. */
+    var left = Math.max(5000, L.draftPaused), clock = L.pickClock;
+    var asked = Number(body.pickClock);
+    if (body.pickClock != null && body.pickClock !== '' && !isNaN(asked)){
+      asked = Math.max(15, Math.min(28800, Math.round(asked)));
+      if (asked !== Number(L.pickClock)){
+        clock = asked; L.pickClock = asked;
+        sh_(SHEET_LEAGUES).getRange(L.row, 17).setValue(asked);
+        var turn = draftTurn(L.draftOrder, rosterPlan(L), L.draftPickIdx);
+        left = clockFor_(L, turn.handle, draftBoardsOf(L.id)) * 1000;
+      }
+    }
+    var deadline = new Date(Date.now() + left).toISOString();
     sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue(deadline);
     sh_(SHEET_LEAGUES).getRange(L.row, 22).setValue('');
-    return { ok:true, paused:false, deadline:deadline };
+    clearSchedule_(L);
+    return { ok:true, paused:false, deadline:deadline, pickClock:clock };
   } finally { unlock_(lock); }
 }
 
@@ -2133,9 +2154,18 @@ function rewindDraft(body){
     sh_(SHEET_LEAGUES).getRange(L.row, 10, 1, 2).setValues([[to, turn.phase]]);
     sh_(SHEET_LEAGUES).getRange(L.row, 18).setValue('');
     sh_(SHEET_LEAGUES).getRange(L.row, 22).setValue(clockFor_(L, turn.handle, boards) * 1000);
+    clearSchedule_(L);
     return { ok:true, removed:pickDel.length, toPick:to, turn:turn, paused:true,
              draftStatus:'active' };
   } finally { unlock_(lock); }
+}
+/* The draft date and everyone's agreement to it (cols 13-14). Once a draft has
+   started they are reused as the RESTART time while it is paused, so every
+   pause, rewind and resume wipes them: an old date must never show up in the
+   room as "restarts at …" after it has already been and gone. */
+function clearSchedule_(L){
+  if (L.draftDate || Object.keys(L.draftAgree || {}).length)
+    sh_(SHEET_LEAGUES).getRange(L.row, 13, 1, 2).setValues([['', '{}']]);
 }
 /* Delete sheet rows by 1-based index, highest first so earlier indexes hold.
    Runs of adjacent rows go in one deleteRows call — a rewind of a few rounds is

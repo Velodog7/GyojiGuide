@@ -86,6 +86,14 @@ draft can be reopened only before any trade, add/drop, keeper roll-over or
 tournament. The supplemental re-draft logs every pick as index 0 with phase
 `redraft` — the guard and the rewind both skip those rows.
 
+While a draft is paused, the draft date + agreement (cols 13-14) double as the
+**restart time**: `draftState` returns `restartAt` / `restartAgreed`, the
+commissioner sets it with the ordinary `setDraftDate`, members sign off with
+`agreeDraftDate`. Pause, rewind and resume all wipe cols 13-14 (`clearSchedule_`)
+so a stale date can never show as a restart. Nothing auto-resumes — the
+commissioner presses Resume. `resumeDraft` takes an optional `pickClock`; a
+changed clock gives whoever is up a full new clock and applies to every pick after.
+
 ### Bump `BACKEND_VERSION` with every backend change
 
 `?action=version` returns it. If it doesn't match what you just wrote, the

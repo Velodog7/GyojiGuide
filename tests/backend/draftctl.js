@@ -267,5 +267,70 @@ t('the rewound draft runs to completion again', ()=>{
   assert.deepStrictEqual(idx, [...Array(12).keys()], 'pick indexes run 0..11 with no gaps or repeats');
 });
 
+console.log('\n— restarting on a new day —');
+t('pausing wipes the pre-draft date so it never reads as a restart time', ()=>{
+  const c=world();
+  c.setDraftDate({handle:'sean',auth:'a',id:'lg1',draftDate:'2026-09-10T21:00:00.000Z'});
+  started(c);
+  c.pauseDraft({handle:'sean',auth:'a',id:'lg1'});
+  const s=c.draftState('lg1');
+  assert.strictEqual(s.restartAt,'', 'old date leaked: '+s.restartAt);
+  assert.strictEqual(s.restartAgreed.length,0);
+});
+t('a rewind wipes it too', ()=>{
+  const c=world(); started(c); pickNext(c);
+  c.pauseDraft({handle:'sean',auth:'a',id:'lg1'});
+  c.setDraftDate({handle:'sean',auth:'a',id:'lg1',draftDate:'2026-09-11T23:00:00.000Z'});
+  c.rewindDraft({handle:'sean',auth:'a',id:'lg1',toPick:0});
+  assert.strictEqual(c.draftState('lg1').restartAt,'');
+});
+t('while paused the commissioner can schedule the restart and members sign off', ()=>{
+  const c=world(); started(c); pickNext(c);
+  c.rewindDraft({handle:'sean',auth:'a',id:'lg1',toPick:0});
+  const when='2026-09-11T23:00:00.000Z';
+  assert.ok(c.setDraftDate({handle:'sean',auth:'a',id:'lg1',draftDate:when}).ok);
+  assert.ok(c.agreeDraftDate({handle:'mika',auth:'a',id:'lg1',agree:true}).ok);
+  const s=c.draftState('lg1');
+  assert.strictEqual(s.paused,true);
+  assert.strictEqual(s.restartAt,when);
+  assert.strictEqual(JSON.stringify([...s.restartAgreed].sort()),'["mika","sean"]','the commissioner counts, and mika signed off');
+  assert.strictEqual(P(c).length,0,'scheduling moved nothing on the board');
+});
+t('nobody is timed out overnight — a paused draft sits still however long it waits', ()=>{
+  const c=world(); started(c);
+  c.pauseDraft({handle:'sean',auth:'a',id:'lg1'});
+  c.__store.Leagues.rows[1][17]=new Date(Date.now()-24*3600*1000).toISOString();   // a day-old deadline, somehow
+  for (let i=0;i<5;i++) c.draftState('lg1');
+  assert.strictEqual(P(c).length,0);
+});
+t('resume on a longer clock gives whoever is up the full new clock', ()=>{
+  const c=world(); started(c);
+  c.pauseDraft({handle:'sean',auth:'a',id:'lg1'});
+  c.__store.Leagues.rows[1][21]=20000;              // only 20s were left on the old clock
+  const r=c.resumeDraft({handle:'sean',auth:'a',id:'lg1',pickClock:900});
+  assert.ok(r.ok, r.error); assert.strictEqual(r.pickClock,900);
+  assert.strictEqual(c.leagueRow('lg1').pickClock,900,'stored for every later pick');
+  const left=(new Date(r.deadline).getTime()-Date.now())/1000;
+  assert.ok(left>890 && left<=900,'a full 15 minutes, got '+left);
+  pickNext(c);
+  const next=(new Date(c.leagueRow('lg1').pickDeadline).getTime()-Date.now())/1000;
+  assert.ok(next>890,'the next pick gets 15 minutes too, got '+next);
+});
+t('resume on the same clock keeps the time that was left', ()=>{
+  const c=world(); started(c);
+  c.pauseDraft({handle:'sean',auth:'a',id:'lg1'});
+  c.__store.Leagues.rows[1][21]=20000;
+  const r=c.resumeDraft({handle:'sean',auth:'a',id:'lg1',pickClock:120});
+  const left=(new Date(r.deadline).getTime()-Date.now())/1000;
+  assert.ok(left>18 && left<=20,'got '+left);
+});
+t('resume clears the restart time', ()=>{
+  const c=world(); started(c);
+  c.pauseDraft({handle:'sean',auth:'a',id:'lg1'});
+  c.setDraftDate({handle:'sean',auth:'a',id:'lg1',draftDate:'2026-09-11T23:00:00.000Z'});
+  c.resumeDraft({handle:'sean',auth:'a',id:'lg1'});
+  assert.strictEqual(c.leagueRow('lg1').draftDate,'');
+});
+
 console.log('\n'+pass+' passed, '+fail+' failed\n');
 process.exit(fail?1:0);
