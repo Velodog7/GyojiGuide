@@ -774,6 +774,13 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
     var btn = $("applyRankBtn"), msg = $("applyRankMsg");
     if (!confirm("Apply banzuke ranking for the current basho?\n\nDo this once, after every player\u2019s results are archived \u2014 it promotes and demotes everyone on the curve, crowns the basho\u2019s champions, and can\u2019t be safely re-run for the same basho.")) return;
     btn.disabled = true; msg.style.color = ""; msg.textContent = "Computing ranks\u2026";
+    /* The server now reads the banzuke itself, so these tiers are only a
+       fallback for a backend that can't reach sumo-api. Send them LIVE all the
+       same: this line used to post gg-account.js's hand-maintained RANKS table
+       straight from the bundle, and for Aki 2026 that table was still on
+       Nagoya \u2014 which crowned every title in the site against the wrong
+       banzuke. ranksReady() replaces it with the published one first. */
+    try { if (window.GyojiGuide && GyojiGuide.ranksReady) await GyojiGuide.ranksReady(); } catch (e) {}
     var res = await aPost("adminApplyRanking", { tiers: (window.GyojiGuide && GyojiGuide.RANKS) || null });
     btn.disabled = false;
     if (res && res.ok){

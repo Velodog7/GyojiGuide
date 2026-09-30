@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-11-steady';
+var BACKEND_VERSION = '2026-09-30-recrown';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -370,6 +370,7 @@ function doPost(e) {
     if (body.action === 'requestPinReset')    return json(requestPinReset(body));
     if (body.action === 'adminPinResets')     return json(adminPinResets(body.adminKey));
     if (body.action === 'adminApplyRanking')  return json(adminApplyRanking(body));
+    if (body.action === 'adminRecrown')       return json(adminRecrown(body));
     if (body.action === 'adminResetPin')      return json(adminResetPin(body));
     if (body.action === 'adminBasho')         return json(adminBasho(body.adminKey));
     if (body.action === 'adminRefreshResults') return json(adminRefreshResults(body));
@@ -3627,13 +3628,42 @@ function champSheet_(){ return ensureSheet(SpreadsheetApp.getActiveSpreadsheet()
 var TIER_LEVEL = { Y:4, O:3, S:2, K:1, M:0, J:0 };
 
 /* name -> banzuke tier for one basho, in order of trust:
-     1. the map the admin page posts at award time (gg-account.js RANKS, the
-        same table every score on the site was computed from). It's stored in
-        Meta so a title can be explained months later.
-     2. the tiers embedded in archived TeamHistory rows, if no map was posted
-     3. 'M' for an unknown name — exactly what gg-account.js falls back to */
+     1. the real banzuke for that basho, straight off sumo-api. It is the
+        document the ranks ARE, so nothing can be more right than it.
+     2. a map cached from (1) on an earlier pass.
+     3. whatever the admin page posted.
+     4. the tiers embedded in archived TeamHistory rows.
+     5. 'M' for an unknown name — exactly what gg-account.js falls back to.
+
+   The order used to begin at (3), and that is how Aki 2026 came to be scored
+   against NAGOYA's banzuke. admin.html posts gg-account.js's hand-maintained
+   RANKS table; it had not been rolled to the new basho, a posted map always
+   won, and it was then cached under 'tiers:<basho>' as if it were
+   authoritative. Every sanyaku upset bonus for the tournament was computed
+   against the wrong ranks — 39 rikishi affected, 135 bonus points handed out
+   where 74 were due, one league's title margin reading 27 points when it was
+   really 1. Nothing errored, because a plausible map is indistinguishable
+   from a correct one.
+
+   fetchBanzukeTiers_ exists precisely so this can be settled server-side; it
+   had simply never been reached. Two requests, once per basho close, and it
+   is now consulted BEFORE the cache, because the cache is exactly what got
+   poisoned last time. */
 function tierMapFor_(basho, posted){
   var key = 'tiers:' + basho, map = {}, n;
+
+  var id = bashoIdForName_(basho);
+  if (id){
+    var live = fetchBanzukeTiers_(id);
+    /* A partial answer is worse than none. What the bonus turns on is the
+       sanyaku, so a map with no Y/O/S/K in it would silently zero every upset
+       in the tournament rather than fail — demand those before believing it. */
+    if (hasSanyaku_(live)){ setMeta_(key, JSON.stringify(live)); return live; }
+  }
+
+  try { map = JSON.parse(readMeta()[key] || '{}'); } catch(e){ map = {}; }
+  if (Object.keys(map).length) return map;
+
   if (posted && typeof posted === 'object' && Object.keys(posted).length){
     for (n in posted){
       if (!posted.hasOwnProperty(n)) continue;
@@ -3642,8 +3672,7 @@ function tierMapFor_(basho, posted){
     setMeta_(key, JSON.stringify(map));
     return map;
   }
-  try { map = JSON.parse(readMeta()[key] || '{}'); } catch(e){ map = {}; }
-  if (Object.keys(map).length) return map;
+
   var v = sh_(SHEET_HISTORY).getDataRange().getValues();
   for (var r = 1; r < v.length; r++){
     if (String(v[r][1]) !== basho) continue;
@@ -3651,6 +3680,20 @@ function tierMapFor_(basho, posted){
     rows.forEach(function(x){ if (x && x.name && x.tier) map[String(x.name)] = String(x.tier); });
   }
   return map;
+}
+
+/* Does this map actually name the ranks the upset bonus depends on? A banzuke
+   fetch that came back short, or a map built from nothing but Maegashira, is
+   not a map worth caching. */
+function hasSanyaku_(map){
+  var n, t, seen = 0, total = 0;
+  for (n in map){
+    if (!map.hasOwnProperty(n)) continue;
+    total++;
+    t = String(map[n] || '').toUpperCase().charAt(0);
+    if (t === 'Y' || t === 'O' || t === 'S' || t === 'K') seen++;
+  }
+  return total >= 40 && seen >= 4;
 }
 function tierLevel_(name, tiers){ return TIER_LEVEL[String((tiers || {})[name] || 'M')] || 0; }
 
@@ -3823,21 +3866,14 @@ function championsFrom_(entries){
 /* Crown every title for a finished basho. Idempotent: if the sheet already
    holds a row for this basho we return untouched, so a re-run of the ranking
    pass can never mint a second set of trophies. */
-function awardChampions_(basho, tiers){
-  var sh = champSheet_(), v = sh.getDataRange().getValues(), r;
-  for (r = 1; r < v.length; r++) if (String(v[r][1]) === basho) return { already:true, awarded:0 };
-  var now = new Date().toISOString(), rows = [];
+/* Who WOULD take each title for this basho — computed, not written.
 
-  function push(scope, leagueId, leagueName, res){
-    if (!res) return;
-    res.winners.forEach(function(w){
-      // index-suffixed: newId() alone collides often enough to matter in a
-      // batch this size, and two trophies sharing an id would be confusing
-      rows.push([newId('ch_') + '_' + rows.length, basho, scope, leagueId, leagueName, w.handle, w.score,
-                 res.runnerUp ? res.runnerUp.handle : '', res.runnerUp ? res.runnerUp.score : '',
-                 res.entrants, now]);
-    });
-  }
+   Split out of awardChampions_ so the same arithmetic can be shown as a dry
+   run before anything is rewritten. A trophy is not a number you want to
+   change twice, and re-crowning blind is how one wrong answer becomes two.
+   The scoring below is lifted verbatim from the original award pass. */
+function championScopesFor_(basho, tiers){
+  var out = [], r;
 
   /* --- the public title: the top archived score on the shared board --- */
   var hv = sh_(SHEET_HISTORY).getDataRange().getValues(), pub = [];
@@ -3846,7 +3882,7 @@ function awardChampions_(basho, tiers){
     var h = String(hv[r][0] || ''); if (!h) continue;
     pub.push({ handle:h, score:Number(hv[r][3] || 0) });
   }
-  push('public', '', 'Sumo Slap Down League', championsFrom_(pub));
+  out.push({ scope:'public', leagueId:'', leagueName:'Sumo Slap Down League', res:championsFrom_(pub) });
 
   /* --- one title per private league, under that league's own scoring --- */
   var lv = sh_(SHEET_LEAGUES).getDataRange().getValues();
@@ -3876,11 +3912,103 @@ function awardChampions_(basho, tiers){
         entries.push({ handle:mh, score:serverTeamScore_(names, model) });
       });
     }
-    push('league', id, name, championsFrom_(entries));
+    out.push({ scope:'league', leagueId:id, leagueName:name, res:championsFrom_(entries) });
   }
 
+  return out;
+}
+
+/* Those scopes as Champions rows, stamped now. */
+function championRowsFrom_(basho, scopes){
+  var now = new Date().toISOString(), rows = [];
+  scopes.forEach(function(s){
+    if (!s.res) return;
+    s.res.winners.forEach(function(w){
+      // index-suffixed: newId() alone collides often enough to matter in a
+      // batch this size, and two trophies sharing an id would be confusing
+      rows.push([newId('ch_') + '_' + rows.length, basho, s.scope, s.leagueId, s.leagueName, w.handle, w.score,
+                 s.res.runnerUp ? s.res.runnerUp.handle : '', s.res.runnerUp ? s.res.runnerUp.score : '',
+                 s.res.entrants, now]);
+    });
+  });
+  return rows;
+}
+
+function awardChampions_(basho, tiers){
+  var sh = champSheet_(), v = sh.getDataRange().getValues(), r;
+  for (r = 1; r < v.length; r++) if (String(v[r][1]) === basho) return { already:true, awarded:0 };
+  var rows = championRowsFrom_(basho, championScopesFor_(basho, tiers));
   if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, CHAMP_HEAD.length).setValues(rows);
   return { already:false, awarded:rows.length };
+}
+
+/* Re-crown one basho from scratch, because the first crowning was wrong.
+
+   awardChampions_ is deliberately once-only — a re-run of the ranking pass
+   must not mint a second set of trophies — so correcting a bad award needs
+   its own door, and that door defaults to SHUT: without apply:true this
+   computes everything, writes nothing, and hands back the before/after for
+   every scope so a human can look at it first.
+
+   Aki 2026 is why this exists. See tierMapFor_. */
+function recrownBasho_(opts){
+  opts = opts || {};
+  var basho = String(opts.basho || readMeta().basho || '').trim();
+  if (!basho) return { ok:false, error:'No basho given.' };
+
+  var tiers = tierMapFor_(basho, null);
+  if (!hasSanyaku_(tiers))
+    return { ok:false, error:'No usable banzuke for ' + basho +
+             ' — refusing to re-crown against a map that would zero every upset bonus.' };
+
+  var scopes = championScopesFor_(basho, tiers);
+  var sh = champSheet_(), v = sh.getDataRange().getValues(), r;
+
+  var had = {}, hadRows = [];
+  for (r = 1; r < v.length; r++){
+    if (String(v[r][1]) !== basho) continue;
+    hadRows.push(r + 1);                                  // 1-based sheet row
+    var k = String(v[r][2]) + '|' + String(v[r][3]);
+    if (!had[k]) had[k] = { handles:[], score:Number(v[r][6] || 0) };
+    had[k].handles.push(String(v[r][5]));
+  }
+
+  function key(a){ return (a || []).slice().sort().join(','); }
+  var changes = [];
+  scopes.forEach(function(s){
+    var k = s.scope + '|' + s.leagueId, was = had[k] || null;
+    var nowH = s.res ? s.res.winners.map(function(w){ return w.handle; }) : [];
+    var nowS = s.res ? s.res.top : null;
+    if (!was && !nowH.length) return;                     // no title then, none now
+    changes.push({ scope:s.scope, leagueId:s.leagueId, league:s.leagueName,
+                   wasHandles: was ? was.handles : [], wasScore: was ? was.score : null,
+                   nowHandles: nowH, nowScore: nowS,
+                   titleMoves: key(was ? was.handles : []) !== key(nowH),
+                   scoreChanges: !was || was.score !== nowS });
+  });
+  var moving = changes.filter(function(c){ return c.titleMoves; });
+  var rescored = changes.filter(function(c){ return c.scoreChanges; });
+
+  if (!opts.apply)
+    return { ok:true, dryRun:true, basho:basho, scopes:changes.length,
+             titlesMoving:moving.length, scoresChanging:rescored.length,
+             changes:changes };
+
+  /* Bottom-up: deleting a row shifts every row below it. */
+  hadRows.sort(function(a, b){ return b - a; });
+  hadRows.forEach(function(row){ sh.deleteRow(row); });
+
+  var rows = championRowsFrom_(basho, scopes);
+  if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, CHAMP_HEAD.length).setValues(rows);
+  return { ok:true, dryRun:false, basho:basho, removed:hadRows.length, awarded:rows.length,
+           titlesMoving:moving.length, scoresChanging:rescored.length, changes:changes };
+}
+
+function adminRecrown(body){
+  var bad = adminGate(body && body.adminKey); if (bad) return bad;
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try { return recrownBasho_({ basho: body && body.basho, apply: !!(body && body.apply) }); }
+  finally { unlock_(lock); }
 }
 
 /* Every title one handle holds, newest first — the trophy case. */
