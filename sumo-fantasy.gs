@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-30-recrown';
+var BACKEND_VERSION = '2026-09-30-rerank';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -371,6 +371,8 @@ function doPost(e) {
     if (body.action === 'adminPinResets')     return json(adminPinResets(body.adminKey));
     if (body.action === 'adminApplyRanking')  return json(adminApplyRanking(body));
     if (body.action === 'adminRecrown')       return json(adminRecrown(body));
+    if (body.action === 'adminSnapshotKeepers') return json(adminSnapshotKeepers(body));
+    if (body.action === 'adminRerank')        return json(adminRerank(body));
     if (body.action === 'adminResetPin')      return json(adminResetPin(body));
     if (body.action === 'adminBasho')         return json(adminBasho(body.adminKey));
     if (body.action === 'adminRefreshResults') return json(adminRefreshResults(body));
@@ -831,6 +833,10 @@ function leagueDetail(id, handle){
     iAgreedDraft: handle ? !!agree[handle.toLowerCase()] : false,
     isMember: handle ? isMember(id, handle) : false },
     champion: reigningChampion_(id),
+    /* The finished tournament, for a keepers league between basho. Results is
+       cleared by the roll-over, so this record is the only thing the standings
+       board can be drawn from once Kyushu opens. */
+    lastBasho: L.mode === 'keepers' ? keeperHistoryFor_(id) : null,
     members:mem, messages:msgs };
 }
 
@@ -3577,7 +3583,7 @@ function rankTeamSize_(t){
   return 0;
 }
 function rankStateMap_(){
-  var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_RANKINGS, ['handle','rankIdx','bashoCount','topStreak','lastBasho']);
+  var sh = rankSheet_();
   var v = sh.getDataRange().getValues(), map = {}, r;
   for (r=1;r<v.length;r++){
     var h = String(v[r][0]||'').toLowerCase(); if (!h) continue;
@@ -3590,14 +3596,22 @@ function rankBadgeMap_(){
   for (h in state){ if (!state.hasOwnProperty(h)) continue; var idx = rankClampIdx(state[h].rankIdx||0), R = RANK_LADDER[idx]; out[h] = { idx:idx, label:R.label, div:R.div }; }
   return out;
 }
-function writeRankings_(arr, basho){
-  var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_RANKINGS, ['handle','rankIdx','bashoCount','topStreak','lastBasho']);
+/* `prior` is each account's state BEFORE this pass graded it, keyed by lower
+   handle. It is stored beside the new state so the pass can be undone — see
+   rerankBasho_. Called without it (old callers, tests) the prior columns are
+   left as they are rather than being filled with today's values, which would
+   make an un-doable row look undoable. */
+function writeRankings_(arr, basho, prior){
+  var sh = rankSheet_();
   var v = sh.getDataRange().getValues(), rowByHandle = {}, r;
   for (r=1;r<v.length;r++){ rowByHandle[String(v[r][0]||'').toLowerCase()] = r+1; }
   arr.forEach(function(u){
     var key = u.handle.toLowerCase(), row = rowByHandle[key];
     var vals = [u.handle, u.rankIdx||0, u.bashoCount||0, u.topStreak||0, basho];
-    if (row) sh.getRange(row,1,1,5).setValues([vals]); else sh.appendRow(vals);
+    var pv = prior && prior[key];
+    if (pv) vals = vals.concat([pv.rankIdx||0, pv.bashoCount||0, pv.topStreak||0, pv.lastBasho||'\u2014']);
+    if (row) sh.getRange(row,1,1,vals.length).setValues([vals]);
+    else sh.appendRow(vals);
   });
 }
 function setMeta_(key, value){
@@ -3796,6 +3810,22 @@ function fetchBanzukeTiers_(bashoId){
    teams for the NEXT one, and a second pass would archive those instead.
 
    CALLER MUST HOLD THE SCRIPT LOCK. Use archiveBasho_() if you don't.       */
+/* Has the tournament stopped producing results? Three ways to be sure, in
+   descending order of confidence: the importer's last poll added nothing new;
+   the importer has gone quiet for hours; or there is no importer at all and
+   the results were entered by hand, in which case there is nothing to wait
+   for. */
+function bashoResultsSettled_(meta){
+  meta = meta || readMeta();
+  if (Number(meta.lastDay || 0) < 15) return false;
+  var stamp = String(meta.lastImport || '');
+  if (!stamp) return true;
+  if (String(meta.lastImportAdded) === '0') return true;
+  var age = Date.now() - new Date(stamp).getTime();
+  if (!(age >= 0)) return true;                       // unparseable stamp: don't wait forever
+  return age > 3 * 3600 * 1000;
+}
+
 function archiveAllTeams_(opts){
   opts = opts || {};
   var meta = readMeta();
@@ -3805,6 +3835,16 @@ function archiveAllTeams_(opts){
   if (!opts.force && lastDay < 15)
     return { ok:false, waiting:true, lastDay:lastDay, archived:0,
              error:'Basho still running \u2014 day ' + lastDay + ' of 15.' };
+  /* And "day 15" is not "the basho is over". lastDay advances the moment the
+     FIRST day-15 bout imports, which at Aki 2026 was early afternoon JST —
+     so the pass froze most accounts several bouts short, while the handful of
+     players who happened to open the site that evening got a complete score
+     from the client's own archiveTeam. Two different tournaments, on one
+     board, and the ranking curve was applied to the short one. Wait for the
+     importer to go quiet. */
+  if (!opts.force && !bashoResultsSettled_(meta))
+    return { ok:false, waiting:true, lastDay:lastDay, archived:0,
+             error:'Day 15 is still coming in \u2014 waiting for the import to settle.' };
   if (!opts.force && String(meta.archivedBasho || '') === basho)
     return { ok:true, already:true, basho:basho, archived:0 };
 
@@ -3942,6 +3982,158 @@ function awardChampions_(basho, tiers){
   return { already:false, awarded:rows.length };
 }
 
+/* ---- the keeper-league basho record ---------------------------------------
+   A keeper league's tournament left no trace. TeamHistory stores only the
+   public seven-band team, and "Start a new basho" clears Results — the very
+   rows a keeper score is computed from — so the standings board emptied the
+   moment Kyushu opened and there was no way to ever look at Aki again.
+
+   This writes the finished tournament down: one row per (league, member),
+   with the active lineup itemised exactly as the standings board showed it,
+   so the readout survives the roll-over and every basho after it accumulates
+   rather than replacing the last.
+
+   It scores off ros.active UNCLAMPED, deliberately: championScopesFor_ does
+   the same, and a snapshot that disagreed with the trophy it was minted
+   beside would be worse than no snapshot at all. If the lineup cap needs
+   enforcing it has to be enforced in both places or neither.            */
+var SHEET_KPHIST = 'KeeperHistory';
+var KPHIST_HEAD = ['id', 'basho', 'leagueId', 'leagueName', 'handle', 'pos', 'score',
+                   'wins', 'bonus', 'extras', 'entrants', 'active', 'bench', 'benchPts', 'savedAt'];
+
+function kpHistSheet_(){ return ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_KPHIST, KPHIST_HEAD); }
+/* Reads must never create the sheet. leagueDetail runs this on every league
+   page load and every draft poll; routing those through ensureSheet() is the
+   mistake boardSheetIfAny_ exists to remember. */
+function kpHistSheetIfAny_(){ return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_KPHIST); }
+
+/* One league's members, scored and placed, with the per-rikishi rows. */
+function keeperSnapshotFor_(basho, tiers){
+  var lv = sh_(SHEET_LEAGUES).getDataRange().getValues(), out = [], modelCache = {}, r;
+  for (r = 1; r < lv.length; r++){
+    var id = String(lv[r][0] || ''); if (!id) continue;
+    if (String(lv[r][5] || 'classic') !== 'keepers') continue;
+    var name = String(lv[r][1] || 'League');
+    var scoring = parseScoring(lv[r][11]);
+    var ck = JSON.stringify(scoring);
+    var model = modelCache[ck] || (modelCache[ck] = serverScoreModel_(scoring, tiers));
+
+    var rosters = keeperRostersOf(id), entries = [];
+    membersOf(id).forEach(function(mh){
+      var ros = rosters[mh.toLowerCase()];
+      if (!ros || !ros.active.length) return;            // no lineup set, no entry
+      var aset = {};
+      ros.active.forEach(function(n){ aset[String(n).toLowerCase()] = 1; });
+      var held = [].concat(ros.makuuchi || [], ros.juryo || [])
+                   .filter(function(n){ return !aset[String(n).toLowerCase()]; });
+
+      var a = serverTeamRows_(listToTeam_(ros.active), model, tiers);
+      var b = serverTeamRows_(listToTeam_(held), model, tiers);
+      var raw = 0, bon = 0, ex = 0;
+      a.rows.forEach(function(x){
+        raw += x.wins; bon += x.bonus;
+        ex += (x.sansho ? scoring.sansho : 0) + (x.yusho ? scoring.yusho : 0);
+      });
+      entries.push({ handle:mh, score:a.pts, wins:raw, bonus:bon, extras:ex,
+                     active:a.rows, bench:b.rows, benchPts:b.pts });
+    });
+
+    entries.sort(function(x, y){
+      return y.score - x.score || String(x.handle).toLowerCase().localeCompare(String(y.handle).toLowerCase());
+    });
+    entries.forEach(function(e, i){ e.pos = i + 1; });
+    out.push({ leagueId:id, leagueName:name, entries:entries });
+  }
+  return out;
+}
+
+/* serverTeamRows_ takes the {slot: name} shape a public team has; a keeper
+   lineup is a plain list. */
+function listToTeam_(names){
+  var t = {};
+  (names || []).forEach(function(n, i){ if (n) t['a' + i] = n; });
+  return t;
+}
+
+function keeperSnapshotRows_(basho, scopes){
+  var now = new Date().toISOString(), rows = [];
+  scopes.forEach(function(s){
+    s.entries.forEach(function(e){
+      rows.push([newId('kh_') + '_' + rows.length, basho, s.leagueId, s.leagueName, e.handle,
+                 e.pos, e.score, e.wins, e.bonus, e.extras, s.entries.length,
+                 JSON.stringify(e.active), JSON.stringify(e.bench), e.benchPts, now]);
+    });
+  });
+  return rows;
+}
+
+/* Idempotent like awardChampions_: a basho already written is left alone.
+   `force` replaces it instead — the door for a re-score, and the reason the
+   rows are deleted bottom-up (deleting a row shifts every row below it). */
+function snapshotKeeperBasho_(basho, tiers, opts){
+  opts = opts || {};
+  basho = String(basho || readMeta().basho || '').trim();
+  if (!basho) return { ok:false, error:'No basho given.' };
+
+  var sh = kpHistSheet_(), v = sh.getDataRange().getValues(), had = [], r;
+  for (r = 1; r < v.length; r++) if (String(v[r][1]) === basho) had.push(r + 1);
+  if (had.length && !opts.force) return { ok:true, already:true, basho:basho, rows:had.length };
+
+  var rows = keeperSnapshotRows_(basho, keeperSnapshotFor_(basho, tiers));
+  if (!opts.apply && !opts.write)
+    return { ok:true, dryRun:true, basho:basho, would:rows.length, replacing:had.length };
+
+  had.sort(function(a, b){ return b - a; });
+  had.forEach(function(row){ sh.deleteRow(row); });
+  if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, KPHIST_HEAD.length).setValues(rows);
+  return { ok:true, basho:basho, removed:had.length, written:rows.length };
+}
+
+/* The most recent snapshotted basho for one league, shaped for the page.
+   Returns null when the sheet doesn't exist yet or the league has no record —
+   a league created after the last close is simply not in it. */
+function keeperHistoryFor_(leagueId){
+  var sh = kpHistSheetIfAny_(); if (!sh) return null;
+  var v = sh.getDataRange().getValues(), mine = [], r;
+  for (r = 1; r < v.length; r++) if (String(v[r][2]) === String(leagueId)) mine.push(v[r]);
+  if (!mine.length) return null;
+
+  /* Latest by savedAt, not by sheet order: a re-scored basho is appended
+     after ones that finished later. */
+  var latest = '', basho = '';
+  mine.forEach(function(row){
+    var t = String(row[14] || '');
+    if (t > latest){ latest = t; basho = String(row[1]); }
+  });
+
+  var entries = mine.filter(function(row){ return String(row[1]) === basho; })
+    .map(function(row){
+      var act = [], ben = [];
+      try { act = JSON.parse(row[11] || '[]'); } catch (e) {}
+      try { ben = JSON.parse(row[12] || '[]'); } catch (e) {}
+      return { handle:String(row[4]), pos:Number(row[5] || 0), score:Number(row[6] || 0),
+               wins:Number(row[7] || 0), bonus:Number(row[8] || 0), extras:Number(row[9] || 0),
+               active:act, benchPts:Number(row[13] || 0), benchCount:ben.length };
+    })
+    .sort(function(a, b){ return a.pos - b.pos; });
+
+  return { basho:basho, savedAt:latest, entrants:entries.length, entries:entries };
+}
+
+function adminSnapshotKeepers(body){
+  var bad = adminGate(body && body.adminKey); if (bad) return bad;
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try {
+    var basho = String((body && body.basho) || readMeta().basho || '').trim();
+    var tiers = tierMapFor_(basho, null);
+    if (!hasSanyaku_(tiers))
+      return { ok:false, error:'No usable banzuke for ' + basho +
+               ' — refusing to write a record that would zero every upset bonus.' };
+    return snapshotKeeperBasho_(basho, tiers,
+      { apply: !!(body && body.apply), force: !!(body && body.force) });
+  } finally { unlock_(lock); }
+}
+
 /* Re-crown one basho from scratch, because the first crowning was wrong.
 
    awardChampions_ is deliberately once-only — a re-run of the ranking pass
@@ -4047,6 +4239,131 @@ function reigningChampion_(leagueId){
 /* Compute promotions for a completed basho from everyone archived win rate.
    Idempotent per basho (guarded by Meta.rankedBasho). New handles start at
    Jonokuchi; returning handles carry rankIdx/bashoCount/topStreak forward. */
+/* ---- re-ranking a basho -----------------------------------------------------
+   The promotion curve is applied to a state it also overwrites: rankApplyBasho
+   reads each account's rankIdx and writes the new one into the same cell. Run
+   it twice and the account is promoted twice, off one tournament. So a ranking
+   pass built on bad input used to be permanent — not because correcting it is
+   hard, but because the number it would have to be corrected FROM was gone.
+
+   Rankings now keeps the prior state beside the current one. That costs three
+   columns and makes the pass reversible, which is the difference between a
+   mistake you can fix and a mistake you have to live with.
+
+   Aki 2026 is why this exists: the archive froze partial day-15 results for
+   most accounts, so the win counts the curve was applied to were short. See
+   archiveAllTeams_. */
+var RANK_HEAD = ['handle', 'rankIdx', 'bashoCount', 'topStreak', 'lastBasho',
+                 'prevRankIdx', 'prevBashoCount', 'prevTopStreak', 'prevBasho'];
+
+function rankSheet_(){
+  var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_RANKINGS, RANK_HEAD);
+  migrateRankPrev_(sh);
+  return sh;
+}
+/* Widen a Rankings sheet written before the prior-state columns existed.
+   Header only — the rows themselves stay blank, and a blank prior state is
+   read as "this account has never been ranked", which for every row written
+   before this shipped is true. */
+function migrateRankPrev_(sh){
+  var lastCol = Math.max(RANK_HEAD.length, sh.getLastColumn());
+  var head = sh.getRange(1, 1, 1, lastCol).getValues()[0], i, need = false;
+  for (i = 5; i < RANK_HEAD.length; i++) if (String(head[i] || '') !== RANK_HEAD[i]) need = true;
+  if (need) sh.getRange(1, 6, 1, 4).setValues([RANK_HEAD.slice(5)]);
+}
+
+/* The archive for one basho, shaped the way the curve wants it: a score per
+   account between 0 and 1, being the share of possible wins taken. Lifted out
+   of applyBashoRanking so the re-rank grades exactly the same way the first
+   pass did — two copies of this would be two answers. */
+function rankEntriesFor_(basho){
+  var hv = sh_(SHEET_HISTORY).getDataRange().getValues(), arr = [], r;
+  for (r = 1; r < hv.length; r++){
+    if (String(hv[r][1]) !== basho) continue;
+    var handle = String(hv[r][0] || ''); if (!handle) continue;
+    var wins = Number(hv[r][4] || 0), team = {};
+    try { team = JSON.parse(hv[r][2] || '{}'); } catch (e) {}
+    var size = rankTeamSize_(team), possible = (size > 0 ? size : 1) * 15;
+    arr.push({ handle:handle, score: possible > 0 ? wins / possible : 0 });
+  }
+  return arr;
+}
+
+/* Undo the last ranking pass and run it again against the archive as it now
+   stands. Defaults to writing nothing. */
+function rerankBasho_(opts){
+  opts = opts || {};
+  var meta = readMeta();
+  var basho = String(opts.basho || meta.rankedBasho || '').trim();
+  if (!basho) return { ok:false, error:'No basho given.' };
+
+  /* Only the most recent pass can be undone: the prior state we keep is one
+     deep, so re-running an older basho would restore the wrong starting point
+     and quietly invent a rank history. */
+  if (String(meta.rankedBasho || '') !== basho)
+    return { ok:false, error:'Only the last ranked basho can be re-ranked. That is ' +
+             (meta.rankedBasho || '(none)') + ', not ' + basho + '.' };
+
+  var arr = rankEntriesFor_(basho);
+  if (!arr.length) return { ok:false, error:'No archived results for ' + basho + '.' };
+
+  var sh = rankSheet_(), v = sh.getDataRange().getValues(), state = {}, r;
+  for (r = 1; r < v.length; r++){
+    var h = String(v[r][0] || '').toLowerCase(); if (!h) continue;
+    state[h] = { rankIdx:Number(v[r][1] || 0), bashoCount:Number(v[r][2] || 0),
+                 topStreak:Number(v[r][3] || 0), lastBasho:String(v[r][4] || ''),
+                 prevRankIdx:Number(v[r][5] || 0), prevBashoCount:Number(v[r][6] || 0),
+                 prevTopStreak:Number(v[r][7] || 0), prevBasho:String(v[r][8] || ''),
+                 hasPrev: String(v[r][8] || '') !== '' };
+  }
+
+  /* Restore each account to what it was before this basho was graded. A row
+     with no stored prior is only safe when this basho was its FIRST — then the
+     prior is the default every account starts at. Anything else and we would
+     be guessing at somebody's rank. */
+  var blind = [];
+  arr.forEach(function(u){
+    var st = state[u.handle.toLowerCase()] || {};
+    if (st.hasPrev){
+      u.rankIdx = st.prevRankIdx; u.bashoCount = st.prevBashoCount; u.topStreak = st.prevTopStreak;
+    } else {
+      if (Number(st.bashoCount || 0) > 1) blind.push(u.handle);
+      u.rankIdx = 0; u.bashoCount = 0; u.topStreak = 0;
+    }
+    u.was = Number(st.rankIdx || 0);
+  });
+  if (blind.length)
+    return { ok:false, error:'No stored prior rank for ' + blind.length +
+             ' account(s) that have been ranked more than once (' + blind.slice(0, 5).join(', ') +
+             '). Re-ranking them would invent a rank history.' };
+
+  rankApplyBasho(arr);
+
+  var moves = arr.filter(function(u){ return u.rankIdx !== u.was; })
+                 .map(function(u){ return { handle:u.handle, was:u.was, now:u.rankIdx }; });
+  if (!opts.apply)
+    return { ok:true, dryRun:true, basho:basho, graded:arr.length,
+             moving:moves.length, moves:moves };
+
+  var prior = {};
+  arr.forEach(function(u){
+    var st = state[u.handle.toLowerCase()] || {};
+    prior[u.handle.toLowerCase()] = st.hasPrev
+      ? { rankIdx:st.prevRankIdx, bashoCount:st.prevBashoCount, topStreak:st.prevTopStreak, lastBasho:st.prevBasho }
+      : { rankIdx:0, bashoCount:0, topStreak:0, lastBasho:'' };
+  });
+  writeRankings_(arr, basho, prior);
+  return { ok:true, dryRun:false, basho:basho, graded:arr.length,
+           moving:moves.length, moves:moves };
+}
+
+function adminRerank(body){
+  var bad = adminGate(body && body.adminKey); if (bad) return bad;
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try { return rerankBasho_({ basho: body && body.basho, apply: !!(body && body.apply) }); }
+  finally { unlock_(lock); }
+}
+
 function applyBashoRanking(basho, tiers){
   basho = String(basho || readMeta().basho || '').trim();
   if (!basho) return { ok:false, error:'no basho' };
@@ -4080,15 +4397,36 @@ function applyBashoRanking(basho, tiers){
     try { champs = awardChampions_(basho, tierMapFor_(basho, tiers)); }
     catch (e){ champs = { awarded:0, error:String(e) }; }   // never lose a ranking over a trophy
 
+    /* And write the keeper leagues' record down in the same pass, for the same
+       reason the champions are crowned here: this is the last moment the
+       Results rows exist. Wrapped like the trophies — a ranking is never lost
+       over a scoreboard. */
+    var kpSnap = { written:0 };
+    try { kpSnap = snapshotKeeperBasho_(basho, tierMapFor_(basho, tiers), { apply:true }); }
+    catch (e){ kpSnap = { written:0, error:String(e) }; }
+
+    /* No public archive is not the same as nothing happening: the trophies and
+       the keeper record are both written above, off LeagueTeams and
+       KeeperRosters, and the caller needs to hear that they landed. */
     if (!arr.length) return { ok:false, error:'no archived results for '+basho,
-                              champions:champs.awarded };
+                              champions:champs.awarded,
+                              keeperRows:kpSnap.written || 0, keeperError:kpSnap.error || '' };
     var state = rankStateMap_();
-    arr.forEach(function(u){ var st = state[u.handle.toLowerCase()] || {}; u.rankIdx=st.rankIdx||0; u.bashoCount=st.bashoCount||0; u.topStreak=st.topStreak||0; });
+    /* Captured BEFORE rankApplyBasho, which overwrites the very fields it
+       reads. Without this a pass run on bad input could never be undone. */
+    var prior = {};
+    arr.forEach(function(u){
+      var st = state[u.handle.toLowerCase()] || {};
+      u.rankIdx=st.rankIdx||0; u.bashoCount=st.bashoCount||0; u.topStreak=st.topStreak||0;
+      prior[u.handle.toLowerCase()] = { rankIdx:u.rankIdx, bashoCount:u.bashoCount,
+                                        topStreak:u.topStreak, lastBasho:String(st.lastBasho||'') };
+    });
     rankApplyBasho(arr);
-    writeRankings_(arr, basho);
+    writeRankings_(arr, basho, prior);
     setMeta_('rankedBasho', basho);
     return { ok:true, ranked:arr.length, basho:basho,
-             champions:champs.awarded, championError:champs.error || '' };
+             champions:champs.awarded, championError:champs.error || '',
+             keeperRows:kpSnap.written || 0, keeperError:kpSnap.error || '' };
   } finally { unlock_(lock); }
 }
 function adminApplyRanking(body){

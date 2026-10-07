@@ -7,6 +7,15 @@ const GS = process.env.GG_GS ||
   require('path').join(__dirname, '..', '..', 'sumo-fantasy.gs');
 const SRC = fs.readFileSync(GS,'utf8');
 
+/* Import until the feed stops producing. The archive now refuses to freeze a
+   basho while the importer is still adding rows to it: lastDay ticks over to
+   15 on the FIRST day-15 bout, and at Aki 2026 that is exactly how most of the
+   board came to be archived several bouts short, while the few players who
+   opened the site that evening got a complete score from the client's own
+   archiveTeam. The hourly trigger reaches the quiet tick by itself; a test has
+   to say so out loud. */
+const settle = c => { c.refreshResults(); c.refreshResults(); return c; };
+
 /* ---------- fake Sheet ---------- */
 function makeSheet(name, rows){
   return { name, rows,
@@ -175,7 +184,7 @@ t('an unreachable sumo-api yields an empty map, not an exception', ()=>{
 section('the guards');
 t('nothing is archived mid-basho', ()=>{
   const c=world({throughDay:7});
-  c.refreshResults();
+  settle(c);
   assert.strictEqual(Number(c.readMeta().lastDay), 7, 'seven days imported');
   assert.strictEqual(history(c).length, 0, 'archived '+history(c).length+' rows on day 7');
   assert.ok(!c.readMeta().archivedBasho, 'and did not set the once-per-basho flag');
@@ -186,7 +195,7 @@ t('an empty results sheet is refused even with force', ()=>{
   assert.ok(!r.ok && /no results/i.test(r.error), JSON.stringify(r));
 });
 t('a blank Meta label falls back to the code label, never to an empty key', ()=>{
-  const c=world({throughDay:15}); c.refreshResults();
+  const c=world({throughDay:15}); settle(c);
   c.setMeta_('basho',''); c.setMeta_('archivedBasho','');
   const r=c.archiveBasho_({});
   assert.ok(r.ok, JSON.stringify(r));
@@ -196,27 +205,27 @@ t('a blank Meta label falls back to the code label, never to an empty key', ()=>
 
 section('basho close');
 t('day 15 archives every player who picked, and only those', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const h=history(c);
   assert.strictEqual(h.length, 3, 'expected 3 rows, got '+h.length+': '+h.map(x=>x.handle));
   assert.deepStrictEqual(h.map(x=>x.handle).sort(), ['dave','mika','sean'], 'the lurker who never picked is not archived');
   h.forEach(r=>assert.strictEqual(r.basho, 'Aki 2026', 'stamped with the basho'));
 });
 t('the honours are lifted off the day-15 payload', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const m=c.readMeta();
   assert.strictEqual(String(m.yusho), 'Onosato', 'Makuuchi yusho, not the Juryo one');
   assert.strictEqual(String(m.sansho), 'Ura, Asakoryu', 'both prizewinners, Ura listed once for two prizes');
 });
 t('a hand-typed yusho is not overwritten by the feed', ()=>{
-  const c=world({throughDay:14}); c.refreshResults();
+  const c=world({throughDay:14}); settle(c);
   c.setMeta_('yusho','Hoshoryu'); c.setMeta_('sansho','Takayasu');
-  c.refreshResults();                       // day 15 now lands, carrying Onosato
+  settle(c);                       // day 15 now lands, carrying Onosato
   assert.strictEqual(String(c.readMeta().yusho), 'Hoshoryu', 'the manual correction survived');
   assert.strictEqual(String(c.readMeta().sansho), 'Takayasu');
 });
 t('every archived score matches what the client would have computed', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const results=c.readResults(), meta=c.readMeta();
   history(c).forEach(r=>{
     const want=clientScore(TEAMS[r.handle], results, meta, TIER);
@@ -225,7 +234,7 @@ t('every archived score matches what the client would have computed', ()=>{
   });
 });
 t('the yusho and sansho bonuses actually land in the rows', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const sean=history(c).find(r=>r.handle==='sean');
   const ono=sean.rows.find(r=>r.name==='Onosato'), ura=sean.rows.find(r=>r.name==='Ura');
   assert.ok(ono.yusho, 'Onosato took the cup and Sean picked him');
@@ -233,7 +242,7 @@ t('the yusho and sansho bonuses actually land in the rows', ()=>{
   assert.strictEqual(ura.pts, ura.w + ura.bonus + 5, 'one sansho, not two, for two prizes');
 });
 t('the stored rows carry the tier and the breakdown the account page reads', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   history(c).forEach(r=>{
     assert.strictEqual(r.rows.length, 7, r.handle+' has '+r.rows.length+' rows');
     r.rows.forEach(x=>{
@@ -246,7 +255,7 @@ t('the stored rows carry the tier and the breakdown the account page reads', ()=
   });
 });
 t('the sanyaku bonus is paid from the fetched banzuke, not from a default of M', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   // Kotoshoho (M1) beats Wakatakakage (M1) — no gap. Kirishima (O) loses to nobody above him.
   // Ura (M5) beats Takayasu (M5): no bonus. The gap that must exist: none in these pairs,
   // so assert instead that a Maegashira who beat a Yokozuna would score it.
@@ -261,24 +270,24 @@ t('the sanyaku bonus is paid from the fetched banzuke, not from a default of M',
 
 section('idempotence — the part that decides whether a basho can be lost');
 t('a second hourly tick changes nothing', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const before=JSON.stringify(history(c).map(r=>[r.handle,r.score,r.wins]));
-  c.refreshResults(); c.refreshResults();
+  settle(c); settle(c);
   const after=history(c);
   assert.strictEqual(after.length, 3, 'still 3 rows, got '+after.length);
   assert.strictEqual(JSON.stringify(after.map(r=>[r.handle,r.score,r.wins])), before, 'scores drifted');
 });
 t('a team edited for the NEXT basho does not overwrite the archive', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const was=history(c).find(r=>r.handle==='sean');
   c.saveTeam({handle:'sean',auth:'h0',team:{sanyaku:'Kotozakura'}});   // drafting again
-  c.refreshResults();
+  settle(c);
   const now=history(c).find(r=>r.handle==='sean');
   assert.strictEqual(now.score, was.score, 'the archived score changed to '+now.score);
   assert.strictEqual(Object.keys(now.team).length, 7, 'the archived team was replaced by the new draft');
 });
 t('the client snapshot and the server pass share one row', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const before=history(c).length;
   const r=c.archiveTeam({handle:'sean',auth:'h0',basho:'Aki 2026',
     team:TEAMS.sean, score:999, wins:9, rows:[{name:'Onosato',tier:'Y',w:9,wins:9,bonus:0,sansho:false,yusho:true,pts:14}]});
@@ -288,7 +297,7 @@ t('the client snapshot and the server pass share one row', ()=>{
 });
 t('a client snapshot taken first is corrected by the server pass', ()=>{
   const c=world({throughDay:15});
-  c.refreshResults();
+  settle(c);
   // pretend the client got there first with a stale, mid-basho score
   c.setMeta_('archivedBasho','');
   const sh=c.__store.TeamHistory;
@@ -302,14 +311,14 @@ t('a client snapshot taken first is corrected by the server pass', ()=>{
 
 section('the admin path');
 t('adminArchiveBasho needs the key', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const bad=c.adminArchiveBasho({adminKey:'nope'});
   assert.ok(!bad.ok, 'a wrong key was accepted: '+JSON.stringify(bad));
   const good=c.adminArchiveBasho({adminKey:'test'});
   assert.ok(good.ok && good.already, 'expected "already", got '+JSON.stringify(good));
 });
 t('force re-archives after the flag is set', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const r=c.adminArchiveBasho({adminKey:'test', force:true});
   assert.ok(r.ok && r.archived===3, JSON.stringify(r));
   assert.strictEqual(history(c).length, 3, 'force duplicated rows');
@@ -318,7 +327,7 @@ t('applying the ranking archives first, so the button works on a cold sheet', ()
   const c=world({throughDay:15});
   // import the results without ever letting the auto-archive run
   c.setMeta_('archivedBasho','SKIP');
-  c.refreshResults();
+  settle(c);
   c.__store.TeamHistory.rows = [c.__store.TeamHistory.rows[0]];   // nothing archived at all
   c.setMeta_('archivedBasho','');
   const r=c.applyBashoRanking('Aki 2026', null);
@@ -329,7 +338,7 @@ t('applying the ranking archives first, so the button works on a cold sheet', ()
 });
 t('champions are crowned off the server archive', ()=>{
   const c=world({throughDay:15});
-  c.refreshResults();
+  settle(c);
   const r=c.applyBashoRanking('Aki 2026', null);
   assert.ok(r.ok, JSON.stringify(r));
   const champ=c.reigningChampion_('');
@@ -341,7 +350,7 @@ t('champions are crowned off the server archive', ()=>{
 
 section('reading it back');
 t('accountSummary hands the page a per-basho history it can plot', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const s=c.accountSummary('sean');
   assert.ok(s.ok !== false, JSON.stringify(s));
   assert.ok(Array.isArray(s.history) && s.history.length===1, 'history: '+JSON.stringify(s.history));
@@ -351,7 +360,7 @@ t('accountSummary hands the page a per-basho history it can plot', ()=>{
   assert.strictEqual(h.score, history(c).find(x=>x.handle==='sean').score);
 });
 t('myHistory returns the team and the breakdown', ()=>{
-  const c=world(); c.refreshResults();
+  const c=world(); settle(c);
   const h=c.myHistory('SEAN');            // case-insensitive
   assert.strictEqual(h.length,1);
   assert.strictEqual(h[0].rows.length,7);
@@ -361,12 +370,12 @@ t('myHistory returns the team and the breakdown', ()=>{
 section('offline / degraded');
 t('with sumo-api unreachable nothing is imported and nothing is archived', ()=>{
   const c=world({offline:true});
-  c.refreshResults();
+  settle(c);
   assert.strictEqual(history(c).length, 0);
   assert.strictEqual(Number(c.readMeta().lastDay), 0);
 });
 t('results already in the sheet still archive if the banzuke fetch fails', ()=>{
-  const c=world(); c.refreshResults();                 // full basho, tiers cached in Meta
+  const c=world(); settle(c);                 // full basho, tiers cached in Meta
   const c2=world({offline:true});
   c2.__store.Results.rows = c.__store.Results.rows.map(r=>r.slice());
   c2.setMeta_('lastDay',15);

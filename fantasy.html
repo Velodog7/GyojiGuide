@@ -721,6 +721,10 @@
   .lg-team-row__h{ color:var(--faint); font-family:"WDXL Lubrifont TC",monospace; font-size:0.85rem; margin-left:6px }
   .lg-kp-pos{ min-width:1.6em; text-align:center; font-family:"WDXL Lubrifont TC",monospace; font-weight:700; color:var(--faint) }
   .lg-kpstand .lg-kp-lead .lg-kp-pos{ color:#e8b04b }
+  /* the held bench, named in the expanded row so nobody reads an unplayed
+     total as points they scored */
+  .lg-kp-held{ color:var(--faint) }
+  .lg-kpfinal .lg-rm-head h4{ letter-spacing:.01em }
   .lg-team-row__score{ margin-left:auto; font-family:"WDXL Lubrifont TC",monospace; font-weight:700; color:var(--ink) }
   .lg-team-row__empty{ color:var(--faint); font-size:.82rem; font-style:italic }
   .lg-team-expand{ margin-top:10px }
@@ -1977,6 +1981,7 @@ async function renderLeague(){
   if (d && d.ok){
     lg.members = d.members || []; lg.messages = d.messages || [];
     lg.champion = d.champion || null;
+    lg.lastBasho = d.lastBasho || null;   // the stored record of the last finished basho (keepers)
     if (d.league) { lg.mode = d.league.mode || lg.mode || "classic"; lg.rosterSize = d.league.rosterSize;
       lg.benchSize = d.league.benchSize; lg.farmSize = d.league.farmSize; lg.draftStatus = d.league.draftStatus;
       lg.scoring = d.league.scoring || null; lg.draftDate = d.league.draftDate || "";
@@ -2604,6 +2609,72 @@ function keeperStandingsHTML(lg, members){
   </div>`;
 }
 
+/* The finished tournament, read back from the server's record rather than
+   recomputed. Between basho there is nothing to recompute FROM — "Start a new
+   basho" clears Results — so this is the only thing standing between a keeper
+   league and a scoreboard of zeroes for six weeks at a time.
+
+   It draws ranks from the stored row, never from RK: RK is whatever banzuke
+   is current, and by the time anyone reads this the men have been promoted
+   and demoted out of the ranks they actually fought at. */
+function kpFinalCards(rows){
+  if (!rows || !rows.length) return `<p class="lg-locked-note">No active lineup that basho.</p>`;
+  return `<div class="expand-cards is-team">` + rows.map(r=>{
+    const t = String(r.tier || "M").charAt(0);
+    const line = `${r.wins}W${r.bonus?" +"+r.bonus:""}${r.sansho?" · 賞":""}${r.yusho?" · 優":""} · <b>${r.pts}</b> pts`;
+    return `<div class="ecard"><div class="pcard filled r-${t}">`
+         + `${pcardInner(r.name, t === "J" ? "Jūryō" : "Makuuchi", false)}</div>`
+         + `<div class="ec-pts">${line}</div></div>`;
+  }).join("") + `</div>`;
+}
+
+function keeperFinalHTML(lg, snap, members){
+  const byH = {};
+  (members || []).forEach(m => { byH[String(m.handle).toLowerCase()] = m.name || m.handle; });
+
+  const rowsHTML = (snap.entries || []).map(e=>{
+    const you = acct && String(e.handle).toLowerCase() === acct.handle.toLowerCase();
+    const nm  = byH[String(e.handle).toLowerCase()] || e.handle;
+    const bench = e.benchCount
+      ? `<span class="lg-kp-held">${e.benchCount} held · ${e.benchPts} pts unplayed</span>` : "";
+    return `<div class="lg-team-row${e.pos===1?" lg-kp-lead":""}" data-h="${esc(e.handle)}">
+      <div class="lg-team-row__top">
+        <span class="lg-kp-pos">${e.pos}</span>
+        <span class="lg-team-row__ava">${esc(initials(nm))}</span>
+        <span class="lg-team-row__name">${esc(nm)}${you?`<span class="lg-team-row__you">You</span>`:""}<span class="lg-team-row__h">@${esc(e.handle)}</span></span>
+        <span class="lg-team-row__score">${e.score} pts</span>
+      </div>
+      <div class="lg-team-expand" hidden>
+        <p class="lg-myteam__hint" style="margin:0 0 8px">${e.wins} win${e.wins===1?"":"s"}${e.bonus?` · ${e.bonus} upset bonus`:""}${e.extras?` · ${e.extras} from sanshō/yūshō`:""}${bench?" · "+bench:""}</p>
+        ${kpFinalCards(e.active)}
+      </div>
+    </div>`;
+  }).join("") || `<p class="lg-locked-note">Nobody set a lineup that basho.</p>`;
+
+  const nxt = (window.GyojiGuide && GyojiGuide.basho) ? GyojiGuide.basho.next() : null;
+  const opens = nxt ? ` Next up: <b>${esc(nxt.name)}</b>.` : "";
+
+  return `<div class="lg-teams lg-kpstand lg-kpfinal">
+    <div class="lg-rm-head"><h4>Final standings</h4><span class="lg-rm-window closed">${esc(snap.basho)} · final</span></div>
+    <p class="lg-myteam__hint" style="margin-top:0">How the basho finished, as it was scored on the last day.${opens} Tap a team to see where its points came from.</p>
+    ${rowsHTML}
+  </div>`;
+}
+
+/* Which board to show. The calendar decides, not the sheet: gg-basho.js
+   already knows whether a tournament is being fought, and asking it keeps
+   this from becoming a second source of truth that can drift.
+
+   live            -> the running standings, as always
+   final/upcoming  -> the stored record of the last basho, if there is one
+   no record yet   -> fall back to the live board rather than showing nothing */
+function keeperBoardHTML(lg, members, snap){
+  const st = (window.GyojiGuide && GyojiGuide.basho) ? GyojiGuide.basho.state() : null;
+  const live = !st || st.phase === "live";
+  if (!live && snap && snap.entries && snap.entries.length) return keeperFinalHTML(lg, snap, members);
+  return keeperStandingsHTML(lg, members);
+}
+
 async function renderKeepers(lg, meCommish){
   const el = $("lgKeepers");
   /* Reseed only when the league changes or nothing is in hand — a re-render
@@ -2783,7 +2854,7 @@ async function renderKeepers(lg, meCommish){
   }).join("");
 
   el.innerHTML = `
-    ${keeperStandingsHTML(lg, members)}
+    ${keeperBoardHTML(lg, members, lg.lastBasho)}
     <div class="lg-rostermoves">
       <div class="lg-rm-head"><h4>Roster moves</h4><span class="lg-rm-window ${locked ? "closed" : "open"}">${locked ? "Locked — tournament underway" : "Open — between tournaments"}</span></div>
       <p class="lg-myteam__hint" style="margin-top:0">${locked
