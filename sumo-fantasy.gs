@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-09-30-rerank';
+var BACKEND_VERSION = '2026-10-19-stands';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -371,6 +371,7 @@ function doPost(e) {
     if (body.action === 'adminPinResets')     return json(adminPinResets(body.adminKey));
     if (body.action === 'adminApplyRanking')  return json(adminApplyRanking(body));
     if (body.action === 'adminRecrown')       return json(adminRecrown(body));
+    if (body.action === 'adminStandTitle')    return json(adminStandTitle(body));
     if (body.action === 'adminSnapshotKeepers') return json(adminSnapshotKeepers(body));
     if (body.action === 'adminRerank')        return json(adminRerank(body));
     if (body.action === 'adminResetPin')      return json(adminResetPin(body));
@@ -3634,8 +3635,64 @@ function setMeta_(key, value){
    must not silently change with them.
    ============================================================ */
 var CHAMP_HEAD = ['id', 'basho', 'scope', 'leagueId', 'leagueName', 'handle', 'score',
-                  'runnerUp', 'runnerUpScore', 'entrants', 'awardedAt'];
-function champSheet_(){ return ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_CHAMPS, CHAMP_HEAD); }
+                  'runnerUp', 'runnerUpScore', 'entrants', 'awardedAt',
+                  /* v2: a title that STANDS AS CALLED. See standTitle_. */
+                  'standsAsCalled', 'note', 'correctedHandle', 'correctedScore'];
+function champSheet_(){
+  var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_CHAMPS, CHAMP_HEAD);
+  migrateChampsV2(sh);
+  return sh;
+}
+/* Older Champions sheets stop at awardedAt. Append the four columns a
+   stands-as-called title needs; existing rows just get blanks, which read as
+   "no exception, nothing to explain" everywhere below. */
+function migrateChampsV2(sh){
+  var head = sh.getRange(1, 1, 1, Math.max(11, sh.getLastColumn())).getValues()[0];
+  if (String(head[11] || '').toLowerCase() !== 'standsascalled')
+    sh.getRange(1, 12, 1, 4).setValues([['standsAsCalled', 'note', 'correctedHandle', 'correctedScore']]);
+}
+
+/* =====================================================================
+   A TITLE THAT STANDS AS CALLED
+   ---------------------------------------------------------------------
+   Aki 2026 was crowned against the wrong banzuke (see tierMapFor_), and the
+   corrected arithmetic moves some titles to a different member. A league that
+   has already congratulated someone may not want the trophy taken back weeks
+   later — but the answer to that is never to quietly keep the wrong number.
+
+   So a title can be marked as STANDING AS CALLED: the row keeps the handle and
+   score that were announced, and gains
+     - standsAsCalled : when the commissioner/admin froze it
+     - note           : the sentence shown wherever that title appears
+     - correctedHandle / correctedScore : what the fixed scoring says instead
+   Both answers are on the record and both are shown. A re-crown then leaves
+   that row alone and corrects every other scope as usual.
+   ===================================================================== */
+function standTitle_(basho, scope, leagueId, note, undo){
+  basho = String(basho || '').trim();
+  scope = String(scope || 'league');
+  leagueId = String(leagueId || '');
+  var sh = champSheet_(), v = sh.getDataRange().getValues(), hit = 0;
+  for (var r = 1; r < v.length; r++){
+    if (String(v[r][1]) !== basho) continue;
+    if (String(v[r][2]) !== scope) continue;
+    if (scope === 'league' && String(v[r][3]) !== leagueId) continue;
+    sh.getRange(r + 1, 12, 1, 2).setValues([[ undo ? '' : new Date().toISOString(),
+                                              undo ? '' : String(note || '').slice(0, 300) ]]);
+    if (undo) sh.getRange(r + 1, 14, 1, 2).setValues([['', '']]);
+    hit++;
+  }
+  return hit;
+}
+function adminStandTitle(body){
+  var bad = adminGate(body && body.adminKey); if (bad) return bad;
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try {
+    var n = standTitle_(body.basho, body.scope || 'league', body.leagueId, body.note, !!body.undo);
+    if (!n) return { ok:false, error:'No title on record for that basho and scope.' };
+    return { ok:true, rows:n, stands:!body.undo };
+  } finally { unlock_(lock); }
+}
 
 /* Sanyaku rank levels, mirroring LEVEL in gg-account.js. The bonus for
    beating a higher-ranked opponent is (loserLevel - winnerLevel) steps. */
@@ -4156,13 +4213,16 @@ function recrownBasho_(opts){
   var scopes = championScopesFor_(basho, tiers);
   var sh = champSheet_(), v = sh.getDataRange().getValues(), r;
 
-  var had = {}, hadRows = [];
+  var had = {}, hadRows = [], standRows = {};
   for (r = 1; r < v.length; r++){
     if (String(v[r][1]) !== basho) continue;
-    hadRows.push(r + 1);                                  // 1-based sheet row
     var k = String(v[r][2]) + '|' + String(v[r][3]);
-    if (!had[k]) had[k] = { handles:[], score:Number(v[r][6] || 0) };
+    if (!had[k]) had[k] = { handles:[], score:Number(v[r][6] || 0), stands:!!String(v[r][11] || '') };
     had[k].handles.push(String(v[r][5]));
+    /* A title marked as standing is never deleted and never re-awarded; its
+       row is updated in place with what the corrected scoring says. */
+    if (String(v[r][11] || '')) (standRows[k] = standRows[k] || []).push(r + 1);
+    else hadRows.push(r + 1);                             // 1-based sheet row
   }
 
   function key(a){ return (a || []).slice().sort().join(','); }
@@ -4175,25 +4235,43 @@ function recrownBasho_(opts){
     changes.push({ scope:s.scope, leagueId:s.leagueId, league:s.leagueName,
                    wasHandles: was ? was.handles : [], wasScore: was ? was.score : null,
                    nowHandles: nowH, nowScore: nowS,
+                   stands: !!(was && was.stands),
                    titleMoves: key(was ? was.handles : []) !== key(nowH),
                    scoreChanges: !was || was.score !== nowS });
   });
-  var moving = changes.filter(function(c){ return c.titleMoves; });
+  var standing = changes.filter(function(c){ return c.stands; });
+  var moving = changes.filter(function(c){ return c.titleMoves && !c.stands; });
   var rescored = changes.filter(function(c){ return c.scoreChanges; });
 
   if (!opts.apply)
     return { ok:true, dryRun:true, basho:basho, scopes:changes.length,
              titlesMoving:moving.length, scoresChanging:rescored.length,
-             changes:changes };
+             standing:standing.length, changes:changes };
+
+  /* Bottom-up: deleting a row shifts every row below it. */
+  /* First, write what the fix says onto the titles that are standing — the
+     row keeps the called winner, and carries the corrected one beside it. */
+  changes.forEach(function(c){
+    if (!c.stands) return;
+    var rows = standRows[c.scope + '|' + c.leagueId] || [];
+    rows.forEach(function(row){
+      sh.getRange(row, 14, 1, 2).setValues([[ c.nowHandles.join(', '),
+                                              c.nowScore == null ? '' : c.nowScore ]]);
+    });
+  });
 
   /* Bottom-up: deleting a row shifts every row below it. */
   hadRows.sort(function(a, b){ return b - a; });
   hadRows.forEach(function(row){ sh.deleteRow(row); });
 
-  var rows = championRowsFrom_(basho, scopes);
+  var open = scopes.filter(function(s){
+    return !(had[s.scope + '|' + s.leagueId] || {}).stands;
+  });
+  var rows = championRowsFrom_(basho, open);
   if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, CHAMP_HEAD.length).setValues(rows);
   return { ok:true, dryRun:false, basho:basho, removed:hadRows.length, awarded:rows.length,
-           titlesMoving:moving.length, scoresChanging:rescored.length, changes:changes };
+           titlesMoving:moving.length, scoresChanging:rescored.length,
+           standing:standing.length, changes:changes };
 }
 
 function adminRecrown(body){
@@ -4213,7 +4291,10 @@ function championsOf_(handle){
                leagueId:String(v[r][3] || ''), leagueName:String(v[r][4] || ''),
                score:Number(v[r][6] || 0), runnerUp:String(v[r][7] || ''),
                runnerUpScore:(v[r][8] === '' ? null : Number(v[r][8])),
-               entrants:Number(v[r][9] || 0), awardedAt:String(v[r][10] || '') });
+               entrants:Number(v[r][9] || 0), awardedAt:String(v[r][10] || ''),
+               stands:!!String(v[r][11] || ''), note:String(v[r][12] || ''),
+               correctedHandle:String(v[r][13] || ''),
+               correctedScore:(v[r][14] === '' || v[r][14] == null) ? null : Number(v[r][14]) });
   }
   out.sort(function(a, b){ return new Date(b.awardedAt) - new Date(a.awardedAt); });
   return out;
@@ -4230,10 +4311,15 @@ function reigningChampion_(leagueId){
     if (String(v[r][2]) !== scope) continue;
     if (scope === 'league' && String(v[r][3]) !== want) continue;
     var at = String(v[r][10] || '');
-    if (!best || new Date(at) > new Date(best.at)) best = { at:at, basho:String(v[r][1]), handles:[], score:Number(v[r][6] || 0) };
+    if (!best || new Date(at) > new Date(best.at)) best = { at:at, basho:String(v[r][1]), handles:[], score:Number(v[r][6] || 0),
+      stands:!!String(v[r][11] || ''), note:String(v[r][12] || ''),
+      correctedHandle:String(v[r][13] || ''),
+      correctedScore:(v[r][14] === '' || v[r][14] == null) ? null : Number(v[r][14]) };
     if (best.at === at) best.handles.push(String(v[r][5]));
   }
-  return best ? { basho:best.basho, handles:best.handles, score:best.score } : null;
+  return best ? { basho:best.basho, handles:best.handles, score:best.score,
+                  stands:best.stands, note:best.note,
+                  correctedHandle:best.correctedHandle, correctedScore:best.correctedScore } : null;
 }
 
 /* Compute promotions for a completed basho from everyone archived win rate.

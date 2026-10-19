@@ -136,6 +136,12 @@
     /* these are spans so the card can sit inside inline contexts — they have to
        be told to stack, or all three run together on one line */
     ".gga-title__nm,.gga-title__sub,.gga-title__meta{display:block;overflow:hidden;text-overflow:ellipsis}"+
+    /* the stands-as-called note is the one line here that must WRAP: it is a
+       sentence, not a label, and ellipsing it would hide the reason */
+    ".gga-title__note{color:#c9b7a4;font-style:normal;line-height:1.45;margin-top:4px;"+
+      "white-space:normal;overflow:visible;text-overflow:clip}"+
+    ".gga-title__ast{color:#c58f6a;font-weight:700}"+
+    ".gga-title.stands .gga-title__nm,.gga-title.stands .gga-title__sub{white-space:normal}"+
     ".gga-title__nm{font-size:.88rem;font-weight:700;color:#f2ead6;line-height:1.25;white-space:nowrap}"+
     ".gga-title.is-league .gga-title__nm{color:#e9dfd2;font-size:.85rem}"+
     ".gga-title__sub{font-size:.7rem;color:#e0a23a;letter-spacing:.07em;text-transform:uppercase;"+
@@ -603,12 +609,22 @@
     if (t.runnerUp) meta += " \u00b7 beat " + esc(t.runnerUp) +
       (t.runnerUpScore != null ? " (" + t.runnerUpScore + ")" : "");
     else if (t.entrants > 1) meta += " \u00b7 " + t.entrants + " teams";
-    return '<div class="gga-title '+(pub?"is-public":"is-league")+'">'+
+    /* A title that stands as called carries its reason here too — the trophy
+       case is the one place a title is shown with nothing else around it. */
+    var note = "";
+    if (t.stands){
+      note = t.note || "Recorded as called at the end of the basho; a later scoring fix would have changed it.";
+      if (t.correctedHandle) note += " Corrected scoring gives it to " + t.correctedHandle +
+        (t.correctedScore != null ? " (" + t.correctedScore + " to " + t.score + ")" : "") + ".";
+    }
+    return '<div class="gga-title '+(pub?"is-public":"is-league")+(t.stands?" stands":"")+'">'+
       '<span class="gga-title__ico">'+(pub?EMBLEM.cup:EMBLEM.gunbai)+'</span>'+
       '<span class="gga-title__txt">'+
         '<span class="gga-title__nm">'+esc(pub ? "Sumo Slap Down League" : t.leagueName)+'</span>'+
-        '<span class="gga-title__sub">'+(pub?"Champion":"League champion")+' \u00b7 '+esc(t.basho)+'</span>'+
+        '<span class="gga-title__sub">'+(pub?"Champion":"League champion")+' \u00b7 '+esc(t.basho)+
+          (t.stands?' <span class="gga-title__ast" title="Title stands as called">*</span>':'')+'</span>'+
         '<span class="gga-title__meta">'+meta+'</span>'+
+        (note ? '<span class="gga-title__meta gga-title__note">'+esc(note)+'</span>' : '')+
       '</span>'+
     '</div>';
   }

@@ -327,6 +327,27 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
         <button class="btn gold" id="applyRankBtn">Apply ranking for this basho</button>
         <div id="applyRankMsg" style="margin-top:10px;font-size:.9rem"></div>
       </div>
+      <div class="card" style="max-width:640px">
+        <h3>Titles &amp; re-crowning</h3>
+        <p class="v-sub" style="margin:0 0 12px">Re-crowns a basho from the corrected scoring. <b>Preview first</b> &#8212; it writes nothing until you press Apply. A title marked <i>stands as called</i> is left exactly as it was announced, and the corrected result is recorded beside it and shown to everyone on the league page and in the trophy case. Nothing here hides a number: it only decides which of the two the trophy follows.</p>
+        <div style="display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:10px">
+          <label style="font-size:.82rem">Basho<input id="stBasho" placeholder="Aki 2026" style="width:100%"></label>
+          <label style="font-size:.82rem">Scope
+            <select id="stScope" style="width:100%"><option value="league">One league</option><option value="public">Public leaderboard</option></select></label>
+          <label style="font-size:.82rem">League id<input id="stLeague" placeholder="lg_&hellip;" style="width:100%"></label>
+        </div>
+        <label style="font-size:.82rem;display:block;margin-bottom:10px">Note shown with the title
+          <input id="stNote" style="width:100%" placeholder="Recorded as called at the end of the basho; a scoring fix found later would have changed it."></label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <button class="btn" id="stMarkBtn">Mark: stands as called</button>
+          <button class="btn" id="stUndoBtn">Undo mark</button>
+          <span style="flex:1 1 100%"></span>
+          <button class="btn" id="stPreviewBtn">Preview re-crown</button>
+          <button class="btn gold" id="stApplyBtn">Apply re-crown</button>
+        </div>
+        <div id="stMsg" style="margin-top:10px;font-size:.9rem"></div>
+        <div id="stOut" style="margin-top:10px;font-size:.85rem"></div>
+      </div>
     </section>
 
     <section class="view" id="v-basho">
@@ -680,6 +701,56 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
       body.innerHTML = html;
     });
   }
+  /* ---------- titles: stands-as-called + re-crown ---------- */
+  function stSay(msg, bad){
+    var el = $("stMsg"); el.style.color = bad ? "#e23b2e" : ""; el.textContent = msg || "";
+  }
+  function stArgs(){
+    return { basho: ($("stBasho").value || "").trim(), scope: $("stScope").value,
+             leagueId: ($("stLeague").value || "").trim(), note: ($("stNote").value || "").trim() };
+  }
+  function stRenderChanges(res){
+    var rows = (res && res.changes) || [];
+    if (!rows.length){ $("stOut").innerHTML = "<p class='v-sub'>Nothing to change.</p>"; return; }
+    var html = "<table><thead><tr><th>Scope</th><th>Called</th><th>Corrected</th><th></th></tr></thead><tbody>";
+    rows.forEach(function(c){
+      var was = (c.wasHandles || []).join(", ") + (c.wasScore != null ? " (" + c.wasScore + ")" : "");
+      var now = (c.nowHandles || []).join(", ") + (c.nowScore != null ? " (" + c.nowScore + ")" : "");
+      var tag = c.stands ? "stands as called" : (c.titleMoves ? "title moves" : (c.scoreChanges ? "score only" : ""));
+      html += "<tr><td>" + (c.scope === "public" ? "Public leaderboard" : (c.league || c.leagueId)) +
+        "</td><td>" + (was || "\u2014") + "</td><td>" + (now || "\u2014") + "</td><td>" + tag + "</td></tr>";
+    });
+    $("stOut").innerHTML = html + "</tbody></table>";
+  }
+  async function stRecrown(apply){
+    var a = stArgs();
+    if (!a.basho){ stSay("Which basho?", true); return; }
+    if (apply && !confirm("Apply the re-crown for " + a.basho + "?\n\nTitles marked \u201cstands as called\u201d keep their announced winner; every other title is rewritten from the corrected scoring.")) return;
+    stSay(apply ? "Re-crowning\u2026" : "Computing\u2026");
+    var res = await aPost("adminRecrown", { basho: a.basho, apply: !!apply });
+    if (!res || !res.ok){ stSay((res && res.error) || "That didn\u2019t go through.", true); return; }
+    stSay((apply ? "Done. " : "Preview only \u2014 nothing written. ") +
+      res.scopes + " titles \u00b7 " + res.titlesMoving + " moving \u00b7 " +
+      (res.standing || 0) + " standing as called");
+    stRenderChanges(res);
+  }
+  $("stMarkBtn").onclick = async function(){
+    var a = stArgs();
+    if (!a.basho || (a.scope === "league" && !a.leagueId)){ stSay("Basho and league id, please.", true); return; }
+    stSay("Marking\u2026");
+    var res = await aPost("adminStandTitle", a);
+    stSay(res && res.ok ? "Marked \u2014 that title now shows its note everywhere." : ((res && res.error) || "Couldn\u2019t mark it."), !(res && res.ok));
+  };
+  $("stUndoBtn").onclick = async function(){
+    var a = stArgs(); a.undo = true;
+    if (!a.basho || (a.scope === "league" && !a.leagueId)){ stSay("Basho and league id, please.", true); return; }
+    stSay("Undoing\u2026");
+    var res = await aPost("adminStandTitle", a);
+    stSay(res && res.ok ? "Mark removed \u2014 the next re-crown will treat it like any other title." : ((res && res.error) || "Couldn\u2019t undo it."), !(res && res.ok));
+  };
+  $("stPreviewBtn").onclick = function(){ stRecrown(false); };
+  $("stApplyBtn").onclick = function(){ stRecrown(true); };
+
   $("bashoReloadBtn").onclick = function(){ $("bashoMsg").textContent = ""; loadBasho(); };
   $("bashoRefreshBtn").onclick = async function(){
     var b = $("bashoRefreshBtn"), m = $("bashoMsg");

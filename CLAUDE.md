@@ -106,6 +106,26 @@ for a deploy that changes no code, so the string keeps meaning "this code".)
 that has no key. *Start a new basho* derives and writes it from the label typed
 in, so the two cannot disagree. Do not reintroduce a hand-edited id.
 
+### A title that stands as called
+
+Aki 2026 was crowned against the wrong banzuke, so correcting it moves titles
+that were already announced. A league may keep the called result — but the
+record must carry BOTH answers and show them:
+
+- `standTitle_(basho, scope, leagueId, note, undo)` marks a Champions row
+  (`standsAsCalled`, `note`); `adminStandTitle` is the admin door, and the
+  Titles card on admin.html drives it.
+- `recrownBasho_` leaves a marked row alone and writes the corrected winner
+  into `correctedHandle` / `correctedScore` beside it. Every other scope is
+  rewritten as usual. The dry run reports `stands` per scope and never hides
+  what the fix says.
+- `reigningChampion_` and `championsOf_` carry `stands` / `note` /
+  `correctedHandle` / `correctedScore` through to the league banner
+  (fantasy.html `renderLeagueChampion`) and the trophy case (gg-auth.js
+  `titleCard`). **Never render a marked title without its note** — a bare
+  asterisk is the thing this feature exists to avoid.
+- Champions rows gained four columns; `migrateChampsV2` appends them in place.
+
 ### The draft room must survive a busy server
 
 10 Sept the room crawled, then looked dead. What is in place now:

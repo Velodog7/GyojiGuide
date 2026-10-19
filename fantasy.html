@@ -486,6 +486,13 @@
   .lg-champ__txt b{ color:#f0dcc8; font-weight:700 }
   .lg-champ__txt small{ display:block; font-size:.66rem; letter-spacing:.08em; text-transform:uppercase;
         color:#c58f6a; font-weight:600 }
+  /* a title that stands as called: the asterisk is never silent — the reason
+     sits right under it, for everyone, not just the commissioner */
+  .lg-champ{ max-width:100% }
+  .lg-champ.has-note{ border-radius:14px; align-items:flex-start; padding:9px 14px 10px 10px }
+  .lg-champ__ast{ color:#c58f6a; font-weight:700 }
+  .lg-champ__note{ display:block; font-style:normal; font-size:.72rem; line-height:1.45;
+        color:#cbb49f; margin-top:4px; max-width:52ch }
   /* Reigning public champion, beside a handle on the leaderboard. Scoped
      under .lb-name on purpose: the generic `.lb-name span` rule further down
      sets colour and size, and would otherwise repaint the cup grey. */
@@ -1898,14 +1905,33 @@ function championName(handles, members){
     return m ? m.name : h;
   }).join(" & ");
 }
+/* The sentence under a title that stands as called. The note stored with the
+   title wins; this is the fallback so a marked title is never just a bare
+   asterisk, and the corrected result is always named. */
+function champNote(c, members){
+  const bits = [];
+  if (c.note) bits.push(c.note);
+  else bits.push("Recorded as called at the end of the basho. A scoring fix found later would have changed it.");
+  if (c.correctedHandle){
+    const who = championName(String(c.correctedHandle).split(/\s*,\s*/), members);
+    bits.push("Corrected scoring gives it to " + who +
+      (c.correctedScore != null ? " (" + c.correctedScore + " to " + c.score + ")" : "") + ".");
+  }
+  return bits.join(" ");
+}
 function renderLeagueChampion(lg){
   const box = $("lgChamp"); if (!box) return;
   const c = lg && lg.champion;
-  if (!c || !c.handles || !c.handles.length){ box.hidden = true; box.innerHTML = ""; return; }
+  if (!c || !c.handles || !c.handles.length){ box.hidden = true; box.innerHTML = ""; box.className = "lg-champ"; return; }
   const emblem = (window.GyojiGuide && GyojiGuide.EMBLEM && GyojiGuide.EMBLEM.gunbai) || "";
+  const stands = !!c.stands;
+  box.className = "lg-champ" + (stands ? " has-note" : "");
   box.innerHTML = emblem +
     '<span class="lg-champ__txt"><small>Reigning champion</small>' +
-    '<b>' + esc(championName(c.handles, lg.members)) + '</b> · ' + esc(c.basho) + '</span>';
+    '<b>' + esc(championName(c.handles, lg.members)) + '</b> · ' + esc(c.basho) +
+    (stands ? '<span class="lg-champ__ast" title="Title stands as called">\u2009*</span>' +
+              '<em class="lg-champ__note">' + esc(champNote(c, lg.members)) + '</em>' : '') +
+    '</span>';
   box.hidden = false;
 }
 /* Small cup beside the public champion's name on the leaderboard.
