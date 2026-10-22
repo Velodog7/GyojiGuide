@@ -264,7 +264,8 @@ move between them either way, losing nothing. Status lives in the vault note.
   every request through to Supabase untouched (`gg_fwd=1` marks it, and a
   marked request is never forwarded again), and the hourly trigger stands
   down: the Sheet is frozen. On Supabase the engine hides `__` properties,
-  so the switch can never fire there.
+  so the switch can never fire there. **Keep that Apps Script trigger**: it
+  costs nothing while forwarding, and after a revert it imports again.
 - **Which one is live** is Supabase's `__LIVE` (and `__MAINTENANCE`), shown
   by `?action=__health`. `gg-config.js` asks that in the background (at most
   every 5 minutes, never from localhost) and the next page load follows it.
