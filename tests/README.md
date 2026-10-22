@@ -1,14 +1,47 @@
 # Tests
 
-Two kinds, no framework, no dependencies beyond Node and (for the UI half)
-Playwright. Every file is standalone: `node tests/backend/league.js` works on
-its own, prints `N passed, M failed`, and exits non-zero on failure.
+No framework, no dependencies beyond Node, plus Playwright for the UI half
+and PGlite / Deno for the database and rehearsal suites. Every file is
+standalone: `node tests/backend/league.js` works on its own, prints
+`N passed, M failed`, and exits non-zero on failure.
 
 ```
-./tests/run.sh          # backend only — fast, offline, run before every deploy
+./tests/run.sh          # backend + engine: fast, offline, run before every push
+./tests/run.sh sql      # the engine over the real migrations (PGlite)
+./tests/run.sh e2e      # a whole migration, rehearsed (Deno + PGlite)
 ./tests/run.sh ui       # the browser half
-./tests/run.sh all
+./tests/run.sh all      # everything but e2e
 ```
+
+Getting the tools onto a Mac without Xcode's command line tools: Node and
+Deno both ship standalone downloads (nodejs.org, the Deno GitHub releases)
+that run from any folder; put them on `PATH`, or point `GG_DENO` at deno.
+PGlite: `npm i --prefix tests/engine/.deps @electric-sql/pglite@0.5.8`
+(git-ignored), or point `GG_PGLITE` at a folder holding it.
+
+## engine/ — the same `.gs` on the Supabase engine
+
+The backend now runs on `supabase/functions/api/engine.js`, which emulates
+the Apps Script services over a Postgres sheet store. These suites are the
+evidence that the move changed nothing.
+
+| Suite | Covers |
+|---|---|
+| `differential.js` | every request run twice: through `lib/model.js` (a plain synchronous spreadsheet: Apps Script as it was) and through the engine over an in-memory store (replays, snapshots, commits). Responses must match byte for byte and rows cell for cell. Flows in `lib/flows.js`: accounts and admin, a classic league, a keepers league drafted to the end with pauses, rewinds, an expired clock, trades and keepers, the results importer; then ~640 seeded random requests across every action |
+| `concurrency.js` | the races Sheets lost, run for real over a store that interleaves at random: eight picks on one turn, five pollers on one expired clock, duplicate sign-ups, bursts of DMs, sign-ups and team saves. Each race also runs with the read-set check disabled and **must go wrong there**, or the test proves nothing |
+| `sheets.js` | Sheets behaviour the flows don't reach: an emptied last row reused by `appendRow`, padding, deletes, column inserts, the errors Sheets throws, Dates round-tripping in the script's zone, `formatDate`, Script Properties, maintenance, a store that never stops conflicting |
+| `build.js` | `backend.js` was built from the current `sumo-fantasy.gs` |
+| `routing.js` | `gg-config.js` picks the backend: Apps Script by default, Supabase once it says it is live, back again on a pause or revert; asks at most every five minutes, never from a dev box; survives blocked storage |
+| `sql.js` | the differential flows again, with the real `gg_load` / `gg_commit` / `gg_import_*` in PGlite as the store; then the store's rules call by call, and that the publishable key's roles can read and run nothing |
+| `e2e.mjs` | the whole move, both ways: a Sheet made by the backend itself, the real `index.ts` under Deno, stand-ins for PostgREST and the old admin check, the .gs (switch and all) as the deployed web app, and `apps-script/migrate.gs` (the file you paste) beside it. The rehearsal, compared endpoint by endpoint; `cutover` refusing when code is mismatched or undeployed and rolling itself back when forwarding fails; a real cutover; writes through both URLs; `revertToAppsScript` bringing every change back; a second cutover |
+
+The differential suites were checked against deliberately broken engines
+(no copy-on-write, dropped cell patches, forgotten deletes, needs not
+recorded, cache ignored, blank cells read as null, fetches never cached):
+each one turns them red. What they can't see: real Postgres concurrency
+(PGlite has one connection; `concurrency.js` covers the logic against the
+memory store), Supabase's own gateway, and production data shapes. The live
+comparison during the rehearsal covers those.
 
 ## backend/ — the real `.gs` in a Node vm
 
@@ -36,6 +69,7 @@ whole point. Override the path with `GG_GS=/some/other/sumo-fantasy.gs`.
 | `pinreset.js` | PIN reset request, approve, dismiss |
 | `adminbasho.js` | the admin Basho panel payload |
 | `bashoid.js` | `Meta.bashoId` vs the `BASHO_ID` constant |
+| `forward.js` | the `__FORWARD_TO` switch: with it set, GET and POST pass through to Supabase untouched; a request already forwarded (`gg_fwd`) is never sent on; the hourly importer stands down so the frozen Sheet stays frozen |
 | `titles.js` | the taiko radio title bag (reads `taiko-radio.js`, not the `.gs`) |
 
 ### What these can and cannot catch

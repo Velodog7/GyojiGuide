@@ -3,13 +3,13 @@
 Fantasy sumo hub — analyze rikishi, mock draft a team, simulate upcoming basho,
 and run private fantasy sumo leagues. Live at **https://sumoslapdown.com**.
 
-A static, no-build site: plain HTML + vanilla JS modules, backed by a Google
-Apps Script web app (a Google Sheet is the database). No bundler, no npm, no
+A static, no-build site: plain HTML + vanilla JS modules, hosted on Vercel,
+backed by a Supabase Edge Function over Postgres. No bundler, no npm, no
 framework. Every path is relative, so all the web files just need to sit in the
 same folder on whatever static host you use.
 
-> Deploying or updating the backend? See **[DEPLOY.md](DEPLOY.md)** — it covers
-> the Apps Script side, the `ADMIN_KEY`, and the smoke test.
+> Deploying or updating the backend? See **[DEPLOY.md](DEPLOY.md)**: pushing
+> deploys it, and it covers the `ADMIN_KEY` and the smoke test.
 
 ---
 
@@ -31,7 +31,7 @@ Loaded by the four main pages, in this order:
 
 | File | Role |
 |---|---|
-| `gg-config.js` | The Apps Script `/exec` URL + `apiGet`/`apiGetQ`/`apiPost` helpers. The one place the endpoint lives. |
+| `gg-config.js` | The API URL + `apiGet`/`apiGetQ`/`apiPost` helpers. The one place the endpoint lives; it picks Apps Script or Supabase per page load from Supabase's `?action=__health`. |
 | `gg-account.js` | Accounts, scoring engine, leagues, DM + directory API. |
 | `gg-nav.js` | Shared top nav, the Help/feedback modal, and the site-wide spinner CSS. |
 | `gg-auth.js` | The account control in the nav, the account modal, and Messages. |
@@ -72,10 +72,18 @@ them out.
 
 ## Backend
 
-`sumo-fantasy.gs` is the Google Apps Script source (accounts, leagues, drafts,
-the ranking ladder, the feedback inbox). It isn't served as a web file — it's
-kept here as the source of truth and pasted into script.google.com. See
-DEPLOY.md.
+`sumo-fantasy.gs` is the whole backend: accounts, leagues, drafts, the
+ranking ladder, the feedback inbox. It was written for Google Apps Script and
+still is. Since October 2026 it runs unchanged on Supabase:
+
+| Path | What it is |
+|---|---|
+| `supabase/functions/api/` | The Edge Function. `index.ts` takes the same requests the Apps Script web app did; `engine.js` runs the .gs with Apps Script's services emulated over Postgres. `backend.js` and `seed-sheets.js` are generated (`tools/`). |
+| `supabase/migrations/` | The sheet store (one table of rows per sheet, plus properties and cache) and the hourly pg_cron job that imports results. |
+| `apps-script/` | `migrate.gs`, a second file for the Apps Script project: `cutover` moves the site to Supabase, `revertToAppsScript` moves it back, each copying the data across first. The Apps Script copy of the .gs stays deployed, with a switch that makes it forward to Supabase while Supabase is live. |
+
+Pushing to `main` deploys it (Supabase's GitHub integration). See DEPLOY.md,
+and CLAUDE.md for how the engine works.
 
 ---
 

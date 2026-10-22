@@ -1,0 +1,12 @@
+# Supabase config for Sumo Slap Down.
+#
+# On every push to main, the GitHub integration applies new files in
+# supabase/migrations and deploys the functions declared below.
+
+project_id = "GyojiGuide"
+
+[functions.api]
+enabled = true
+# The pages call the API with no Supabase key, just as they called Apps
+# Script. Accounts are checked inside the backend (handle + PIN hash).
+verify_jwt = false

@@ -1,8 +1,14 @@
 # Sumo Slap Down — working notes for Claude
 
 Fantasy sumo site at **sumoslapdown.com**. Static, no build step: plain HTML,
-vanilla JS modules, SVG. The backend is a single Google Apps Script web app
-(`sumo-fantasy.gs`) over a Google Sheet. No bundler, no npm, no framework.
+vanilla JS modules, SVG. No bundler, no npm, no framework.
+
+The backend is still one file, `sumo-fantasy.gs`, written for Google Apps
+Script. Since October 2026 it runs **unchanged on Supabase**: a Supabase Edge
+Function (`supabase/functions/api`) runs it on an engine that emulates the
+handful of Apps Script services it uses, over a Postgres "sheet store"
+(`supabase/migrations`). Pushing to `main` deploys both. See *The Supabase
+engine* below.
 
 `README.md` says what each file is. `DEPLOY.md` is the human deploy guide.
 This file is the stuff that is easy to get wrong.
@@ -15,8 +21,12 @@ This file is the stuff that is easy to get wrong.
 |---|---|
 | Pages | `index.html` (home), `analysis.html`, `dohyo.html`, `fantasy.html`, `admin.html`, `banzuke.html` (legacy) |
 | Shared modules | `gg-config.js` (the `/exec` URL, one place), `gg-account.js`, `gg-nav.js`, `gg-auth.js`, `gg-roster.js`, `gg-dossier.js`, `gg-banzuke.js`, `gg-mawashi.js` |
-| Backend | `sumo-fantasy.gs` — one file, ~190 KB |
-| Tests | `tests/` — see `tests/README.md` |
+| Backend logic | `sumo-fantasy.gs`, one file, ~240 KB. The only place game rules live. |
+| Backend runtime | `supabase/functions/api/`: `index.ts` (routes), `engine.js` (Apps Script on Postgres), `store.js`, and two generated files, `backend.js` (the .gs as a string) and `seed-sheets.js` |
+| Database | `supabase/migrations/`: the sheet store and the hourly pg_cron job |
+| Moving between backends | `apps-script/migrate.gs`: `cutover`, `revertToAppsScript`; the `__FORWARD_TO` switch in `sumo-fantasy.gs`; the routing in `gg-config.js` |
+| Tools | `tools/build-backend.mjs`, `tools/learn-sheets.mjs` |
+| Tests | `tests/`; see `tests/README.md` |
 
 Everything uses relative paths and must sit in one flat directory when deployed.
 
@@ -29,7 +39,11 @@ Writing one over the other has happened. After creating any new module, check
 ## Static-side conventions
 
 - **No build.** Anything you add has to work opened straight from disk.
-- Pages talk to the backend only through `gg-config.js`. Never hardcode `/exec`.
+- Pages talk to the backend only through `gg-config.js`. Never hardcode a
+  backend URL. It picks Apps Script or Supabase per page load (see *Two
+  backends, one switch*); `fantasy.html` and `admin.html` keep an Apps Script
+  fallback, which is always safe because that URL forwards while Supabase is
+  live.
 - `renderLeague` in `fantasy.html` copies a **hand-picked whitelist** of fields
   off `d.league`. Any new league field added server-side must be added there
   too, or it silently reads as `undefined` in the league panel. This has bitten
@@ -38,6 +52,10 @@ Writing one over the other has happened. After creating any new module, check
   `keepMk`, `keepJr`). Test for blank, never for falsy, and never `|| 0`.
 
 ## Backend rules
+
+These were learned on Apps Script and still hold: the .gs is the same code,
+and the reference model in `tests/engine` is Apps Script as it behaved. The
+engine makes the lock lessons below unbreakable rather than unnecessary.
 
 ### Always release locks through `unlock_`
 
@@ -96,9 +114,9 @@ changed clock gives whoever is up a full new clock and applies to every pick aft
 
 ### Bump `BACKEND_VERSION` with every backend change
 
-`?action=version` returns it. If it doesn't match what you just wrote, the
-deploy didn't land — you saved without creating a new version. (Leave it alone
-for a deploy that changes no code, so the string keeps meaning "this code".)
+`?action=version` returns it. If it doesn't match what you just pushed, the
+deploy didn't land. (Leave it alone for a deploy that changes no code, so the
+string keeps meaning "this code".)
 
 ### `Meta` beats constants
 
@@ -158,11 +176,55 @@ league open. `ensureSheet()` **creates** sheets — calling it from a read path
 made the first request after a deploy hang while it inserted a sheet. Reads use
 `...IfAny_()` helpers that return `null`.
 
+## The Supabase engine
+
+`engine.js` runs the .gs as the body of one function per request (a clean
+slate each time, as an Apps Script execution was) and hands it stand-ins for
+`SpreadsheetApp`, `PropertiesService`, `LockService`, `CacheService`,
+`UrlFetchApp`, `ContentService`, `Utilities`, `Session`, `ScriptApp`, `Logger`.
+
+- **Replays.** The .gs is synchronous and the database isn't. A run that
+  reaches for a sheet or URL it doesn't have is noted, discarded, and run
+  again once that is loaded. Nothing a discarded run wrote goes anywhere.
+  `seed-sheets.js` tells a fresh instance what each action needs, so most
+  requests settle in one run.
+- **One commit per request** (`gg_commit`), all or nothing. A run that took
+  the script lock sends the versions of the sheets it *looked at*; if any
+  moved, the commit is refused and the request runs again on fresh data. So
+  seven-picks-on-one-turn and five-auto-picks cannot happen whatever the .gs
+  does. A sheet a run only *appended* to isn't checked, so DMs and chat
+  don't queue behind each other.
+- **Every load is one consistent snapshot.** Topping up sheet by sheet let
+  a run see one sheet from before a write and another from after it.
+- **The draft-room snapshot cache (`ds:*`, `dsg:*`) is never stored.** A
+  miss is always a correct answer, and Postgres is fast enough without it.
+- **Not emulated:** A1 notation, `getSheets()`, `computeDigest`, `newBlob`,
+  triggers (now pg_cron, in a migration). If the .gs starts using one,
+  extend `engine.js` and pin it with a probe in `tests/engine/sheets.js`.
+- **Dates** are stored tagged (`{"$d": iso}`) and come back as Dates that
+  print in the script's old time zone (`__GG_TZ`), like Apps Script.
+- **Script Properties** live in `gg_props`. Keys starting `__` belong to the
+  engine (`__CRON_KEY`, `__MAINTENANCE`, `__LIVE`, `__GG_TZ`) and are hidden
+  from the .gs; the import never copies one across either way. To rotate
+  `ADMIN_KEY`, use the SQL editor, and set the same value in Apps Script's
+  Script Properties too (`migrate.gs` signs in with that copy):
+  `update gg_props set value = '<new>' where key = 'ADMIN_KEY';`
+- **Browsing the data:** Table Editor, schema `gg_admin`: `sheets` (counts)
+  and `sheet_rows` (every row, by sheet). Not reachable through the API.
+- **Editing rows by hand** (SQL editor, Table Editor): also run
+  `update gg_sheets set version = version + 1 where name = '<sheet>';` so a
+  request that read the sheet before your edit re-reads instead of
+  committing over it.
+
 ## Testing
 
-Run `./tests/run.sh` before any backend deploy. Backend suites run the real
-`.gs` in a Node vm over a fake Sheet — fast, offline, and the only cheap check
-that exists. `tests/README.md` covers what they can and cannot catch.
+Run `./tests/run.sh` before every push that touches the backend. It runs the
+backend suites (the real `.gs` in a Node vm over a fake Sheet) and the engine
+suites (the same `.gs` through `engine.js`, held to a plain spreadsheet model
+request by request, then raced). `./tests/run.sh sql` does the same against
+the real migrations in PGlite, and `./tests/run.sh e2e` rehearses a whole
+migration: `index.ts` under Deno, `migrate.gs` in front. `tests/README.md` has
+what each can and cannot catch, and how to install Node, Deno and PGlite.
 
 Aki 2026 is the site's **first ever tournament**, so most of the downstream code
 has never executed against real data. The test harnesses are the only evidence
@@ -172,76 +234,88 @@ any of it works. Treat them as the deliverable, not scaffolding.
 
 ## Deploying the backend
 
-The static site deploys by pushing. The backend does not — it lives in the Apps
-Script editor and has to be pushed there by hand. Full procedure:
+Push to `main`. The Supabase GitHub integration applies new migrations, then
+deploys the `api` function; Vercel deploys the pages. Before pushing:
 
-1. **Sean pushes first.** Deploy from what GitHub is serving, never from a local
-   copy, so the deployed code and the repo can't diverge.
-2. **Checksum before and after.** Fetch
-   `raw.githubusercontent.com/Velodog7/GyojiGuide/main/sumo-fantasy.gs`, compute
-   length + djb2, compare to the copy the tests ran against. Replace the Monaco
-   model with `pushEditOperations`, then checksum the model. **Never retype the
-   file.**
-3. **Save** with the toolbar *Save project to Drive* button, then confirm the
-   "Unsaved changes" indicator clears. `cmd+s` is unreliable.
-4. **Deploy → Manage deployments → pencil → Version: New version.** Not *New
-   deployment* — that mints a new `/exec` URL and every page would need
-   `gg-config.js` updated.
-5. **Read the Version field back before clicking Deploy.** It has silently
-   offered a stale version once and put old code live for two minutes.
-6. **Verify live**, all four:
-   - `?action=version` matches `BACKEND_VERSION`
-   - any new admin action + a wrong key → `"Not authorised."`
-   - an invented action → `"unknown action"` (proves you're reading the router)
-   - `?action=data` still returns sane `meta`, rows, users
-7. The deployment ID must be unchanged:
-   `AKfycbyrhng3sZoNNpgDA2JApz2Z0xx01x9N1TwnGhqkMfbmXCR-q11NIqlB_i3krHPZ3yZ7GA`
+1. Edit `sumo-fantasy.gs`, bump `BACKEND_VERSION`.
+2. `node tools/build-backend.mjs` (refreshes `backend.js`; the `build` suite is
+   red until you do). After adding or changing actions, also
+   `node tools/learn-sheets.mjs`.
+3. `./tests/run.sh` green. For engine or migration changes, `sql` and `e2e` too.
 
-Apps Script project: `1NwBuWjSVoowPWGUk76z79RUt7T5BmyVU7t-oDK8WzrcVe2QH4FWCAE_C`
+Then verify live against
+`https://ulzbcqnvltbioajvgvrr.supabase.co/functions/v1/api`:
+- `?action=version` matches `BACKEND_VERSION`
+- `?action=__health`: `ok`, `live: true`, `maintenance: false`
+- an invented action returns `"unknown action"`; a new admin action with a
+  wrong key returns `"Not authorised."`
+- `?action=data` returns a sane `meta`, rows and users
 
-### The function dropdown lies — six for six
+A migration that fails stops the function deploying too: keep migrations
+re-runnable (`if not exists`, `create or replace`) and test them in PGlite.
 
-Every attempt to run a function from the editor toolbar has executed
-**`defaultScoring`** instead: four attempts at `setup` on 8 Sept, two at
-`refreshResults` on 9 Sept.
+## Two backends, one switch (October 2026)
 
-The toolbar label and the committed selection are **separate state**, and
-everything observable tracks the label. On 9 Sept the toolbar read
-`refreshResults` — confirmed by zooming on it — Run was pressed, and the
-Executions page recorded `defaultScoring` at 0.744 s.
+The same `sumo-fantasy.gs` is deployed in both places, and the site can
+move between them either way, losing nothing. Status lives in the vault note.
 
-The mechanism: the function list is virtualised, so an option outside the
-rendered window has a **zero-size bounding rect**. Clicking it by accessibility
-ref clicks nothing, `scrollIntoView` doesn't materialise it, and the widget
-keeps whatever was committed before. Typeahead + Enter updates the label only.
-The Execution log panel prints "Execution completed" either way, so it is no
-evidence at all.
+- **The switch** is the Script Property `__FORWARD_TO` on the Apps Script
+  side (`forwardTarget_` in the .gs). Set, the Apps Script web app passes
+  every request through to Supabase untouched (`gg_fwd=1` marks it, and a
+  marked request is never forwarded again), and the hourly trigger stands
+  down: the Sheet is frozen. On Supabase the engine hides `__` properties,
+  so the switch can never fire there.
+- **Which one is live** is Supabase's `__LIVE` (and `__MAINTENANCE`), shown
+  by `?action=__health`. `gg-config.js` asks that in the background (at most
+  every 5 minutes, never from localhost) and the next page load follows it.
+- **`apps-script/migrate.gs`**, a second file in the Apps Script project, moves
+  the site. Each function is one Run in the editor and checks before acting:
+  - `cutover`: refuses unless the editor's code, the deployed web app and
+    Supabase all run the same `BACKEND_VERSION`. Then it copies the Sheet,
+    pauses writes, sets the switch, confirms the deployed app really
+    forwards, copies again, compares per-sheet checksums and ~25 answers old
+    against new, and only then goes live. Any failure puts everything back.
+  - `revertToAppsScript`: pauses Supabase, copies every sheet and Script
+    Property back into the Sheet (including everything written since the
+    cutover), then clears the switch.
+  - `resumeSupabase`: undoes a revert that stopped part-way, but refuses
+    once one has finished; use `cutover` then, which carries the Sheet's
+    newer data across.
+  - `exportToSupabase`: a copy without switching; refuses while Supabase is
+    live, since it would overwrite newer data.
+- **Deploying the .gs to Apps Script** is only needed when a change should
+  also reach that side (the switch itself did). `cutover` and the revert check
+  the deployed version, so a missed deploy stops them before they touch
+  anything. Paste the file, save, then Deploy → Manage deployments → pencil →
+  New version.
 
-**The Executions page is the only proof.** Check the top row names the function
-you meant, and check the duration — `defaultScoring` returns an object and
-finishes under a second, while a real `setup` took 8.8 s.
+`tests/backend/forward.js` pins the switch; `tests/engine/e2e.mjs` runs the
+real `migrate.gs` through a cutover, a revert and a second cutover.
 
-Better still, don't run anything from the editor. The hourly `refreshResults`
-trigger runs against **Head**, so waiting for the next scheduled run is cheaper
-than fighting the widget and tests the production path instead of a simulation
-of it.
+### Driving the Apps Script editor
 
-### Driving the editor from a browser tool
-
-- Prefer `find` refs over coordinates. But a ref to a zero-rect element is
-  useless (above), so check the rect when a click seems to do nothing.
-- If a ref click does nothing, a plain `el.click()` via JS often works — that
-  is how the Save button finally took.
-- Screenshot space is **not** page space. `innerWidth` 2389 against a 1456-wide
-  screenshot ≈ ×1.64. Compute rects in JS and divide; don't eyeball.
-- Don't trigger native `alert`/`confirm` — they freeze the extension. Apps
-  Script's own dialogs are ordinary DOM and are fine.
+Hard-won, from deploying to it with a browser tool:
+- Never retype the file: replace the Monaco model with `pushEditOperations`
+  and checksum it. Save with the toolbar button; `cmd+s` is unreliable.
+- **Deploy → Manage deployments → pencil → New version**, never *New
+  deployment* (that mints a new `/exec` URL). Read the Version field back
+  before clicking Deploy. The deployment ID must stay
+  `AKfycbyrhng3sZoNNpgDA2JApz2Z0xx01x9N1TwnGhqkMfbmXCR-q11NIqlB_i3krHPZ3yZ7GA`.
+  Project: `1NwBuWjSVoowPWGUk76z79RUt7T5BmyVU7t-oDK8WzrcVe2QH4FWCAE_C`.
+- The function dropdown can't be trusted from a browser tool (it ran
+  `defaultScoring` six times out of six). The **Executions** page is the only
+  proof of what ran. A person clicking it directly is fine.
 
 ## Environment notes
 
 - Repo lives on Sean's Mac at `~/Documents/GitHub/GyojiGuide`; remote is
   `github.com/Velodog7/GyojiGuide`, branch `main`.
-- The device shell is **Linux**, so `sed -i` (GNU), not the macOS `sed -i ''`.
+- Sessions have run in a Linux shell (GNU `sed -i`) and on Sean's Mac (BSD,
+  `sed -i ''`). Check `uname` before scripting edits.
+- The Mac has no Xcode command line tools: `git` and `python3` pop up an
+  installer instead of running (so `./tests/run.sh ui`, which starts a
+  `python3` server, does too). Node and Deno run fine from their official
+  standalone downloads.
 - `node --check` refuses a `.gs` extension. Copy to `.js` first.
 - Basho calendar: six a year, on fixed months — Hatsu 01, Haru 03, Natsu 05,
   Nagoya 07, Aki 09, Kyushu 11. Basho ids are `YYYYMM`.

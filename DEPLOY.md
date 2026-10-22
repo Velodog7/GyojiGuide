@@ -82,61 +82,60 @@ the radio just won't have audio.
 
 ---
 
-## 3. Backend — `sumo-fantasy.gs` (Google Apps Script)
+## 3. Backend: Supabase (deploys when you push)
 
-`sumo-fantasy.gs` is **not** a web file — it's the source for your Apps Script
-web app (accounts, leagues, drafts, and the Help/feedback inbox). It's kept in
-the repo as the source of truth. To update the live backend:
+`sumo-fantasy.gs` is the backend (accounts, leagues, drafts, the
+Help/feedback inbox). It is **not** a web file. Supabase runs it, unchanged,
+inside the `api` Edge Function in `supabase/functions/api`, over the tables
+in `supabase/migrations`.
 
-1. Open your Apps Script project at **script.google.com**.
-2. Paste in the contents of `sumo-fantasy.gs`.
-3. **Set your `ADMIN_KEY` as a Script Property — do it in code, not by hand.**
-   The key is not stored in `sumo-fantasy.gs` (the file only *reads* it), so the
-   secret never lives in a file you commit or share. Setting it by typing into
-   **Project Settings → Script Properties** works in theory, but in practice a
-   stray trailing space — or setting it in the wrong one of your several sumo
-   projects — will make the login reject the correct key. The reliable way is to
-   set it programmatically: temporarily paste this into the project, **Run** it
-   once, confirm the log, then delete it:
-   ```js
-   function setAdminKeyNow() {
-     PropertiesService.getScriptProperties().setProperty('ADMIN_KEY', 'YOUR-KEY-HERE');
-     Logger.log('set; this project serves: ' + ScriptApp.getService().getUrl());
-   }
-   ```
-   The logged "this project serves" URL **must** match the `/exec` URL in
-   `gg-config.js` — if it doesn't, you set the key in the wrong project. This is
-   the password `admin.html` asks for; if the property is unset the dashboard
-   fails closed. Rotate the key the same way (change the value, run, delete) —
-   no redeploy needed, setting a property is instant.
-4. **Run `setup()` once.** This creates/updates the Sheets, including the
-   **Feedback** sheet used by the Help modal (FAQ questions, suggestions, bug
-   reports, user reports), the **PageViews** sheet the admin dashboard reads
-   for analytics, the `status` / `warnMsg` columns on the **Users** sheet for
-   warn/ban moderation, and the **LeaderboardBoard** / **LeaderboardVotes**
-   sheets behind the Fantasy page's Leaderboard-tab message board. It's safe to
-   re-run on existing data.
-5. **Deploy → Manage deployments → click the ✏️ pencil on your existing
-   deployment → Version: New version → Deploy.** ⚠️ **Always update the
-   existing deployment this way — do _not_ create a *new* deployment.** Editing
-   the current one keeps the same `/exec` URL; creating a new one mints a fresh
-   URL and forces you to update `gg-config.js`, `fantasy.html`, and `admin.html`
-   every time (this is exactly what caused the repeated URL churn). If the URL
-   ever does change, update it in those three files — see below.
-6. Set access to **Anyone**, or browser calls will be blocked.
+**To change the backend:** edit `sumo-fantasy.gs` and bump `BACKEND_VERSION`,
+run `node tools/build-backend.mjs` and `./tests/run.sh`, then push to `main`.
+Supabase's GitHub integration (Project Settings → Integrations → GitHub,
+*Deploy to production* on, working directory `.`) applies any new migration
+and redeploys the function. Confirm with `?action=version`.
 
-### The `/exec` URL
+**`ADMIN_KEY`** came across from the old Script Properties and lives in the
+`gg_props` table. To rotate it, run this in the Supabase SQL editor; it
+takes effect on the next request:
 
-The site currently points at:
-
-```
-https://script.google.com/macros/s/AKfycbyrhng3sZoNNpgDA2JApz2Z0xx01x9N1TwnGhqkMfbmXCR-q11NIqlB_i3krHPZ3yZ7GA/exec
+```sql
+update gg_props set value = 'YOUR-NEW-KEY' where key = 'ADMIN_KEY';
 ```
 
-This lives in **`gg-config.js`** (`GyojiGuide.API_URL`) — the single source of
-truth every page reads. `fantasy.html` and `admin.html` each keep a matching
-fallback copy. **If you ever create a new deployment (new URL), update all
-three** and re-upload them.
+**The hourly results import** is a pg_cron job (`gg-refresh-results`) that
+calls the function. Check it under Integrations → Cron in the dashboard.
+
+**Free plan caution:** Supabase pauses a free project after 7 days with no
+activity, and it stays down until someone un-pauses it in the dashboard.
+Daily visitors keep it awake. Pro ($25/mo) never pauses.
+
+### The API URLs
+
+```
+https://ulzbcqnvltbioajvgvrr.supabase.co/functions/v1/api                  Supabase
+https://script.google.com/macros/s/AKfycbyrhng3sZoNNpgDA2JApz2Z0xx01x9N1TwnGhqkMfbmXCR-q11NIqlB_i3krHPZ3yZ7GA/exec   Apps Script
+```
+
+Both live in **`gg-config.js`**, which picks one per page load: Apps Script
+until Supabase says it is live, then Supabase. While Supabase is live the
+Apps Script URL forwards to it, so the fallback copies in `fantasy.html` and
+`admin.html` (Apps Script) are always safe.
+
+### Moving between them
+
+`apps-script/migrate.gs` is a second file in the Apps Script project. Pick
+a function in the editor's toolbar and press **Run**:
+
+- **`cutover`** moves the site to Supabase (about two minutes; changes pause
+  briefly). It checks first, verifies the copy cell by cell, and puts
+  everything back by itself if anything fails.
+- **`revertToAppsScript`** moves it back, copying everything from Supabase
+  into the Sheet first, so nothing written since the cutover is lost.
+
+Both need the current `sumo-fantasy.gs` saved **and deployed** in Apps Script
+(Deploy → Manage deployments → pencil → Version: New version → Deploy). The
+details are in CLAUDE.md under *Two backends, one switch*.
 
 ---
 
@@ -152,25 +151,31 @@ three** and re-upload them.
 5. **Fantasy → My Leagues** on a league you commissioner: the scoring-rules
    editor and (on keepers leagues) the draft-date scheduler with member
    agreement.
-6. Click **?** → **Report a bug**, submit → check the Sheet's **Feedback** tab
-   for the new row. (If it says it couldn't send, the backend URL/access or the
-   `setup()` step needs attention.)
+6. Click **?** → **Report a bug**, submit → the Admin page's Feedback tab shows
+   the new row (or, in the Supabase Table Editor, schema `gg_admin`,
+   `sheet_rows` filtered to sheet `Feedback`). If it says it couldn't send,
+   check `?action=__health` and the URL in `gg-config.js`.
 7. **Admin page** → Feedback tab (Reply) and Users tab (Message).
 8. **Admin page → Users → Broadcast a message**: open it and confirm the
    recipient count appears. That count is a live `dryRun` call, so if it stays
-   blank the backend is out of date — paste `sumo-fantasy.gs` in again and
-   redeploy (the broadcast needs the `adminBroadcast` action).
+   blank the backend is out of date: check `?action=version` against
+   `BACKEND_VERSION` and that the last push deployed (the broadcast needs the
+   `adminBroadcast` action).
 9. **Champions.** Titles are crowned once per basho, by the same
    **Admin page → Apply ranking for this basho** button that promotes and
    demotes everyone. After running it, the message should read
-   "…and crowned N champions", and the Sheet gains a **Champions** tab.
+   "…and crowned N champions", and the store gains a **Champions** sheet.
    Then check all three surfaces: the account modal's **Trophy case** (a gold
    Emperor's Cup card for the public title, a bronze gunbai card per private
    league), the **leaderboard** (a small cup beside the reigning champion's
    name), and a **league page** (a "Reigning champion" pill under the name).
    If the button reports a `championError`, the ranking still went through —
    the trophies didn't. Nothing is lost: fix the cause, clear the
-   `rankedBasho` row in **Meta**, and run it again.
+   `rankedBasho` row in **Meta**, and run it again. In the SQL editor:
+   ```sql
+   delete from gg_rows where sheet = 'Meta' and cells->>0 = 'rankedBasho';
+   update gg_sheets set version = version + 1 where name = 'Meta';
+   ```
 
 Hard-refresh (Cmd/Ctrl+Shift+R) after uploading to clear cached old copies.
 

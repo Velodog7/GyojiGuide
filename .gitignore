@@ -22,3 +22,6 @@ node_modules/
 # Screenshots and scratch dropped here by Cowork/Claude — not part of the site
 Claude outputs/
 *.tar.gz
+
+# PGlite for ./tests/run.sh sql (npm i --prefix tests/engine/.deps @electric-sql/pglite@0.5.8)
+tests/engine/.deps/
