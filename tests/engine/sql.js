@@ -201,6 +201,22 @@ async function t(name, fn) {
     await db.exec('reset role');
     assert.strictEqual(m.props.ADMIN_KEY, 'secret');
   });
+  /* Supabase loads pg-safeupdate for API requests: a DELETE or UPDATE with no
+     WHERE is refused, even inside a function. PGlite doesn't load it, so read
+     every gg_ function as installed and insist. (The first rehearsal against
+     production stopped on exactly this.) */
+  await t('every DELETE and UPDATE in a gg_ function has a WHERE (Supabase’s safeupdate refuses them otherwise)', async () => {
+    const fns = (await db.query("select proname, prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and proname like 'gg\\_%'")).rows;
+    assert.ok(fns.length >= 9, 'found the gg_ functions');
+    const bad = [];
+    for (const f of fns) {
+      const sql = f.prosrc.replace(/--[^\n]*/g, ' ');
+      for (const m of sql.matchAll(/\b(delete\s+from\s+[\w.]+|update\s+[\w.]+\s+set)\b([^;]*);/gi)) {
+        if (!/\bwhere\b/i.test(m[2])) bad.push(f.proname + ': ' + m[0].replace(/\s+/g, ' ').slice(0, 80));
+      }
+    }
+    assert.deepStrictEqual(bad, []);
+  });
   await t('the cron migration applied cleanly without pg_cron, and left __CRON_KEY in place', async () => {
     const k = (await db.query("select count(*)::int as n from pg_namespace where nspname = 'cron'")).rows[0].n;
     assert.strictEqual(k, 0, 'PGlite has no pg_cron, so nothing was scheduled');
