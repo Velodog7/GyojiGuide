@@ -22,7 +22,7 @@ function page(opts) {
   const ls = opts.storage || new Map();
   const asked = [];
   const ctx = {
-    window: {}, location: { hostname: opts.host === undefined ? 'sumoslapdown.com' : opts.host },
+    location: { hostname: opts.host === undefined ? 'sumoslapdown.com' : opts.host },
     localStorage: opts.blocked ? { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } }
       : { getItem: (k) => (ls.has(k) ? ls.get(k) : null), setItem: (k, v) => ls.set(k, String(v)) },
     Date, Number, String, JSON, Promise,
@@ -32,19 +32,21 @@ function page(opts) {
       return { json: async () => opts.health };
     }
   };
-  ctx.window.fetch = ctx.fetch;
+  ctx.window = ctx;                       // as in a browser: window is the global object
   vm.createContext(ctx);
   vm.runInContext(SRC, ctx);
+  if (opts.twice) vm.runInContext(SRC, ctx);
   const GG = ctx.window.GyojiGuide;
-  return { GG, ls, asked, settle: () => new Promise(r => setTimeout(r, 5)) };
+  return { GG, ctx, ls, asked, settle: () => new Promise(r => setTimeout(r, 5)) };
 }
+const PIN = 'forceFunctionRegion=us-west-2';
 
 (async () => {
   console.log('\n— which backend a page talks to —');
   await t('a first visit starts on Apps Script and asks Supabase in the background', async () => {
     const p = page({ health: { ok: true, live: false } });
     assert.ok(APPS.test(p.GG.API_URL), p.GG.API_URL);
-    assert.deepStrictEqual(p.asked, [SUPA + '?action=__health']);
+    assert.deepStrictEqual(p.asked, [SUPA + '?action=__health&' + PIN]);
     await p.settle();
     assert.strictEqual(p.ls.get('gg.api'), 'appsScript');
   });
@@ -82,6 +84,28 @@ function page(opts) {
     assert.strictEqual(r.maintenance, true);
     assert.strictEqual(ls.get('gg.api.asked'), '0', 'the next page load will ask');
     assert.strictEqual(page({ storage: ls, health: { ok: true, live: false } }).asked.length, 1);
+  });
+  await t('every call to the function runs next to the database (us-west-2); Apps Script calls are untouched', async () => {
+    const ls = new Map([['gg.api', 'supabase'], ['gg.api.asked', String(Date.now())]]);
+    const p = page({ storage: ls, health: { ok: true } });
+    await p.GG.apiGet('data');
+    await p.GG.apiGetQ('league', { id: 'lg1', handle: 'sean' });
+    await p.GG.apiPost({ action: 'save' });
+    await p.ctx.fetch(SUPA + '?action=data');                  // a page's own direct fetch, as fantasy.html does
+    assert.deepStrictEqual(p.asked, [
+      SUPA + '?action=data&' + PIN,
+      SUPA + '?action=league&id=lg1&handle=sean&' + PIN,
+      SUPA + '?' + PIN,
+      SUPA + '?action=data&' + PIN]);
+    const apps = page({ storage: new Map([['gg.api.asked', String(Date.now())]]), health: { ok: true } });
+    await apps.GG.apiGet('data');
+    assert.ok(APPS.test(apps.asked[0].split('?')[0]) && !apps.asked[0].includes(PIN), apps.asked[0]);
+  });
+  await t('loading gg-config.js twice pins once, and a URL that already says where to run is left alone', async () => {
+    const p = page({ storage: new Map([['gg.api', 'supabase'], ['gg.api.asked', String(Date.now())]]), health: { ok: true }, twice: true });
+    await p.GG.apiGet('data');
+    await p.ctx.fetch(SUPA + '?action=x&forceFunctionRegion=eu-west-1');
+    assert.deepStrictEqual(p.asked, [SUPA + '?action=data&' + PIN, SUPA + '?action=x&forceFunctionRegion=eu-west-1']);
   });
   await t('a dev box never asks and stays on Apps Script', async () => {
     for (const host of ['localhost', '127.0.0.1', '']) {
