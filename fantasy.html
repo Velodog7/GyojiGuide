@@ -704,6 +704,24 @@
   .rd-pool--flat{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px }
   .rd-pick{ font-size:.82rem; padding:5px 10px }
   .rd-turn{ margin:8px 0; font-size:.95rem }
+  /* the keeper deadline: the line on the declaration screen, the commissioner's
+     controls, and the reminder banner at the top of the page */
+  .kw-deadline{ margin:4px 0 10px; font-size:.9rem; color:var(--dim) }
+  .kw-deadline b{ color:var(--ink) }
+  .kw-deadline .kw-left{ font-family:"WDXL Lubrifont TC",monospace; color:var(--sun) }
+  .kw-deadline.closed{ color:var(--tangerine) }
+  .kw-deadline.none{ color:var(--faint); font-style:italic }
+  .kw-when{ display:inline-flex; align-items:center; gap:8px; margin:6px 10px 10px 0; font-size:.88rem; color:var(--dim) }
+  .kw-when input{ font:inherit; color:var(--ink); background:var(--surface-2); border:1px solid var(--line2);
+        border-radius:8px; padding:6px 8px; color-scheme:dark }
+  .kw-dl-row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:6px }
+  .kw-nudge{ margin:12px 0 4px; border:1px solid rgba(var(--sun-rgb),.45); background:rgba(var(--sun-rgb),.08);
+        border-radius:var(--radius-sm); padding:10px 14px }
+  .kw-nudge__row{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; font-size:.92rem }
+  .kw-nudge__row + .kw-nudge__row{ margin-top:8px; padding-top:8px; border-top:1px solid rgba(var(--sun-rgb),.2) }
+  .kw-nudge b{ color:var(--sun) }
+  .lg-hist-link{ color:var(--sun); text-decoration:none }
+  .lg-hist-link:hover{ text-decoration:underline }
   .lu-item{ display:inline-flex; align-items:center; gap:5px; font-size:.85rem; padding:4px 9px; border:1px solid var(--line,#2a2e3a); border-radius:7px; cursor:pointer }
   .lu-item input{ accent-color:var(--sun,#d8b25a) }
   .lg-rm-head{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:4px }
@@ -825,6 +843,8 @@
 </nav>
 
 <div class="wrap">
+  <!-- open keeper windows this member still owes a declaration in (keeperNudge) -->
+  <div class="kw-nudge" id="kwNudge" hidden></div>
   <header class="top">
     <div class="brandline">
       <div class="auth-actions" id="authActions">
@@ -989,7 +1009,7 @@
               <button class="btn ghost sm" id="lgRenameCancel" type="button">Cancel</button>
             </form>
             <span class="status lg-rename-status" id="lgRenameStatus"></span>
-            <div class="lg-sub"><span id="lgRole"></span> · <span id="lgCount"></span></div>
+            <div class="lg-sub"><span id="lgRole"></span> · <span id="lgCount"></span> · <a class="lg-hist-link" id="lgHistLink" href="history.html">League history</a></div>
             <div class="lg-champ" id="lgChamp" hidden></div>
           </div>
           <button class="btn ghost sm" id="lgInvite">Copy invite link</button>
@@ -1375,6 +1395,7 @@ function setAcct(a){
   saveLocal(); acctUI();
   // keep the leagues tab in sync with sign-in/out
   if (typeof loadLeagues === "function" && $("tab-leagues").getAttribute("aria-selected")==="true") loadLeagues();
+  if (typeof checkKeeperNudge === "function") checkKeeperNudge();
   // keep the leaderboard chat's locked/post + own-vote state in sync with every sign-in/out
   if (typeof loadLbBoard === "function") loadLbBoard();
   // a just-signed-in user with a pending invite link should auto-join
@@ -1975,6 +1996,7 @@ async function loadLeagues(preferId){
   lgBusy(true, "Loading your leagues");
   let res=null; try{ res=await GyojiGuide.leagues(acct.handle); }catch(e){}
   leaguesCache = (res && res.leagues) || [];
+  keeperNudge(leaguesCache);
   $("lgN").textContent = leaguesCache.length;
   lgBusy(false); lgStatus("");
   if (!leaguesCache.length){ lgBusy(false); $("lgEmpty").hidden=false; $("lgPanel").hidden=true; $("lgSwitch").innerHTML=""; return; }
@@ -2014,7 +2036,8 @@ async function renderLeague(){
       lg.scoring = d.league.scoring || null; lg.draftDate = d.league.draftDate || "";
       lg.draftAgreedCount = d.league.draftAgreedCount || 0; lg.draftMemberCount = d.league.draftMemberCount || (d.members||[]).length;
       lg.iAgreedDraft = !!d.league.iAgreedDraft;
-      lg.keepMk = d.league.keepMk; lg.keepJr = d.league.keepJr; }   // blank stays null (= keep everyone); never coerce to 0
+      lg.keepMk = d.league.keepMk; lg.keepJr = d.league.keepJr;    // blank stays null (= keep everyone); never coerce to 0
+      lg.keepDeadline = d.league.keepDeadline || ""; }               // when an open keeper window closes; "" = by hand
   } else { lg.members = Array.isArray(lg.members) ? lg.members : []; lg.messages = lg.messages || []; }
   lgBusy(false); lgStatus("");
 
@@ -2022,6 +2045,7 @@ async function renderLeague(){
   $("lgPanel").hidden=false;
   const meCommish = acct && lg.commissioner.toLowerCase()===acct.handle.toLowerCase();
   $("lgName").innerHTML = esc(lg.name) + (lg.mode==="keepers" ? '<span class="lg-mode-badge">Keepers</span>' : '');
+  $("lgHistLink").href = "history.html?league=" + encodeURIComponent(lg.id);
   $("lgTeamLeagueName").textContent = lg.name;
   setupLeagueRename(lg, meCommish);
   $("lgRole").textContent = meCommish ? "You're the commissioner" : "Member";
@@ -2424,6 +2448,68 @@ let keepPollTimer = null;
    instead, and win over the server until they are saved. */
 let kwDraft = null;            // { league, picks: Set of lower-case names }
 let kwSeq = 0, kwMsg = null, kwSaving = false;
+let kwDlMsg = null;            // the deadline control's last message, like kwMsg
+const kwReminded = {};         // league id -> posted a chat reminder this visit (no double posts on a repaint)
+
+/* ---- the keeper deadline ----
+   Times travel as ISO and are shown in the reader's own time zone. A
+   datetime-local input speaks wall-clock time with no zone, so these two
+   convert at the edge. */
+function fmtWhen(iso){
+  const d = new Date(iso); if (isNaN(d)) return "";
+  return d.toLocaleString(undefined, { weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
+}
+function fmtLeft(iso){
+  const ms = new Date(iso).getTime() - Date.now(); if (!(ms > 0)) return "";
+  const m = Math.floor(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+  return d ? d + "d " + h + "h" : h ? h + "h " + (m % 60) + "m" : (m % 60) + "m";
+}
+function toLocalInput(t){
+  const d = new Date(t), p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+function fromLocalInput(v){ if (!v) return ""; const d = new Date(v); return isNaN(d) ? null : d.toISOString(); }
+/* Three days out at 8pm, but not before the evening after the next banzuke:
+   the window can only close once the new basho is in. */
+function defaultKeepDeadline(){
+  const d = new Date(Date.now() + 3 * 86400000); d.setHours(20, 0, 0, 0);
+  const nx = (window.GyojiGuide && GyojiGuide.basho && GyojiGuide.basho.next) ? GyojiGuide.basho.next() : null;
+  if (nx && nx.banzuke){
+    const b = new Date(nx.banzuke); b.setDate(b.getDate() + 1); b.setHours(20, 0, 0, 0);
+    if (b > d && b < new Date(nx.start)) return b;
+  }
+  return d;
+}
+
+/* The reminder, on whichever tab is open: every league with keeper
+   declarations open that this member hasn't answered yet. The leagues list
+   says so (keepDeclared), so it costs one read on load. */
+function keeperNudge(leagues){
+  const box = $("kwNudge"); if (!box) return;
+  /* past its deadline a league can't take a declaration, so it drops out */
+  const open = l => !l.keepDeadline || new Date(l.keepDeadline) > new Date();
+  const owed = (leagues || []).filter(l => l.draftStatus === "keepers" && !l.keepDeclared && open(l));
+  if (!owed.length){ box.hidden = true; box.innerHTML = ""; return; }
+  box.innerHTML = owed.map(l => {
+    const due = l.keepDeadline ? ` &mdash; they close <b>${esc(fmtWhen(l.keepDeadline))}</b> (${fmtLeft(l.keepDeadline)} left)` : "";
+    return `<div class="kw-nudge__row"><span>Keeper declarations are open in <b>${esc(l.name)}</b>${due}.</span>
+      <button class="btn sm" type="button" data-lg="${esc(l.id)}">Declare keepers</button></div>`;
+  }).join("");
+  box.hidden = false;
+  box.querySelectorAll("[data-lg]").forEach(b => b.onclick = () => {
+    curLeagueId = b.dataset.lg;
+    if ($("tab-leagues").getAttribute("aria-selected") !== "true") setView("leagues");
+    else { renderSwitch(); renderLeague(); }
+    setTimeout(() => { const k = $("lgKeepers"); if (k) k.scrollIntoView({ behavior:"smooth", block:"start" }); }, 900);
+  });
+}
+async function checkKeeperNudge(){
+  if (!acct || !hasAPI()) return keeperNudge([]);
+  let res = null; try { res = await GyojiGuide.leagues(acct.handle); } catch(e){}
+  if (res && res.ok) keeperNudge(res.leagues);
+}
+// on load; setAcct asks again on every sign-in, and loadLeagues refreshes it from its own read
+setTimeout(() => { try { checkKeeperNudge(); } catch(e){} }, 0);
 /* does this league cut anyone at the roll-over? null in BOTH divisions means no */
 function keepLimited(lg){ return !!lg && (lg.keepMk != null || lg.keepJr != null); }
 function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } draftPollMs = 0; stopDraftTick();
@@ -2910,7 +2996,7 @@ async function renderKeepers(lg, meCommish){
       </div>
       ${lineupHTML(myRoster)}
       ${(isCommish && !locked) ? (keepLimited(lg)
-        ? `<div class="lg-teams"><h5>End of basho &middot; keepers</h5><p class="lg-myteam__hint" style="margin-top:0">Each team keeps <b>${keepLabel(lg)}</b>. Open declarations and everyone picks who to carry over; anyone still undecided when you close keeps their best by this basho&rsquo;s wins. The re-draft then fills the empty slots.</p><button class="btn" id="lgOpenKeepers">Open keeper declarations</button><span id="lgRedraftStatus" class="status"></span></div>`
+        ? `<div class="lg-teams"><h5>End of basho &middot; keepers</h5><p class="lg-myteam__hint" style="margin-top:0">Each team keeps <b>${keepLabel(lg)}</b>. Open declarations and everyone picks who to carry over. At the deadline they stop, and once the new basho has been started on the admin page the window closes itself and the re-draft opens; anyone still undecided keeps their best by this basho&rsquo;s wins.</p><label class="kw-when">Declarations close <input type="datetime-local" id="lgKeepDeadline" value="${toLocalInput(defaultKeepDeadline())}"></label><button class="btn" id="lgOpenKeepers">Open keeper declarations</button><span id="lgRedraftStatus" class="status"></span></div>`
         : `<div class="lg-teams"><h5>New banzuke &middot; re-draft</h5><p class="lg-myteam__hint" style="margin-top:0">When the new banzuke is published, open a supplemental draft: anyone demoted out of the top two divisions is released, then every team fills its open slots worst-first.</p><button class="btn" id="lgOpenRedraft">Open re-draft</button><span id="lgRedraftStatus" class="status"></span></div>`) : ""}
       ${(isCommish && !locked) ? `<div class="lg-teams"><h5>Draft</h5><p class="lg-myteam__hint" style="margin-top:0">Did the last pick go wrong? Undo it and the draft room reopens, paused, with that member back on the clock. This only works before any trades, add/drops or basho roll-over.</p><button class="btn ghost" id="lgReopenDraft">Undo final pick</button><span id="lgReopenStatus" class="status"></span></div>` : ""}
     </div>`;
@@ -2936,9 +3022,13 @@ async function renderKeepers(lg, meCommish){
   };
   const okBtn = $("lgOpenKeepers");
   if (okBtn) okBtn.onclick = async ()=>{
-    if (!confirm("Open keeper declarations?\n\nEveryone picks who to carry over. Anyone who hasn\u2019t decided when you close keeps their best by this basho\u2019s wins.")) return;
-    okBtn.disabled=true; const st=$("lgRedraftStatus"); st.textContent=" Opening\u2026"; st.className="status";
-    const r = await GyojiGuide.openKeeperWindow(lg.id);
+    const st=$("lgRedraftStatus"), dlIn=$("lgKeepDeadline");
+    const dl = fromLocalInput(dlIn ? dlIn.value : "");
+    if (dl === null){ st.textContent=" That deadline isn\u2019t a date."; st.className="status err"; return; }
+    if (!confirm("Open keeper declarations?\n\n" + (dl ? "They close " + fmtWhen(dl) + ". " : "With no deadline, you close them by hand. ") +
+                 "Anyone who hasn\u2019t decided by then keeps their best by this basho\u2019s wins.")) return;
+    okBtn.disabled=true; st.textContent=" Opening\u2026"; st.className="status";
+    const r = await GyojiGuide.openKeeperWindow(lg.id, dl);
     if (r && r.ok){ lg.draftStatus="keepers"; renderLeague(); }
     else { okBtn.disabled=false; st.textContent=" "+((r&&r.error)||"Couldn\u2019t open declarations."); st.className="status err"; }
   };
@@ -2967,6 +3057,9 @@ async function renderKeepers(lg, meCommish){
    order they'd be auto-kept in if you never got round to it. */
 async function renderKeeperWindow(lg){
   const body = document.getElementById("keepBody"); if (!body) return;
+  // the commissioner is typing a new deadline: a repaint would wipe it and close the picker
+  const ae = document.activeElement;
+  if (ae && ae.id === "kwDeadline" && body.contains(ae)) return;
   const seq = ++kwSeq;
   let res=null; try { res = await GyojiGuide.keeperState(lg.id); } catch(e){}
   if (seq !== kwSeq) return;                             // a newer paint, or a save, overtook this one
@@ -2992,19 +3085,40 @@ async function renderKeeperWindow(lg){
     return `<div class="lg-teams"><h5>${label} <span class="lg-rm-window open" id="kwCount_${div}"></span></h5>
       ${lim == null ? `<p class="lg-myteam__hint" style="margin-top:0">No limit — all of these carry over.</p>` : ""}
       <div class="rd-pool">${list.map(r=>`<label class="lu-item"><input type="checkbox" class="kw-cb" data-div="${div}" value="${esc(r.name)}"
-        ${picks.has(r.name.toLowerCase())?"checked":""} ${lim==null?"disabled checked":""}> ${esc(r.name)}
+        ${picks.has(r.name.toLowerCase())||lim==null?"checked":""} ${lim==null||res.closed?"disabled":""}> ${esc(r.name)}
         <span class="lg-team-row__h">${r.wins} win${r.wins===1?"":"s"}</span></label>`).join("")}</div></div>`;
   };
 
+  const dl = res.deadline || "", undecided = res.members.filter(m=>!m.declared).map(m=>m.handle);
+  const dlMsg = kwDlMsg && kwDlMsg.league === lg.id ? kwDlMsg : null;
+  const deadlineLine = res.closed
+    ? `<p class="kw-deadline closed">Declarations closed ${esc(fmtWhen(dl))}. ${res.ready
+        ? "The re-draft opens within the hour." : "The re-draft opens once the new basho has been started on the admin page."}</p>`
+    : dl ? `<p class="kw-deadline">Declarations close <b>${esc(fmtWhen(dl))}</b> &middot; <span class="kw-left">${fmtLeft(dl)} left</span></p>`
+         : `<p class="kw-deadline none">No deadline set &mdash; the commissioner closes declarations.</p>`;
+
   body.innerHTML =
     `<p class="rd-turn">Keep <b>${res.keepMk==null?"all":res.keepMk}</b> in Makuuchi and <b>${res.keepJr==null?"all":res.keepJr}</b> in J\u016bry\u014d. Everyone else goes back into the pool.</p>` +
+    deadlineLine +
     group("makuuchi","Makuuchi", res.mine.makuuchi) +
     group("juryo","J\u016bry\u014d", res.mine.juryo) +
-    `<div style="margin-top:10px"><button class="btn" id="kwSave"${kwSaving?" disabled":""}>${res.mine.declared?"Update my keepers":"Confirm my keepers"}</button>
+    `<div style="margin-top:10px"><button class="btn" id="kwSave"${kwSaving||res.closed?" disabled":""}>${res.mine.declared?"Update my keepers":"Confirm my keepers"}</button>
       <span id="kwStatus" class="status${kwMsg && kwMsg.cls ? " "+kwMsg.cls : ""}">${kwMsg ? " "+esc(kwMsg.text) : ""}</span></div>
-     <p class="lg-myteam__hint">${res.waiting} of ${res.members.length} still to decide${res.waiting?": "+res.members.filter(m=>!m.declared).map(m=>"@"+esc(m.handle)).join(", "):""}.</p>` +
-    (isCommish ? `<div class="lg-teams"><h5>Close and re-draft</h5>
-        <p class="lg-myteam__hint" style="margin-top:0">Applies every declaration, auto-keeps for anyone who hasn\u2019t decided, then opens the supplemental re-draft to refill rosters.</p>
+     <p class="lg-myteam__hint">${res.closed
+       ? (res.waiting ? "Didn\u2019t declare: " + undecided.map(h=>"@"+esc(h)).join(", ") + " \u2014 they keep their best by this basho\u2019s wins." : "Everyone declared.")
+       : `${res.waiting} of ${res.members.length} still to decide${res.waiting?": "+undecided.map(h=>"@"+esc(h)).join(", "):""}.`}</p>` +
+    (isCommish ? `<div class="lg-teams"><h5>Deadline</h5>
+        <p class="lg-myteam__hint" style="margin-top:0">Declarations stop at the deadline. Once the new basho has been started on the admin page, the window then closes itself at the next hourly check and the re-draft opens.</p>
+        <div class="kw-dl-row"><label class="kw-when">Close at <input type="datetime-local" id="kwDeadline" value="${toLocalInput(dl || defaultKeepDeadline())}"></label>
+          <button class="btn sm" id="kwDlSave" type="button">${dl ? "Move deadline" : "Set deadline"}</button>
+          ${dl ? `<button class="btn ghost sm" id="kwDlClear" type="button">No deadline</button>` : ""}
+          <span id="kwDlStatus" class="status${dlMsg && dlMsg.cls ? " "+dlMsg.cls : ""}">${dlMsg ? " "+esc(dlMsg.text) : ""}</span></div>
+        ${res.waiting && !res.closed ? `<div class="kw-dl-row">${kwReminded[lg.id]
+          ? `<span class="status ok">Reminder posted on the league board ✓</span>`
+          : `<button class="btn ghost sm" id="kwRemind" type="button">Post a reminder on the league board</button><span id="kwRemindStatus" class="status"></span>`}</div>` : ""}
+      </div>
+      <div class="lg-teams"><h5>Close and re-draft now</h5>
+        <p class="lg-myteam__hint" style="margin-top:0">Applies every declaration, auto-keeps for anyone who hasn\u2019t decided, then opens the supplemental re-draft to refill rosters.${res.ready ? "" : " <b>Start the new basho on the admin page first</b> &mdash; the re-draft is drawn from the new banzuke."}</p>
         <button class="btn" id="kwClose">Close declarations &amp; start re-draft</button><span id="kwCloseStatus" class="status"></span></div>` : "");
 
   const sync = () => {
@@ -3040,11 +3154,50 @@ async function renderKeeperWindow(lg){
     sv.disabled = true; kwSaving = true; say("Saving\u2026");
     const r = await GyojiGuide.declareKeepers(lg.id, keep);
     kwSaving = false;
-    if (r && r.ok){ kwDraft = null; say("Saved \u2713", "ok"); renderKeeperWindow(lg); }
+    if (r && r.ok){
+      kwDraft = null; say("Saved \u2713", "ok"); renderKeeperWindow(lg);
+      const mine = (leaguesCache || []).find(l => l.id === lg.id);       // the reminder banner stands down
+      if (mine){ mine.keepDeclared = true; keeperNudge(leaguesCache); }
+    }
     else {
       say((r&&r.error)||"Couldn\u2019t save.", "err");
       const b = document.getElementById("kwSave"); if (b) b.disabled = false;   // a repaint may have replaced sv
     }
+  };
+
+  /* the commissioner's deadline: move it, or go back to closing by hand */
+  const dlSay = (t, cls) => {
+    kwDlMsg = t ? { league: lg.id, text: t, cls: cls || "" } : null;
+    const s = document.getElementById("kwDlStatus"); if (s){ s.textContent = t ? " "+t : ""; s.className = "status"+(cls?" "+cls:""); }
+  };
+  const setDl = async (iso) => {
+    dlSay("Saving…");
+    const r = await GyojiGuide.setKeeperDeadline(lg.id, iso);
+    if (r && r.ok){ lg.keepDeadline = r.deadline || ""; dlSay(r.deadline ? "Saved ✓" : "Deadline removed ✓", "ok"); renderKeeperWindow(lg); }
+    else dlSay((r && r.error) || "Couldn’t save the deadline.", "err");
+  };
+  const dlSave = document.getElementById("kwDlSave");
+  if (dlSave) dlSave.onclick = () => {
+    const iso = fromLocalInput((document.getElementById("kwDeadline") || {}).value || "");
+    if (!iso){ dlSay("Pick a date and time.", "err"); return; }
+    setDl(iso);
+  };
+  const dlClear = document.getElementById("kwDlClear");
+  if (dlClear) dlClear.onclick = () => {
+    if (confirm("Remove the deadline?\n\nDeclarations then stay open until you close them by hand.")) setDl("");
+  };
+  /* a nudge on the league board, in the commissioner's own name, naming who's left */
+  const rem = document.getElementById("kwRemind");
+  if (rem) rem.onclick = async () => {
+    const s = document.getElementById("kwRemindStatus");
+    const text = "Reminder: keeper declarations " + (dl ? "close " + fmtWhen(dl) : "are open") +
+                 ". Still to decide: " + undecided.map(h => "@" + h).join(", ") + ".";
+    if (!confirm("Post this on the league board?\n\n" + text)) return;
+    rem.disabled = true;
+    const r = await GyojiGuide.msgPost(lg.id, text, "");
+    if (r && r.ok){ kwReminded[lg.id] = Date.now(); renderLeague(); return; }
+    if (s){ s.textContent = " " + ((r && r.error) || "Couldn’t post it."); s.className = "status err"; }
+    rem.disabled = false;
   };
 
   const cl = document.getElementById("kwClose");
