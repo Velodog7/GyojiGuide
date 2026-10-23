@@ -41,8 +41,10 @@ const LEGACY_EXEC = Deno.env.get('GG_LEGACY_EXEC') ||
 const SELF_URL = SUPABASE_URL.replace(/\/+$/, '') + '/functions/v1/api';
 const BACKEND_VERSION = (SOURCE.match(/var BACKEND_VERSION = '([^']*)'/) || [])[1] || '';
 
-// Triggers the old project ran on a timer. pg_cron calls __cron with one of these.
-const CRON_JOBS = new Set(['refreshResults']);
+// Triggers the old project ran on a timer, plus the keeper clock (every five
+// minutes, so a keeper window closes on draft day itself). pg_cron calls
+// __cron with one of these.
+const CRON_JOBS = new Set(['refreshResults', 'keeperClock']);
 
 const store = createRestStore({ url: SUPABASE_URL, key: SECRET });
 const engine = createEngine({ source: SOURCE, store, selfUrl: SELF_URL, seed: SEED_SHEETS });

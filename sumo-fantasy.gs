@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-10-23-keepers-history';
+var BACKEND_VERSION = '2026-10-23-draft-day';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -1729,8 +1729,17 @@ function setDraftDate(body){
   var when = String(body.draftDate || '').slice(0, 40);   // ISO-ish; the client sends a datetime-local value
   var agree = {};
   if (when) agree[L.commissioner.toLowerCase()] = true;   // proposing it counts as agreeing to it
+  var dl = keepDeadlineFrom_(when);                       // binding only while keepers are being declared
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
+    L = leagueRow(L.id);                                   // re-read under lock
+    /* Declarations open: the draft date is draft day, when keepers lock and
+       the re-draft opens, so it has to work as a deadline too. */
+    if (L.draftStatus === 'keepers'){
+      if (dl.error) return { ok:false, error:dl.error };
+      setKeeperDraftDay_(L, dl.iso);
+      return { ok:true, draftDate:dl.iso, keepDeadline:dl.iso };
+    }
     sh_(SHEET_LEAGUES).getRange(L.row, 13, 1, 2).setValues([[when, JSON.stringify(agree)]]);
     dsBust_(L.id);
     return { ok:true, draftDate:when };
@@ -3356,7 +3365,7 @@ function openKeeperWindow(body){
   try {
     deleteRowsWhere_(SHEET_KEEPS, 0, String(L.id));      // a fresh window starts clean
     sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue('keepers');
-    setKeepDeadline_(L, dl.iso);
+    setKeeperDraftDay_(L, dl.iso);                         // also retires the first draft's old date
     return { ok:true, keepMk:kp.mk, keepJr:kp.jr, deadline:dl.iso };
   } finally { unlock_(lock); }
 }
@@ -3368,21 +3377,37 @@ function openKeeperWindow(body){
    released for dropping out of it.
 
    So a window can carry a deadline (Leagues column 23). After it, declarations
-   are refused, and the hourly import closes the window and opens the re-draft,
-   but only once the new basho is in Meta and its banzuke can be read, since
-   that is what the re-draft is drawn from (closeKeeperWindowLocked_). The
-   commissioner can still close early by hand, under the same condition. */
+   are refused, and the keeper clock (every five minutes) or the hourly import
+   closes the window and opens the re-draft, but only once the new basho is in
+   Meta and its banzuke can be read, since that is what the re-draft is drawn
+   from (closeKeeperWindowLocked_). The commissioner can still close early by
+   hand, under the same condition.
+
+   The deadline is draft day: while the window is open the draft date and the
+   deadline are one setting, so whichever the commissioner sets writes both,
+   and members agree to the draft date as they did for the first draft. */
 function keepDeadlineFrom_(raw){
   if (raw === undefined || raw === null || String(raw).trim() === '') return { iso:'' };
   var t = new Date(String(raw)).getTime();
-  if (isNaN(t)) return { error:'That deadline isn\u2019t a date.' };
-  if (t < Date.now() + 10 * 60 * 1000) return { error:'Set the deadline at least ten minutes from now.' };
-  if (t > Date.now() + 45 * 24 * 3600 * 1000) return { error:'Set the deadline within the next six weeks.' };
+  if (isNaN(t)) return { error:'That isn\u2019t a date and time.' };
+  if (t < Date.now() + 10 * 60 * 1000) return { error:'Pick a time at least ten minutes from now.' };
+  if (t > Date.now() + 45 * 24 * 3600 * 1000) return { error:'Pick a time within the next six weeks.' };
   return { iso:new Date(t).toISOString() };
 }
 function setKeepDeadline_(L, iso){
   ensureKeepDeadlineHead_();
   sh_(SHEET_LEAGUES).getRange(L.row, KEEP_DEADLINE_COL).setValue(iso || '');
+}
+/* Draft day, while keeper declarations are open: the deadline and the draft
+   date together. A new date asks everyone again (the commissioner, who set
+   it, counts as agreeing), exactly as setDraftDate does; the same date leaves
+   the agreements alone. Caller holds the script lock. */
+function setKeeperDraftDay_(L, iso){
+  setKeepDeadline_(L, iso);
+  if (String(L.draftDate || '') !== '' && isoCell_(L.draftDate) === (iso || '')) return;
+  var agree = {}; if (iso) agree[L.commissioner.toLowerCase()] = true;
+  sh_(SHEET_LEAGUES).getRange(L.row, 13, 1, 2).setValues([[iso || '', JSON.stringify(agree)]]);
+  dsBust_(L.id);
 }
 function keepDeadlinePassed_(L){
   var t = L && L.keepDeadline ? new Date(L.keepDeadline).getTime() : NaN;
@@ -3404,7 +3429,7 @@ function setKeeperDeadline(body){
   if (L.draftStatus !== 'keepers') return { ok:false, error:'Keeper declarations aren\u2019t open.' };
   var dl = keepDeadlineFrom_(body.deadline); if (dl.error) return { ok:false, error:dl.error };
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
-  try { setKeepDeadline_(leagueRow(L.id), dl.iso); return { ok:true, deadline:dl.iso }; }
+  try { setKeeperDraftDay_(leagueRow(L.id), dl.iso); return { ok:true, deadline:dl.iso }; }
   finally { unlock_(lock); }
 }
 
@@ -3516,9 +3541,18 @@ function closeKeeperWindowLocked_(L){
   return res;
 }
 
-/* Windows past their deadline close themselves on the hourly import, once the
-   new basho is in. A window that can't close yet (no new basho, banzuke not
-   readable) is simply tried again next hour. */
+/* The keeper clock: pg_cron runs this every five minutes (gg-keeper-clock), so
+   a window closes on draft day itself, not at the next hourly import (minute 7),
+   which would open a 7:30 draft at 8:07. It costs one Meta read unless a
+   window is due. */
+function keeperClock(){
+  if (forwardTarget_(null)) return { ok:true, forwarded:true };
+  return { ok:true, closed:closeDueKeeperWindows_() };
+}
+
+/* Windows past their deadline close themselves on the keeper clock and the
+   hourly import, once the new basho is in. A window that can't close yet (no
+   new basho, banzuke not readable) is simply tried again next time. */
 function closeDueKeeperWindows_(){
   if (!newBanzukeReady_()) return [];
   var lv = sh_(SHEET_LEAGUES).getDataRange().getValues(), due = [], r;

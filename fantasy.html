@@ -2316,10 +2316,10 @@ function fmtDraftDate(iso){
   const t = Date.parse(iso); if (isNaN(t)) return iso;
   return new Date(t).toLocaleString(undefined, { weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit" });
 }
-// convert an ISO string to the value a <input type=datetime-local> expects
-function toLocalInput(iso){
-  const t = iso ? Date.parse(iso) : NaN;
-  const d = isNaN(t) ? new Date(Date.now()+86400000) : new Date(t);
+// an ISO string (or Date) as the local value a <input type=datetime-local> expects; "" for none
+function toLocalInput(t){
+  const d = t instanceof Date ? t : new Date(t || NaN);
+  if (isNaN(d)) return "";
   const pad = n => String(n).padStart(2,"0");
   return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes());
 }
@@ -2333,17 +2333,22 @@ function renderSchedPanel(lg, meCommish){
   const total = lg.draftMemberCount || (lg.members||[]).length;
   const agreed = lg.draftAgreedCount || 0;
 
-  if (drafted){
+  if (drafted || lg.draftStatus === "redraft"){
     count.textContent = "";
-    body.innerHTML = `<p class="lg-set-note">The draft has ${lg.draftStatus === "complete" ? "already run" : "started"}.</p>`;
+    body.innerHTML = `<p class="lg-set-note">${lg.draftStatus === "redraft" ? "The re-draft is open."
+      : `The draft has ${lg.draftStatus === "complete" ? "already run" : "started"}.`}</p>`;
     return;
   }
+  /* While keepers are being declared this date is draft day: the server makes
+     it the keeper deadline, so keepers lock and the re-draft opens then. */
+  const keeping = lg.draftStatus === "keepers";
   count.textContent = lg.draftDate ? `${agreed}/${total} agreed` : "";
   count.className = "lg-agree-count" + (lg.draftDate && agreed===total && total>0 ? " all" : "");
 
   let html = "";
   if (lg.draftDate){
     html += `<div class="lg-sched-date"><span class="lg-sched-when">📅 ${esc(fmtDraftDate(lg.draftDate))}</span></div>`;
+    if (keeping) html += `<p class="lg-set-note">Keepers lock at the draft, and the re-draft opens then.</p>`;
     // per-member agreement chips
     const mem = lg.members || [];
     html += `<div class="lg-agree-list">` + mem.map(m=>{
@@ -2361,15 +2366,18 @@ function renderSchedPanel(lg, meCommish){
       html += `<div class="lg-agree-actions"><span class="status" id="lgSchedStatus"></span></div>`;
     }
   } else {
-    html += `<p class="lg-set-note">${meCommish ? "Set a date and members can agree to it before you start the draft." : "The commissioner hasn't scheduled the draft yet."}</p>`;
+    html += `<p class="lg-set-note">${keeping
+      ? (meCommish ? "Set the draft date and members can agree to it. Keepers lock then, and the re-draft opens within a few minutes, once the new basho has been started on the admin page."
+                   : "The commissioner hasn't scheduled the draft yet. Keepers lock when it starts.")
+      : (meCommish ? "Set a date and members can agree to it before you start the draft." : "The commissioner hasn't scheduled the draft yet.")}</p>`;
   }
 
-  // commissioner date editor
+  // commissioner date editor (with its own status line until a date exists)
   if (meCommish){
     html += `<div class="lg-sched-edit">
       <input type="datetime-local" id="lgDraftDateInput" value="${toLocalInput(lg.draftDate)}">
       <button class="btn sm" id="lgDraftDateSave">${lg.draftDate ? "Update date" : "Set date"}</button>
-      ${lg.draftDate ? `<button class="btn ghost sm" id="lgDraftDateClear">Clear</button>` : ""}
+      ${lg.draftDate ? `<button class="btn ghost sm" id="lgDraftDateClear">Clear</button>` : `<span class="status" id="lgSchedStatus"></span>`}
     </div>`;
   }
   body.innerHTML = html;
@@ -2387,7 +2395,8 @@ function renderSchedPanel(lg, meCommish){
     };
     const clr = $("lgDraftDateClear");
     if (clr) clr.onclick = async () => {
-      if (!confirm("Clear the scheduled draft date? Everyone's agreement will reset.")) return;
+      if (!confirm("Clear the scheduled draft date? Everyone's agreement will reset." +
+                   (keeping ? "\n\nKeepers then stay open until you set a new date or close them by hand." : ""))) return;
       const r = await GyojiGuide.setDraftDate(lg.id, "");
       if (r && r.ok) loadLeagues(lg.id);
     };
@@ -2464,22 +2473,7 @@ function fmtLeft(iso){
   const m = Math.floor(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
   return d ? d + "d " + h + "h" : h ? h + "h " + (m % 60) + "m" : (m % 60) + "m";
 }
-function toLocalInput(t){
-  const d = new Date(t), p = n => String(n).padStart(2, "0");
-  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes());
-}
 function fromLocalInput(v){ if (!v) return ""; const d = new Date(v); return isNaN(d) ? null : d.toISOString(); }
-/* Three days out at 8pm, but not before the evening after the next banzuke:
-   the window can only close once the new basho is in. */
-function defaultKeepDeadline(){
-  const d = new Date(Date.now() + 3 * 86400000); d.setHours(20, 0, 0, 0);
-  const nx = (window.GyojiGuide && GyojiGuide.basho && GyojiGuide.basho.next) ? GyojiGuide.basho.next() : null;
-  if (nx && nx.banzuke){
-    const b = new Date(nx.banzuke); b.setDate(b.getDate() + 1); b.setHours(20, 0, 0, 0);
-    if (b > d && b < new Date(nx.start)) return b;
-  }
-  return d;
-}
 
 /* The reminder, on whichever tab is open: every league with keeper
    declarations open that this member hasn't answered yet. The leagues list
@@ -2491,7 +2485,8 @@ function keeperNudge(leagues){
   const owed = (leagues || []).filter(l => l.draftStatus === "keepers" && !l.keepDeclared && open(l));
   if (!owed.length){ box.hidden = true; box.innerHTML = ""; return; }
   box.innerHTML = owed.map(l => {
-    const due = l.keepDeadline ? ` &mdash; they close <b>${esc(fmtWhen(l.keepDeadline))}</b> (${fmtLeft(l.keepDeadline)} left)` : "";
+    const due = l.keepDeadline ? ` &mdash; keepers lock at the draft, <b>${esc(fmtWhen(l.keepDeadline))}</b> (${fmtLeft(l.keepDeadline)} left)`
+                               : " &mdash; keepers lock on draft day";
     return `<div class="kw-nudge__row"><span>Keeper declarations are open in <b>${esc(l.name)}</b>${due}.</span>
       <button class="btn sm" type="button" data-lg="${esc(l.id)}">Declare keepers</button></div>`;
   }).join("");
@@ -3009,7 +3004,7 @@ async function renderKeepers(lg, meCommish){
       </div>
       ${lineupHTML(myRoster)}
       ${(isCommish && !locked) ? (keepLimited(lg)
-        ? `<div class="lg-teams"><h5>End of basho &middot; keepers</h5><p class="lg-myteam__hint" style="margin-top:0">Each team keeps <b>${keepLabel(lg)}</b>. Open declarations and everyone picks who to carry over. At the deadline they stop, and once the new basho has been started on the admin page the window closes itself and the re-draft opens; anyone still undecided keeps their best by this basho&rsquo;s wins.</p><label class="kw-when">Declarations close <input type="datetime-local" id="lgKeepDeadline" value="${toLocalInput(defaultKeepDeadline())}"></label><button class="btn" id="lgOpenKeepers">Open keeper declarations</button><span id="lgRedraftStatus" class="status"></span></div>`
+        ? `<div class="lg-teams"><h5>End of basho &middot; keepers</h5><p class="lg-myteam__hint" style="margin-top:0">Each team keeps <b>${keepLabel(lg)}</b>. Open declarations and everyone picks who to carry over. Keepers lock on draft day, and the re-draft opens then, once the new basho has been started on the admin page; anyone still undecided keeps their best by this basho&rsquo;s wins. Leave the draft day empty if it isn&rsquo;t scheduled yet and set it later.</p><label class="kw-when">Draft day <input type="datetime-local" id="lgKeepDeadline" value=""></label><button class="btn" id="lgOpenKeepers">Open keeper declarations</button><span id="lgRedraftStatus" class="status"></span></div>`
         : `<div class="lg-teams"><h5>New banzuke &middot; re-draft</h5><p class="lg-myteam__hint" style="margin-top:0">When the new banzuke is published, open a supplemental draft: anyone demoted out of the top two divisions is released, then every team fills its open slots worst-first.</p><button class="btn" id="lgOpenRedraft">Open re-draft</button><span id="lgRedraftStatus" class="status"></span></div>`) : ""}
       ${(isCommish && !locked) ? `<div class="lg-teams"><h5>Draft</h5><p class="lg-myteam__hint" style="margin-top:0">Did the last pick go wrong? Undo it and the draft room reopens, paused, with that member back on the clock. This only works before any trades, add/drops or basho roll-over.</p><button class="btn ghost" id="lgReopenDraft">Undo final pick</button><span id="lgReopenStatus" class="status"></span></div>` : ""}
     </div>`;
@@ -3037,8 +3032,8 @@ async function renderKeepers(lg, meCommish){
   if (okBtn) okBtn.onclick = async ()=>{
     const st=$("lgRedraftStatus"), dlIn=$("lgKeepDeadline");
     const dl = fromLocalInput(dlIn ? dlIn.value : "");
-    if (dl === null){ st.textContent=" That deadline isn\u2019t a date."; st.className="status err"; return; }
-    if (!confirm("Open keeper declarations?\n\n" + (dl ? "They close " + fmtWhen(dl) + ". " : "With no deadline, you close them by hand. ") +
+    if (dl === null){ st.textContent=" That draft day isn\u2019t a date."; st.className="status err"; return; }
+    if (!confirm("Open keeper declarations?\n\n" + (dl ? "Keepers lock at the draft, " + fmtWhen(dl) + ". " : "No draft day yet: set it once you know, and keepers lock then. ") +
                  "Anyone who hasn\u2019t decided by then keeps their best by this basho\u2019s wins.")) return;
     okBtn.disabled=true; st.textContent=" Opening\u2026"; st.className="status";
     const r = await GyojiGuide.openKeeperWindow(lg.id, dl);
@@ -3105,10 +3100,10 @@ async function renderKeeperWindow(lg){
   const dl = res.deadline || "", undecided = res.members.filter(m=>!m.declared).map(m=>m.handle);
   const dlMsg = kwDlMsg && kwDlMsg.league === lg.id ? kwDlMsg : null;
   const deadlineLine = res.closed
-    ? `<p class="kw-deadline closed">Declarations closed ${esc(fmtWhen(dl))}. ${res.ready
-        ? "The re-draft opens within the hour." : "The re-draft opens once the new basho has been started on the admin page."}</p>`
-    : dl ? `<p class="kw-deadline">Declarations close <b>${esc(fmtWhen(dl))}</b> &middot; <span class="kw-left">${fmtLeft(dl)} left</span></p>`
-         : `<p class="kw-deadline none">No deadline set &mdash; the commissioner closes declarations.</p>`;
+    ? `<p class="kw-deadline closed">Keepers locked at the draft, ${esc(fmtWhen(dl))}. ${res.ready
+        ? "The re-draft opens within a few minutes." : "The re-draft opens once the new basho has been started on the admin page."}</p>`
+    : dl ? `<p class="kw-deadline">Keepers lock at the draft: <b>${esc(fmtWhen(dl))}</b> &middot; <span class="kw-left">${fmtLeft(dl)} left</span></p>`
+         : `<p class="kw-deadline none">Keepers lock on draft day. The commissioner hasn&rsquo;t set it yet.</p>`;
 
   body.innerHTML =
     `<p class="rd-turn">Keep <b>${res.keepMk==null?"all":res.keepMk}</b> in Makuuchi and <b>${res.keepJr==null?"all":res.keepJr}</b> in J\u016bry\u014d. Everyone else goes back into the pool.</p>` +
@@ -3120,11 +3115,11 @@ async function renderKeeperWindow(lg){
      <p class="lg-myteam__hint">${res.closed
        ? (res.waiting ? "Didn\u2019t declare: " + undecided.map(h=>"@"+esc(h)).join(", ") + " \u2014 they keep their best by this basho\u2019s wins." : "Everyone declared.")
        : `${res.waiting} of ${res.members.length} still to decide${res.waiting?": "+undecided.map(h=>"@"+esc(h)).join(", "):""}.`}</p>` +
-    (isCommish ? `<div class="lg-teams"><h5>Deadline</h5>
-        <p class="lg-myteam__hint" style="margin-top:0">Declarations stop at the deadline. Once the new basho has been started on the admin page, the window then closes itself at the next hourly check and the re-draft opens.</p>
-        <div class="kw-dl-row"><label class="kw-when">Close at <input type="datetime-local" id="kwDeadline" value="${toLocalInput(dl || defaultKeepDeadline())}"></label>
-          <button class="btn sm" id="kwDlSave" type="button">${dl ? "Move deadline" : "Set deadline"}</button>
-          ${dl ? `<button class="btn ghost sm" id="kwDlClear" type="button">No deadline</button>` : ""}
+    (isCommish ? `<div class="lg-teams"><h5>Draft day</h5>
+        <p class="lg-myteam__hint" style="margin-top:0">Keepers lock at the draft, and the re-draft opens within a few minutes, once the new basho has been started on the admin page. It&rsquo;s the same date as the Draft date panel, where members can agree to it.</p>
+        <div class="kw-dl-row"><label class="kw-when">Draft <input type="datetime-local" id="kwDeadline" value="${toLocalInput(dl)}"></label>
+          <button class="btn sm" id="kwDlSave" type="button">${dl ? "Move draft day" : "Set draft day"}</button>
+          ${dl ? `<button class="btn ghost sm" id="kwDlClear" type="button">Clear</button>` : ""}
           <span id="kwDlStatus" class="status${dlMsg && dlMsg.cls ? " "+dlMsg.cls : ""}">${dlMsg ? " "+esc(dlMsg.text) : ""}</span></div>
         ${res.waiting && !res.closed ? `<div class="kw-dl-row">${kwReminded[lg.id]
           ? `<span class="status ok">Reminder posted on the league board ✓</span>`
@@ -3186,8 +3181,9 @@ async function renderKeeperWindow(lg){
   const setDl = async (iso) => {
     dlSay("Saving…");
     const r = await GyojiGuide.setKeeperDeadline(lg.id, iso);
-    if (r && r.ok){ lg.keepDeadline = r.deadline || ""; dlSay(r.deadline ? "Saved ✓" : "Deadline removed ✓", "ok"); renderKeeperWindow(lg); }
-    else dlSay((r && r.error) || "Couldn’t save the deadline.", "err");
+    /* the draft date moved with it, so repaint the whole league, not just this panel */
+    if (r && r.ok){ lg.keepDeadline = r.deadline || ""; dlSay(r.deadline ? "Saved ✓" : "Draft day cleared ✓", "ok"); renderLeague(); }
+    else dlSay((r && r.error) || "Couldn’t save the draft day.", "err");
   };
   const dlSave = document.getElementById("kwDlSave");
   if (dlSave) dlSave.onclick = () => {
@@ -3197,13 +3193,13 @@ async function renderKeeperWindow(lg){
   };
   const dlClear = document.getElementById("kwDlClear");
   if (dlClear) dlClear.onclick = () => {
-    if (confirm("Remove the deadline?\n\nDeclarations then stay open until you close them by hand.")) setDl("");
+    if (confirm("Clear draft day?\n\nKeepers then stay open until you set a new date or close them by hand.")) setDl("");
   };
   /* a nudge on the league board, in the commissioner's own name, naming who's left */
   const rem = document.getElementById("kwRemind");
   if (rem) rem.onclick = async () => {
     const s = document.getElementById("kwRemindStatus");
-    const text = "Reminder: keeper declarations " + (dl ? "close " + fmtWhen(dl) : "are open") +
+    const text = (dl ? "Reminder: keepers lock at the draft, " + fmtWhen(dl) : "Reminder: keeper declarations are open; they lock on draft day") +
                  ". Still to decide: " + undecided.map(h => "@" + h).join(", ") + ".";
     if (!confirm("Post this on the league board?\n\n" + text)) return;
     rem.disabled = true;

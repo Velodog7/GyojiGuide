@@ -191,13 +191,21 @@ A commissioner can give the keeper window a deadline (`Leagues` column 23,
 `keepDeadline`; set from the open-declarations control or moved later with
 `setKeeperDeadline`). At the deadline `declareKeepers` refuses, but nothing is
 cut yet: the re-draft pool is the banzuke of the basho in `Meta`, so the close
-waits for the roll-over. `closeDueKeeperWindows_()` runs at the end of each
-hourly import and closes a league only when its deadline has passed,
-`newBanzukeReady_()` holds (Meta's basho differs from `rankedBasho`) and the
-new banzuke actually reads from sumo-api. The manual close and
-`openSupplementalDraft` refuse on the same test. Undecided teams auto-keep by
-the finished basho's wins, which the roll-over saves to `Meta.lastWins` before
-it clears Results (`rikishiWins_()` falls back to it). `keepdeadline.js`.
+waits for the roll-over. `closeDueKeeperWindows_()` runs from `keeperClock()`
+every five minutes (pg_cron job `gg-keeper-clock`, migration
+`20261023200000_gg_keeper_clock.sql`, allowed in `CRON_JOBS` in `index.ts`) and
+at the end of each hourly import (minute 7). It closes a league only when its
+deadline has passed, `newBanzukeReady_()` holds (Meta's basho differs from
+`rankedBasho`) and the new banzuke actually reads from sumo-api. The manual
+close and `openSupplementalDraft` refuse on the same test. Undecided teams
+auto-keep by the finished basho's wins, which the roll-over saves to
+`Meta.lastWins` before it clears Results (`rikishiWins_()` falls back to it).
+
+The deadline is draft day. While declarations are open the draft date (columns
+13–14, with members' agreement) and the deadline are one setting:
+`setDraftDate`, `setKeeperDeadline` and `openKeeperWindow` all write both
+through `setKeeperDraftDay_()`, and a new date resets the agreement. Opening
+declarations retires the first draft's old date. `keepdeadline.js`.
 
 ### League history
 
@@ -323,9 +331,9 @@ doesn't move on its own is the bundled data, so each cycle has two jobs:
 Before rolling over, fill in the finished basho's league records if any are
 missing (admin page, "League records — fill in a basho"): it needs that
 basho's Results, which the roll-over clears. Then roll the Sheet over (admin
-page: start the new basho). Keeper leagues whose deadline has passed close at
-the next hourly import after that; the re-draft draws its pool from the
-banzuke of the basho in `Meta`.
+page: start the new basho). After that a keeper league closes within five
+minutes of its draft day (the keeper clock), and the re-draft draws its pool
+from the banzuke of the basho in `Meta`.
 
 ## Two backends, one switch (October 2026)
 

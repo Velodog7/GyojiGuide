@@ -192,6 +192,10 @@ async function keepers(make) {
   await H.post({ action: 'setKeeperDeadline', handle: 'mika', auth: 'h2', id, deadline: due });
   await H.post({ action: 'setKeeperDeadline', handle: 'sean', auth: 'h1', id, deadline: due });
   await H.get({ action: 'leagues', handle: 'mika' });
+  // draft day: the draft date and the deadline are one setting, and the clock leaves a future one alone
+  await H.post({ action: 'setDraftDate', handle: 'sean', auth: 'h1', id, draftDate: due });
+  await H.post({ action: 'agreeDraftDate', handle: 'mika', auth: 'h2', id, agree: true });
+  await H.fn('keeperClock');
   // closing before the new basho is started is refused, with nothing cut
   await H.post({ action: 'closeKeeperWindow', handle: 'sean', auth: 'h1', id });
   await H.post({ action: 'adminResetBasho', adminKey: ADMIN, basho: 'Kyushu 2026', force: true });

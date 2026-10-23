@@ -241,5 +241,66 @@ console.log('\nthe league without limits');
   });
 }
 
+console.log('\ndraft day: while declarations are open, the draft date is when keepers lock');
+{
+  const ctx = makeCtx(base(), { banzuke: NEXT });
+  setCell(ctx, 13, '2026-09-10T23:00:00.000Z'); setCell(ctx, 14, '{"sean":true,"ace":true}');   // the first draft's, long past
+  ctx.openKeeperWindow(sean(ctx));
+  t('opening declarations clears the first draft’s old date and its agreement', () => {
+    const lg = ctx.leagueDetail('lgK', 'ace').league;
+    assert.strictEqual(lg.draftDate, ''); assert.strictEqual(lg.draftAgreedCount, 0);
+  });
+  const when = inDays(4);
+  const r = ctx.setDraftDate(sean(ctx, { draftDate: when }));
+  t('setting the draft date sets the keeper deadline too', () => {
+    assert.ok(r.ok, JSON.stringify(r));
+    assert.strictEqual(L(ctx).keepDeadline, when);
+    assert.strictEqual(ctx.keeperState('lgK', 'ace').deadline, when);
+  });
+  t('members can still agree to it', () => {
+    assert.ok(ctx.agreeDraftDate({ handle:'ace', auth:'h1', id:'lgK', agree:true }).ok);
+    assert.strictEqual(ctx.leagueDetail('lgK', 'sean').league.draftAgreedCount, 2);
+  });
+  t('moving the keeper deadline moves the draft date with it, and asks everyone again', () => {
+    const moved = inDays(5);
+    assert.ok(ctx.setKeeperDeadline(sean(ctx, { deadline: moved })).ok);
+    const lg = ctx.leagueDetail('lgK', 'sean').league;
+    assert.strictEqual(lg.draftDate, moved);
+    assert.strictEqual(lg.draftAgreedCount, 1);                      // the commissioner, who proposed it
+  });
+  t('a draft date too soon is refused, with nothing changed', () => {
+    const before = L(ctx).keepDeadline;
+    const r2 = ctx.setDraftDate(sean(ctx, { draftDate: new Date(Date.now() + 60000).toISOString() }));
+    assert.ok(!r2.ok, JSON.stringify(r2));
+    assert.strictEqual(L(ctx).keepDeadline, before);
+    assert.strictEqual(ctx.leagueDetail('lgK', 'sean').league.draftDate, before);
+  });
+  t('clearing the draft date clears the deadline', () => {
+    assert.ok(ctx.setDraftDate(sean(ctx, { draftDate: '' })).ok);
+    assert.strictEqual(L(ctx).keepDeadline, '');
+  });
+}
+{
+  const ctx = makeCtx(base(), { banzuke: NEXT });
+  const r = ctx.setDraftDate(sean(ctx, { draftDate: inDays(3) }));
+  t('outside declarations the draft date is only a date: no keeper deadline', () => {
+    assert.ok(r.ok, JSON.stringify(r));
+    assert.strictEqual(L(ctx).keepDeadline || '', '');
+  });
+}
+
+console.log('\nthe keeper clock (every few minutes, not just hourly)');
+{
+  const ctx = makeCtx(base(), { banzuke: NEXT });
+  ctx.openKeeperWindow(sean(ctx, { deadline: inDays(1) }));
+  rollOver(ctx);
+  ctx.keeperClock();
+  t('it leaves a window whose deadline is still ahead', () => assert.strictEqual(L(ctx).draftStatus, 'keepers'));
+  setCell(ctx, 23, new Date(Date.now() - 60000).toISOString());
+  ctx.keeperClock();
+  t('and closes it once the deadline passes, without waiting for the hourly import', () =>
+    assert.strictEqual(L(ctx).draftStatus, 'redraft'));
+}
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
