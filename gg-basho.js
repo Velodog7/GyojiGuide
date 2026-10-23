@@ -27,7 +27,15 @@
      ranks aren't known before it. */
   var SCHEDULE = [
     { name:"Aki 2026",    venue:"Tokyo",   banzuke:"2026-08-31T06:00:00+09:00", start:"2026-09-13T00:00:00+09:00", end:"2026-09-27T23:59:59+09:00" },
-    { name:"Kyushu 2026", venue:"Fukuoka", banzuke:"2026-10-26T06:00:00+09:00", start:"2026-11-08T00:00:00+09:00", end:"2026-11-22T23:59:59+09:00" }
+    { name:"Kyushu 2026", venue:"Fukuoka", banzuke:"2026-10-26T06:00:00+09:00", start:"2026-11-08T00:00:00+09:00", end:"2026-11-22T23:59:59+09:00" },
+    /* 2027, from the JSA's annual schedule. Hatsu's banzuke comes out early,
+       before the New Year holidays, not on the usual Monday 13 days before. */
+    { name:"Hatsu 2027",  venue:"Tokyo",   banzuke:"2026-12-21T06:00:00+09:00", start:"2027-01-10T00:00:00+09:00", end:"2027-01-24T23:59:59+09:00" },
+    { name:"Haru 2027",   venue:"Osaka",   banzuke:"2027-03-01T06:00:00+09:00", start:"2027-03-14T00:00:00+09:00", end:"2027-03-28T23:59:59+09:00" },
+    { name:"Natsu 2027",  venue:"Tokyo",   banzuke:"2027-04-26T06:00:00+09:00", start:"2027-05-09T00:00:00+09:00", end:"2027-05-23T23:59:59+09:00" },
+    { name:"Nagoya 2027", venue:"Nagoya",  banzuke:"2027-06-28T06:00:00+09:00", start:"2027-07-11T00:00:00+09:00", end:"2027-07-25T23:59:59+09:00" },
+    { name:"Aki 2027",    venue:"Tokyo",   banzuke:"2027-08-30T06:00:00+09:00", start:"2027-09-12T00:00:00+09:00", end:"2027-09-26T23:59:59+09:00" },
+    { name:"Kyushu 2027", venue:"Fukuoka", banzuke:"2027-11-01T06:00:00+09:00", start:"2027-11-14T00:00:00+09:00", end:"2027-11-28T23:59:59+09:00" }
   ];
 
   /* How long a finished basho keeps the strip after the last bout: long enough
