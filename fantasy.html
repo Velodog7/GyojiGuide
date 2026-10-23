@@ -2925,8 +2925,20 @@ async function renderKeepers(lg, meCommish){
     return;
   }
 
+  /* The finished basho's table stays up through the roll-over: declarations
+     and the re-draft are when people most want to look back at it, and the
+     commissioner has to see what everyone else sees. */
+  const lastBoard = () => (lg.lastBasho && lg.lastBasho.entries && lg.lastBasho.entries.length)
+    ? keeperFinalHTML(lg, lg.lastBasho, lg.members || []) : "";
+  const wireLastBoard = () => el.querySelectorAll(".lg-kpfinal .lg-team-row").forEach(row=>{
+    const ex = row.querySelector(".lg-team-expand"); if (!ex) return;
+    row.style.cursor = "pointer";
+    row.onclick = () => { ex.hidden = !ex.hidden; };
+  });
+
   if (lg.draftStatus === "keepers") {
-    el.innerHTML = `<div class="lg-draftroom"><h4>Keeper declarations <span class="lg-rm-window open">end of basho</span></h4><div id="keepBody">${ggSpinner('Loading your roster','sm')}</div></div>`;
+    el.innerHTML = `<div class="lg-draftroom"><h4>Keeper declarations <span class="lg-rm-window open">end of basho</span></h4><div id="keepBody">${ggSpinner('Loading your roster','sm')}</div></div>${lastBoard()}`;
+    wireLastBoard();
     await renderKeeperWindow(lg);
     if (keepPollTimer) clearInterval(keepPollTimer);
     keepPollTimer = setInterval(()=>renderKeeperWindow(lg), 5000);
@@ -2934,7 +2946,8 @@ async function renderKeepers(lg, meCommish){
   }
 
   if (lg.draftStatus === "redraft") {
-    el.innerHTML = `<div class="lg-draftroom"><h4>Supplemental re-draft <span class="lg-rm-window open">new banzuke</span></h4><div id="redraftBody">${ggSpinner('Loading the re-draft','sm')}</div></div>`;
+    el.innerHTML = `<div class="lg-draftroom"><h4>Supplemental re-draft <span class="lg-rm-window open">new banzuke</span></h4><div id="redraftBody">${ggSpinner('Loading the re-draft','sm')}</div></div>${lastBoard()}`;
+    wireLastBoard();
     rdSel = ""; rdSending = false; rdMsg = ""; rdSig = ""; rdFilter = "";
     await renderRedraft(lg);
     if (redraftPollTimer) clearInterval(redraftPollTimer);
