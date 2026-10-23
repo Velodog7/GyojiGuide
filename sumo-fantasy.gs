@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-10-22-supabase';
+var BACKEND_VERSION = '2026-10-22-lineups';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -868,6 +868,10 @@ function leagueDetail(id, handle){
        cleared by the roll-over, so this record is the only thing the standings
        board can be drawn from once Kyushu opens. */
     lastBasho: L.mode === 'keepers' ? keeperHistoryFor_(id) : null,
+    /* The lineups this basho is being (or was) scored with. The standings
+       board must use these, not the roster, which can change once the lock
+       lifts. null until the first bout is in. */
+    played: L.mode === 'keepers' ? playedForBoard_(id) : null,
     members:mem, messages:msgs };
 }
 
@@ -1539,6 +1543,12 @@ function tournamentActive(){
   var meta = readMeta();
   var results = readResults();
   return results.length > 0 && Number(meta.lastDay || 0) < 15;
+}
+/* Keeper lineups stay locked a little longer than that: until the last day's
+   results have all come in. tournamentActive() lets go when the FIRST day-15
+   bout imports, which left the last afternoon open to a late swap. */
+function lineupsLocked_(){
+  return readResults().length > 0 && !bashoResultsSettled_(readMeta());
 }
 
 /* The three roster numbers, normalised in one place so the draft, the roster
@@ -2403,10 +2413,12 @@ function setActive(body){
   var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
   if (L.mode !== 'keepers' || L.draftStatus !== 'complete') return { ok:false, error:'Set your lineup once the keeper draft is complete.' };
   if (tournamentActive()) return { ok:false, error:'Lineups are locked once the tournament starts.' };
+  if (lineupsLocked_()) return { ok:false, error:'Lineups unlock once the last day’s results are all in.' };
   var cap = Number(L.rosterSize) || 6;
   var wanted = {}; (Array.isArray(body.active) ? body.active : []).forEach(function(n){ wanted[String(n).toLowerCase()] = 1; });
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
+    recordLineups_(L.id);                      // the basho's lineup goes on record before any change
     var sh = sh_(SHEET_ROSTERS), v = sh.getDataRange().getValues(), key = u.handle.toLowerCase();
     var mine = [];
     for (var r=1;r<v.length;r++){
@@ -2471,6 +2483,7 @@ function respondTrade(body){
     var fromHandle = String(v[r][2]), toHandle = String(v[r][3]);
     var lock = LockService.getScriptLock(); lock.waitLock(20000);
     try {
+      recordLineups_(leagueId);
       for (var i=0;i<offer.length;i++){ var o = whoOwns(leagueId, offer[i]); if (!o || o.handle.toLowerCase()!==fromHandle.toLowerCase()) return { ok:false, error: offer[i] + ' is no longer available to trade.' }; }
       for (var j=0;j<request.length;j++){ var w = whoOwns(leagueId, request[j]); if (!w || w.handle.toLowerCase()!==toHandle.toLowerCase()) return { ok:false, error: request[j] + ' is no longer available to trade.' }; }
       offer.forEach(function(name){ var o = whoOwns(leagueId, name); sh_(SHEET_ROSTERS).getRange(o.row, 2).setValue(toHandle); });
@@ -2492,6 +2505,7 @@ function addDrop(body){
   if (!drop || !add) return { ok:false, error:'Pick both a wrestler to drop and one to add.' };
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
+    recordLineups_(L.id);
     var owned = whoOwns(L.id, drop);
     if (!owned || owned.handle.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'You don\u2019t own ' + drop + '.' };
     if (whoOwns(L.id, add)) return { ok:false, error: add + ' is already owned in this league.' };
@@ -3370,6 +3384,7 @@ function closeKeeperWindow(body){
 
   var lock = LockService.getScriptLock(); lock.waitLock(25000);
   try {
+    recordLineups_(L.id);                      // before the cuts empty anyone's roster
     var cut = applyKeeperCuts_(L);
     deleteRowsWhere_(SHEET_KEEPS, 0, String(L.id));
     var res = startSupplementalDraft_(L);
@@ -4023,11 +4038,11 @@ function championScopesFor_(basho, tiers){
     var model = modelCache[ck] || (modelCache[ck] = serverScoreModel_(scoring, tiers));
     var members = membersOf(id), entries = [];
     if (mode === 'keepers'){
-      var rosters = keeperRostersOf(id);
+      var lineups = lineupsFor_(leagueRow(id), basho);   // the lineups that played
       members.forEach(function(mh){
-        var ros = rosters[mh.toLowerCase()];
-        if (!ros || !ros.active.length) return;          // no lineup set, no title shot
-        entries.push({ handle:mh, score:serverTeamScore_(ros.active, model) });
+        var lu = lineups[mh.toLowerCase()];
+        if (!lu || !lu.active.length) return;            // no lineup set, no title shot
+        entries.push({ handle:mh, score:serverTeamScore_(lu.active, model) });
       });
     } else {
       var teams = leagueTeamsOf(id);
@@ -4080,10 +4095,9 @@ function awardChampions_(basho, tiers){
    so the readout survives the roll-over and every basho after it accumulates
    rather than replacing the last.
 
-   It scores off ros.active UNCLAMPED, deliberately: championScopesFor_ does
-   the same, and a snapshot that disagreed with the trophy it was minted
-   beside would be worse than no snapshot at all. If the lineup cap needs
-   enforcing it has to be enforced in both places or neither.            */
+   It scores the lineups that played (lineupsFor_), exactly as
+   championScopesFor_ does, because a snapshot that disagreed with the trophy
+   it was minted beside would be worse than no snapshot at all.          */
 var SHEET_KPHIST = 'KeeperHistory';
 var KPHIST_HEAD = ['id', 'basho', 'leagueId', 'leagueName', 'handle', 'pos', 'score',
                    'wins', 'bonus', 'extras', 'entrants', 'active', 'bench', 'benchPts', 'savedAt'];
@@ -4093,6 +4107,104 @@ function kpHistSheet_(){ return ensureSheet(SpreadsheetApp.getActiveSpreadsheet(
    page load and every draft poll; routing those through ensureSheet() is the
    mistake boardSheetIfAny_ exists to remember. */
 function kpHistSheetIfAny_(){ return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_KPHIST); }
+
+/* ---- the lineups that played -------------------------------------------------
+   A keeper lineup is locked while the basho is fought, but nothing remembered
+   it. The standings board, the title and the basho record all scored the
+   finished basho off each team's lineup AT THE TIME OF READING, and the lock
+   lifted the moment the first day-15 bout imported. So a lineup changed on
+   the last afternoon, or set for the next basho, rewrote the result of the
+   one just fought: at Aki 2026 a league's winner changed weeks after both
+   players had agreed who won.
+
+   So each lineup is written down while it is locked, once per basho per
+   team, and everything that scores that basho reads it from here. WHO counts
+   is decided in one place, lineupOf_, by the standings board's own rule:
+   Makuuchi men marked active, in roster order, up to the lineup size.     */
+var SHEET_LINEUPS = 'KeeperLineups';
+var LINEUP_HEAD = ['leagueId', 'basho', 'handle', 'active', 'held', 'savedAt'];
+
+function lineupOf_(ros, L){
+  ros = ros || { makuuchi:[], juryo:[], active:[] };
+  var on = {}, inLineup = {};
+  (ros.active || []).forEach(function(n){ on[String(n).toLowerCase()] = 1; });
+  var active = (ros.makuuchi || []).filter(function(n){ return on[String(n).toLowerCase()]; })
+                                   .slice(0, rosterPlan(L).active);
+  active.forEach(function(n){ inLineup[String(n).toLowerCase()] = 1; });
+  var held = [].concat(ros.makuuchi || [], ros.juryo || [])
+               .filter(function(n){ return !inLineup[String(n).toLowerCase()]; });
+  return { active: active, held: held };
+}
+
+/* { handle(lower): {active, held} } on record for one league and basho.
+   A read path, so it never creates the sheet. */
+function playedLineups_(leagueId, basho){
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LINEUPS); if (!sh) return {};
+  var v = sh.getDataRange().getValues(), out = {};
+  for (var r = 1; r < v.length; r++){
+    if (String(v[r][0]) !== String(leagueId) || String(v[r][1]) !== String(basho)) continue;
+    var a = [], h = [];
+    try { a = JSON.parse(v[r][3] || '[]'); } catch (e) {}
+    try { h = JSON.parse(v[r][4] || '[]'); } catch (e) {}
+    out[String(v[r][2]).toLowerCase()] = { active: a, held: h };
+  }
+  return out;
+}
+
+/* Every member's lineup for a basho: the one on record, else the roster's
+   now (a basho fought before the record existed). */
+function lineupsFor_(L, basho){
+  var played = playedLineups_(L.id, basho), rosters = keeperRostersOf(L.id), out = {};
+  membersOf(L.id).forEach(function(mh){
+    var k = mh.toLowerCase();
+    out[k] = played[k] || lineupOf_(rosters[k], L);
+  });
+  return out;
+}
+
+/* The current basho's lineups on record, shaped for the standings board, or
+   null before there are any. */
+function playedForBoard_(leagueId){
+  var basho = String(readMeta().basho || '').trim(); if (!basho) return null;
+  var p = playedLineups_(leagueId, basho), active = {}, any = false;
+  Object.keys(p).forEach(function(k){ active[k] = p[k].active; any = true; });
+  return any ? { basho: basho, active: active } : null;
+}
+
+/* Write down the lineups of every keeper league (or just one), once per basho
+   per team. The hourly import calls this while a basho is being fought, which
+   is when lineups are locked; and anything that changes a roster calls it
+   first, so no change can get in ahead of the record. Nothing to do between
+   basho, or once the basho is ranked and its record closed.
+   CALLER HOLDS THE SCRIPT LOCK. */
+function recordLineups_(onlyLeagueId){
+  if (!readResults().length) return 0;
+  var meta = readMeta(), basho = String(meta.basho || '').trim();
+  if (!basho || String(meta.rankedBasho || '') === basho) return 0;
+  var sh = ensureSheet(SpreadsheetApp.getActiveSpreadsheet(), SHEET_LINEUPS, LINEUP_HEAD);
+  var v = sh.getDataRange().getValues(), have = {}, r;
+  for (r = 1; r < v.length; r++)
+    if (String(v[r][1]) === basho) have[String(v[r][0]) + '|' + String(v[r][2]).toLowerCase()] = 1;
+  var lv = sh_(SHEET_LEAGUES).getDataRange().getValues(), rows = [], now = new Date().toISOString();
+  for (r = 1; r < lv.length; r++){
+    var id = String(lv[r][0] || ''); if (!id) continue;
+    if (onlyLeagueId && id !== String(onlyLeagueId)) continue;
+    if (String(lv[r][5] || 'classic') !== 'keepers') continue;
+    var L = leagueRow(id), rosters = keeperRostersOf(id);
+    membersOf(id).forEach(function(mh){
+      if (have[id + '|' + mh.toLowerCase()]) return;
+      var lu = lineupOf_(rosters[mh.toLowerCase()], L);
+      if (!lu.active.length && !lu.held.length) return;     // no roster yet
+      rows.push([id, basho, mh, JSON.stringify(lu.active), JSON.stringify(lu.held), now]);
+    });
+  }
+  if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, LINEUP_HEAD.length).setValues(rows);
+  return rows.length;
+}
+function recordLineupsLocked_(){
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try { return recordLineups_(); } finally { unlock_(lock); }
+}
 
 /* One league's members, scored and placed, with the per-rikishi rows. */
 function keeperSnapshotFor_(basho, tiers){
@@ -4105,17 +4217,13 @@ function keeperSnapshotFor_(basho, tiers){
     var ck = JSON.stringify(scoring);
     var model = modelCache[ck] || (modelCache[ck] = serverScoreModel_(scoring, tiers));
 
-    var rosters = keeperRostersOf(id), entries = [];
+    var lineups = lineupsFor_(leagueRow(id), basho), entries = [];
     membersOf(id).forEach(function(mh){
-      var ros = rosters[mh.toLowerCase()];
-      if (!ros || !ros.active.length) return;            // no lineup set, no entry
-      var aset = {};
-      ros.active.forEach(function(n){ aset[String(n).toLowerCase()] = 1; });
-      var held = [].concat(ros.makuuchi || [], ros.juryo || [])
-                   .filter(function(n){ return !aset[String(n).toLowerCase()]; });
+      var lu = lineups[mh.toLowerCase()];
+      if (!lu || !lu.active.length) return;              // no lineup set, no entry
 
-      var a = serverTeamRows_(listToTeam_(ros.active), model, tiers);
-      var b = serverTeamRows_(listToTeam_(held), model, tiers);
+      var a = serverTeamRows_(listToTeam_(lu.active), model, tiers);
+      var b = serverTeamRows_(listToTeam_(lu.held), model, tiers);
       var raw = 0, bon = 0, ex = 0;
       a.rows.forEach(function(x){
         raw += x.wins; bon += x.bonus;
@@ -4510,6 +4618,7 @@ function applyBashoRanking(basho, tiers){
        board. It runs inside the same lock, before the rankedBasho guard is
        set, and is idempotent — so a run that dies half-way is safe to repeat. */
     var champs = { awarded:0 };
+    try { recordLineups_(); } catch (e) {}    // normally on record since day 1; a no-op then
     try { champs = awardChampions_(basho, tierMapFor_(basho, tiers)); }
     catch (e){ champs = { awarded:0, error:String(e) }; }   // never lose a ranking over a trophy
 
@@ -4656,6 +4765,11 @@ function refreshResults() {
     setMeta_('lastImport', startedAt);
     setMeta_('lastImportAdded', addedRows);
   } catch (e3) {}
+
+  /* A basho being fought? Its keeper lineups go on record, once per team, so
+     nothing done after the lock lifts can re-score it. */
+  try { recordLineupsLocked_(); }
+  catch (e4) {}
 
   /* Basho over? Snapshot everyone. Self-guarding (day 15, once per basho), so
      calling it on every tick costs one Meta read while the basho is running. */

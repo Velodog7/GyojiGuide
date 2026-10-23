@@ -161,12 +161,13 @@ console.log('\nwhat gets written down');
     assert.strictEqual(String(find(ctx, 'lgA', 'ace')[3]), 'Stable Wars');
   });
 
-  /* ace: Fujinokawa 2 wins over Yokozuna at S = 2 steps each = 4 bonus, +5 sanshō;
-     Kazuma 1 win. 3 wins + 4 + 5 = 12. */
+  /* ace: Fujinokawa 2 wins over Yokozuna at S = 2 steps each = 4 bonus, +5 sanshō.
+     2 wins + 4 + 5 = 11. Kazuma is marked active too, but he is Jūryō: farm,
+     never lineup, which is how the standings board has always counted him. */
   t('the score is wins, upset bonus and the extras, itemised', () => {
     const r = find(ctx, 'lgA', 'ace');
-    assert.strictEqual(Number(r[6]), 12, 'score');
-    assert.strictEqual(Number(r[7]), 3,  'raw wins');
+    assert.strictEqual(Number(r[6]), 11, 'score');
+    assert.strictEqual(Number(r[7]), 2,  'raw wins');
     assert.strictEqual(Number(r[8]), 4,  'bonus');
     assert.strictEqual(Number(r[9]), 5,  'extras');
   });
@@ -175,16 +176,21 @@ console.log('\nwhat gets written down');
        exactly how a bug here would hide */
     const r = find(ctx, 'lgA', 'ace');
     const rows = JSON.parse(r[11]);
-    assert.strictEqual(rows.reduce((s,x)=>s+x.wins, 0), 3);
+    assert.strictEqual(rows.reduce((s,x)=>s+x.wins, 0), 2);
   });
   t('every active man is a row, with his tier as he was ranked THAT basho', () => {
     const rows = JSON.parse(find(ctx, 'lgA', 'ace')[11]);
     const byName = {}; rows.forEach(x => byName[x.name] = x);
-    assert.strictEqual(rows.length, 2, JSON.stringify(rows.map(x=>x.name)));
+    assert.strictEqual(rows.length, 1, JSON.stringify(rows.map(x=>x.name)));
     assert.strictEqual(byName.Fujinokawa.tier, 'S');
     assert.strictEqual(byName.Fujinokawa.bonus, 4);
     assert.strictEqual(byName.Fujinokawa.sansho, true);
-    assert.strictEqual(byName.Kazuma.tier, 'J');
+  });
+  t('a Jūryō man marked active is farm, not lineup, as the standings board counts him', () => {
+    const bench = JSON.parse(find(ctx, 'lgA', 'ace')[12]);
+    const kazuma = bench.find(x => x.name === 'Kazuma');
+    assert.ok(kazuma, JSON.stringify(bench.map(x=>x.name)));
+    assert.strictEqual(kazuma.tier, 'J');
   });
   t('the bench is kept too, as what it would have scored', () => {
     const r = find(ctx, 'lgA', 'bob');
@@ -200,7 +206,7 @@ console.log('\nwhat gets written down');
 
   t('placings are the standings order, and entrants counts the league', () => {
     const ace = find(ctx, 'lgA', 'ace'), bob = find(ctx, 'lgA', 'bob');
-    assert.strictEqual(Number(ace[5]), 1, 'ace 12 should lead');
+    assert.strictEqual(Number(ace[5]), 1, 'ace 11 should lead');
     assert.strictEqual(Number(bob[5]), 2);
     assert.strictEqual(Number(ace[10]), 2, 'two entrants, cid set no lineup');
   });
@@ -280,7 +286,7 @@ console.log('\nreading it back');
     assert.strictEqual(h.basho, 'Aki 2026');
     assert.strictEqual(h.entrants, 2);
     assert.strictEqual(JSON.stringify(h.entries.map(e => e.handle)), '["ace","bob"]');
-    assert.strictEqual(h.entries[0].score, 12);
+    assert.strictEqual(h.entries[0].score, 11);
   });
   t('the read hands back parsed rows, not JSON text', () => {
     const e = ctx.keeperHistoryFor_('lgA').entries[0];
@@ -324,8 +330,8 @@ console.log('\nit survives the roll-over, which is the whole point');
   ctx.__store.Results.rows = [['day','division','east','west','winner','kimarite']];
   t('the record still reads after Results is cleared', () => {
     const h = ctx.keeperHistoryFor_('lgA');
-    assert.strictEqual(h.entries[0].score, 12);
-    assert.strictEqual(h.entries[0].active.length, 2);
+    assert.strictEqual(h.entries[0].score, 11);
+    assert.strictEqual(h.entries[0].active.length, 1);
   });
   t('recomputing from the sheet would now give zero — which is why it is stored', () => {
     const model = ctx.serverScoreModel_(ctx.parseScoring(SCORING), ctx.tierMapFor_('Aki 2026', null));

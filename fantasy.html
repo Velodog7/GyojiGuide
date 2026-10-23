@@ -2008,6 +2008,7 @@ async function renderLeague(){
     lg.members = d.members || []; lg.messages = d.messages || [];
     lg.champion = d.champion || null;
     lg.lastBasho = d.lastBasho || null;   // the stored record of the last finished basho (keepers)
+    lg.played = d.played || null;         // the lineups this basho is scored with (keepers)
     if (d.league) { lg.mode = d.league.mode || lg.mode || "classic"; lg.rosterSize = d.league.rosterSize;
       lg.benchSize = d.league.benchSize; lg.farmSize = d.league.farmSize; lg.draftStatus = d.league.draftStatus;
       lg.scoring = d.league.scoring || null; lg.draftDate = d.league.draftDate || "";
@@ -2607,12 +2608,18 @@ function keeperStandingsHTML(lg, members){
   const phase = !model.started ? "not started"
               : model.lastDay >= 15 ? "final"
               : "Day " + model.lastDay + " of 15";
+  /* Once the basho's first bout is in, its lineups are on record, and those
+     are what it scores: a roster can change once the lock lifts, and a basho
+     already fought must not re-score with the change. */
+  const played = (lg.played && lg.played.basho === model.basho) ? lg.played.active : null;
   const ranked = members.map(m=>{
     const r = m.roster || { makuuchi:[], juryo:[], active:[] };
     const aset = new Set((r.active||[]).map(x=>String(x).toLowerCase()));
-    /* whatever the member actually has starting, capped by the league's plan so a
-       stale lineup can't out-score a legal one */
-    const active = (r.makuuchi||[]).filter(n=>aset.has(String(n).toLowerCase())).slice(0, planOf(lg).active);
+    const rec = played && played[String(m.handle).toLowerCase()];
+    /* otherwise whatever the member actually has starting, capped by the
+       league's plan so a stale lineup can't out-score a legal one */
+    const active = rec ? rec.slice(0, planOf(lg).active)
+      : (r.makuuchi||[]).filter(n=>aset.has(String(n).toLowerCase())).slice(0, planOf(lg).active);
     const team = {}; active.forEach((n,i)=>{ team["a"+i] = n; });
     const s = teamScore(team, model);
     return { ...m, active, pts:s.pts, rows:s.rows };

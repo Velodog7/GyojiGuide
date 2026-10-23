@@ -169,6 +169,19 @@ record must carry BOTH answers and show them:
   deadline. `setInterval` returns a number, so the period lives in
   `draftPollMs`, not on the timer.
 
+### Score a keeper basho from the lineups that played
+
+A roster can change once the basho's lock lifts, so never score a basho from
+`keeperRostersOf()` directly. `recordLineups_()` writes each team's lineup to
+`KeeperLineups` once per basho: the hourly import does it while the basho is
+fought, and anything that changes a roster calls it first. `lineupsFor_()` is
+what the title, the basho record and (via `leagueDetail.played`) the standings
+board read. Who counts is `lineupOf_()`: Makuuchi men marked active, in roster
+order, up to `rosterSize`, which is the board's own rule; Jūryō is farm. Lineups
+stay locked until the last day's results have all come in (`lineupsLocked_`),
+not just until the first day-15 bout. At Aki 2026 a lineup set after the basho
+moved a league's title weeks later. `lineups.js` pins all of it.
+
 ### Keep writes off read paths
 
 `draftState` is polled every ~4s during a live draft and `leagueDetail` on every
