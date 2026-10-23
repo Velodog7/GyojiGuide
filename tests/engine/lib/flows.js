@@ -187,7 +187,18 @@ async function keepers(make) {
   await H.post({ action: 'declareKeepers', handle: 'sean', auth: 'h1', id, keep: [rosterOf('sean').makuuchi[1] || MAK[0]] });
   await H.post({ action: 'declareKeepers', handle: 'mika', auth: 'h2', id, keep: [MAK[0], MAK[1], MAK[2]] });
   await H.get({ action: 'keeperState', id, handle: 'sean' });
+  // the deadline: only the commissioner sets it; the leagues list carries it
+  const due = new Date(H.clock.now + 2 * 86400000).toISOString();
+  await H.post({ action: 'setKeeperDeadline', handle: 'mika', auth: 'h2', id, deadline: due });
+  await H.post({ action: 'setKeeperDeadline', handle: 'sean', auth: 'h1', id, deadline: due });
+  await H.get({ action: 'leagues', handle: 'mika' });
+  // closing before the new basho is started is refused, with nothing cut
   await H.post({ action: 'closeKeeperWindow', handle: 'sean', auth: 'h1', id });
+  await H.post({ action: 'adminResetBasho', adminKey: ADMIN, basho: 'Kyushu 2026', force: true });
+  await H.get({ action: 'keeperState', id, handle: 'mika' });
+  const closed = (await H.post({ action: 'closeKeeperWindow', handle: 'sean', auth: 'h1', id })).json;
+  if (!closed || !closed.ok) H.failures.push('the keeper window did not close after the roll-over: ' + JSON.stringify(closed));
+  await H.get({ action: 'leagueHistory', id });
   await H.post({ action: 'openRedraft', handle: 'sean', auth: 'h1', id });
   await H.post({ action: 'redraftState', id });
   await H.post({ action: 'redraftPick', handle: 'mika', auth: 'h2', id, rikishi: JUR[9] });
@@ -244,7 +255,7 @@ function randomPhase(seedBase, steps) {
       'deleteBoardMessage', 'voteBoardMessage', 'feedback', 'logPageview', 'requestPinReset', 'dmSend', 'dmMarkRead', 'dmDelete',
       'adminUsers', 'adminWarnUser', 'adminBanUser', 'adminUnbanUser', 'adminResetPin', 'adminDmSend', 'adminDeleteMessage',
       'adminEditBoardMessage', 'adminDeleteBoardMsg', 'adminSetFeedbackStatus', 'adminDeleteFeedback', 'adminBroadcast'];
-    const GETS = ['data', 'list', 'results', 'leagues', 'league', 'invite', 'history', 'draftState', 'keeperState', 'trades',
+    const GETS = ['data', 'list', 'results', 'leagues', 'league', 'invite', 'history', 'draftState', 'keeperState', 'trades', 'leagueHistory',
       'board', 'accountSummary', 'dmThreads', 'dmUnread', 'whatsNew', 'dmDirectory', 'version'];
     for (let i = 0; i < steps; i++) {
       const h = pick(handles), auth = rnd() < 0.85 ? (AUTH[h] || 'zz') : 'wrong';

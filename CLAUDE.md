@@ -19,7 +19,7 @@ This file is the stuff that is easy to get wrong.
 
 | | |
 |---|---|
-| Pages | `index.html` (home), `analysis.html`, `dohyo.html`, `fantasy.html`, `admin.html`, `banzuke.html` (legacy) |
+| Pages | `index.html` (home), `analysis.html`, `dohyo.html`, `fantasy.html`, `history.html` (league history), `admin.html`, `banzuke.html` (legacy) |
 | Shared modules | `gg-config.js` (the `/exec` URL, one place), `gg-account.js`, `gg-nav.js`, `gg-auth.js`, `gg-roster.js`, `gg-dossier.js`, `gg-banzuke.js`, `gg-mawashi.js` |
 | Backend logic | `sumo-fantasy.gs`, one file, ~240 KB. The only place game rules live. |
 | Backend runtime | `supabase/functions/api/`: `index.ts` (routes), `engine.js` (Apps Script on Postgres), `store.js`, and two generated files, `backend.js` (the .gs as a string) and `seed-sheets.js` |
@@ -185,6 +185,32 @@ moved a league's title weeks later. The re-draft's worst-first order
 survives the keeper cuts and the roll-over, else the lineups that played.
 `lineups.js` pins all of it.
 
+### The keeper deadline closes the window only after the roll-over
+
+A commissioner can give the keeper window a deadline (`Leagues` column 23,
+`keepDeadline`; set from the open-declarations control or moved later with
+`setKeeperDeadline`). At the deadline `declareKeepers` refuses, but nothing is
+cut yet: the re-draft pool is the banzuke of the basho in `Meta`, so the close
+waits for the roll-over. `closeDueKeeperWindows_()` runs at the end of each
+hourly import and closes a league only when its deadline has passed,
+`newBanzukeReady_()` holds (Meta's basho differs from `rankedBasho`) and the
+new banzuke actually reads from sumo-api. The manual close and
+`openSupplementalDraft` refuse on the same test. Undecided teams auto-keep by
+the finished basho's wins, which the roll-over saves to `Meta.lastWins` before
+it clears Results (`rikishiWins_()` falls back to it). `keepdeadline.js`.
+
+### League history
+
+`history.html?league=<id>` reads `leagueHistory`: the league's titles and
+every stored basho record, newest first. It is a read path (no sheets
+created) and holds nothing private. The basho record covers classic leagues
+too, from their league teams. A basho ranked before that has no table; the
+admin page's "fill in a basho" card back-fills one (`adminSnapshotKeepers`
+with `fill`) while that basho's Results are still on the sheet. It writes a
+league only when a title vouches for it: no title, a classic team saved after
+the title was awarded, or a winner and score that disagree with the title are
+all skipped and listed. `history.js`.
+
 ### Keep writes off read paths
 
 `draftState` is polled every ~4s during a live draft and `leagueDetail` on every
@@ -294,9 +320,12 @@ doesn't move on its own is the bundled data, so each cycle has two jobs:
    extracted to `images/rikishi/<Name>.webp` (see README). The banzuke art,
    the game and the simulator take a newcomer only once he has one.
 
-Then roll the Sheet over (admin page: start the new basho) before any keeper
-league closes its declarations: the re-draft draws its pool from the banzuke
-of the basho in `Meta`.
+Before rolling over, fill in the finished basho's league records if any are
+missing (admin page, "League records — fill in a basho"): it needs that
+basho's Results, which the roll-over clears. Then roll the Sheet over (admin
+page: start the new basho). Keeper leagues whose deadline has passed close at
+the next hourly import after that; the re-draft draws its pool from the
+banzuke of the basho in `Meta`.
 
 ## Two backends, one switch (October 2026)
 

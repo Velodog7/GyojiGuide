@@ -30,6 +30,12 @@ function cannedSumoApi(url) {
     }
     return { status: 200, text: JSON.stringify({ torikumi: bouts }) };
   }
+  /* the next basho's banzuke, so a keeper close and its re-draft can complete */
+  m = url.match(/\/api\/basho\/202611\/banzuke\/(Makuuchi|Juryo)$/);
+  if (m) {
+    const rank = m[1] === 'Makuuchi' ? 'Maegashira 1 East' : 'Juryo 1 East';
+    return { status: 200, text: JSON.stringify({ east: (m[1] === 'Makuuchi' ? MAK : JUR).map(n => ({ shikonaEn: n, rank })), west: [] }) };
+  }
   if (/rikishis\?limit=1/.test(url)) return { status: 200, text: '{"limit":1,"records":[]}' };
   return { status: 404, text: '{"error":"not found"}' };
 }

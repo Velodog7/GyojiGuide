@@ -361,7 +361,10 @@
      survives the roll-over. Pass "" for a division to clear its limit. */
   GG.setLeagueKeepers  = function (id, keepMk, keepJr){
     return GG.apiPost(authed({ action:"setLeagueKeepers", id:id, keepMk:keepMk, keepJr:keepJr })); };
-  GG.openKeeperWindow  = function (id){ return GG.apiPost(authed({ action:"openKeeperWindow", id:id })); };
+  /* deadline: an ISO time, or "" for a window the commissioner closes by hand */
+  GG.openKeeperWindow  = function (id, deadline){ return GG.apiPost(authed({ action:"openKeeperWindow", id:id, deadline: deadline || "" })); };
+  GG.setKeeperDeadline = function (id, deadline){ return GG.apiPost(authed({ action:"setKeeperDeadline", id:id, deadline: deadline || "" })); };
+  GG.leagueHistory     = function (id){ return GG.apiGetQ("leagueHistory", { id:id }); };
   GG.declareKeepers    = function (id, keep){ return GG.apiPost(authed({ action:"declareKeepers", id:id, keep: keep || [] })); };
   GG.closeKeeperWindow = function (id){ return GG.apiPost(authed({ action:"closeKeeperWindow", id:id })); };
   GG.keeperState       = function (id){ return GG.apiGetQ("keeperState", { id:id, handle:(GG.account.get()||{}).handle || "" }); };

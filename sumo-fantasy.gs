@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-10-22-redraft-order';
+var BACKEND_VERSION = '2026-10-23-keepers-history';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -244,6 +244,7 @@ function migrateLeaguesV2(sh) {
     sh.getRange(1, 20, 1, 2).setValues([['keepMk', 'keepJr']]);
   }
   ensurePausedHead_(sh);
+  ensureKeepDeadlineHead_(sh);
 }
 /* v7: the commissioner's pause. BLANK = the clock is running (every existing
    row). A number = the draft is frozen and that many milliseconds were left on
@@ -253,6 +254,21 @@ function ensurePausedHead_(sh){
   sh = sh || sh_(SHEET_LEAGUES);
   var head = sh.getRange(1, 1, 1, Math.max(22, sh.getLastColumn())).getValues()[0];
   if (String(head[21] || '').toLowerCase() !== 'draftpaused') sh.getRange(1, 22).setValue('draftPaused');
+}
+/* v8: the keeper deadline. BLANK = the window closes only by hand, which is
+   every league written before this existed. */
+var KEEP_DEADLINE_COL = 23;
+function ensureKeepDeadlineHead_(sh){
+  sh = sh || sh_(SHEET_LEAGUES);
+  var head = sh.getRange(1, 1, 1, Math.max(KEEP_DEADLINE_COL, sh.getLastColumn())).getValues()[0];
+  if (String(head[KEEP_DEADLINE_COL - 1] || '').toLowerCase() !== 'keepdeadline') sh.getRange(1, KEEP_DEADLINE_COL).setValue('keepDeadline');
+}
+/* A time in a cell as ISO, or ''. A Sheet turns an ISO string it is given
+   into a Date of its own accord, so accept either. */
+function isoCell_(c){
+  if (c === '' || c == null) return '';
+  var t = (Object.prototype.toString.call(c) === '[object Date]') ? c.getTime() : new Date(String(c)).getTime();
+  return isNaN(t) ? '' : new Date(t).toISOString();
 }
 
 // pre-regionality PageViews sheets had only [ts,page,visitorId]. Append the
@@ -308,6 +324,7 @@ function doGet(e) {
     if (action === 'history') return json({ ok: true, history: myHistory(e.parameter.handle) });
     if (action === 'draftState') return json(draftState(e.parameter.id, e.parameter.who));
     if (action === 'keeperState') return json(keeperState(e.parameter.id, e.parameter.handle));
+    if (action === 'leagueHistory') return json(leagueHistory(e.parameter.id));
     if (action === 'trades')  return json({ ok: true, trades: myTrades(e.parameter.id, e.parameter.handle) });
     if (action === 'board')   return json({ ok: true, messages: boardMessages(e.parameter.handle) });
     if (action === 'accountSummary') return json(accountSummary(e.parameter.handle));
@@ -354,6 +371,7 @@ function doPost(e) {
     if (body.action === 'setLeagueRoster')  return json(setLeagueRoster(body));
     if (body.action === 'setLeagueKeepers') return json(setLeagueKeepers(body));
     if (body.action === 'openKeeperWindow') return json(openKeeperWindow(body));
+    if (body.action === 'setKeeperDeadline') return json(setKeeperDeadline(body));
     if (body.action === 'declareKeepers')   return json(declareKeepers(body));
     if (body.action === 'closeKeeperWindow') return json(closeKeeperWindow(body));
     if (body.action === 'setLeagueScoring') return json(setLeagueScoring(body));
@@ -783,7 +801,9 @@ function leagueRow(id){
     keepMk: (v[r][19] === '' || v[r][19] == null) ? null : (Number(v[r][19]) || 0),
     keepJr: (v[r][20] === '' || v[r][20] == null) ? null : (Number(v[r][20]) || 0),
     /* null = the clock is running. A number = paused, with that many ms left. */
-    draftPaused: (v[r][21] === '' || v[r][21] == null) ? null : Math.max(0, Number(v[r][21]) || 0)
+    draftPaused: (v[r][21] === '' || v[r][21] == null) ? null : Math.max(0, Number(v[r][21]) || 0),
+    /* when an open keeper window closes itself; '' = only by hand */
+    keepDeadline: isoCell_(v[r][22])
   };
   return null;
 }
@@ -804,12 +824,22 @@ function myLeagues(handle){
   var mine = {}, k=handle.toLowerCase();
   for (var r=1;r<mem.length;r++) if (String(mem[r][1]).toLowerCase()===k) mine[String(mem[r][0])]=true;
   var lv = sh_(SHEET_LEAGUES).getDataRange().getValues(), out=[];
+  var declared = null;                         // read only if a keeper window is open somewhere
   for (var i=1;i<lv.length;i++){
     var id=String(lv[i][0]); if (!mine[id]) continue;
-    out.push({ id:id, name:String(lv[i][1]), commissioner:String(lv[i][2]),
+    var status = String(lv[i][7]||'none') || 'none';
+    var row = { id:id, name:String(lv[i][1]), commissioner:String(lv[i][2]),
       inviteCode:String(lv[i][4]||''), members:membersOf(id).length,
-      mode:String(lv[i][5]||'classic') || 'classic', draftStatus:String(lv[i][7]||'none') || 'none',
-      isCommissioner: String(lv[i][2]).toLowerCase()===k });
+      mode:String(lv[i][5]||'classic') || 'classic', draftStatus:status,
+      isCommissioner: String(lv[i][2]).toLowerCase()===k };
+    /* an open keeper window: when it closes, and whether this member has
+       declared, so the page can remind him from any tab */
+    if (status === 'keepers'){
+      if (!declared) declared = keepsOfAll_();
+      row.keepDeadline = isoCell_(lv[i][KEEP_DEADLINE_COL - 1]);
+      row.keepDeclared = !!(declared[id] && declared[id][k]);
+    }
+    out.push(row);
   }
   return { ok:true, leagues:out };
 }
@@ -857,7 +887,7 @@ function leagueDetail(id, handle){
   });
   return { ok:true, league:{ id:L.id, name:L.name, commissioner:L.commissioner, inviteCode:L.inviteCode,
     mode:L.mode, rosterSize:L.rosterSize, benchSize:L.benchSize, farmSize:L.farmSize, draftStatus:L.draftStatus,
-    keepMk:L.keepMk, keepJr:L.keepJr,
+    keepMk:L.keepMk, keepJr:L.keepJr, keepDeadline:L.keepDeadline,
     scoring:L.scoring, draftDate:L.draftDate,
     draftAgreedCount:agreedCount, draftMemberCount:mem.length,
     isCommissioner: handle && L.commissioner.toLowerCase()===handle.toLowerCase(),
@@ -3085,6 +3115,8 @@ function adminResetBasho(body){
              error:'Rank ' + was + ' first \u2014 its champions and banzuke moves haven\u2019t been applied yet.' };
   var lock = LockService.getScriptLock(); lock.waitLock(25000);
   try {
+    /* keeper windows close after this, and auto-keep by the finished basho's wins */
+    if (was) setMeta_('lastWins', JSON.stringify({ basho: was, wins: rikishiWins_() }));
     var sh = sh_(SHEET_RESULTS), last = sh.getLastRow(), cleared = Math.max(0, last - 1);
     if (cleared > 0) sh.deleteRows(2, cleared);
     setMeta_('basho',   label);
@@ -3290,10 +3322,21 @@ function keepsOf(id){
 }
 
 /* wins per rikishi across whatever is in the Results sheet — i.e. the basho
-   just finished. Used to auto-keep for anyone who doesn't declare. */
+   just finished. Used to auto-keep for anyone who doesn't declare, and shown
+   beside each name on the declaration screen.
+
+   "Start a new basho" empties Results, and that is exactly when keeper
+   windows close (the re-draft needs the new banzuke). So the roll-over puts
+   the finished basho's wins aside in Meta.lastWins first, and they are read
+   from there while Results is empty. */
 function rikishiWins_(){
+  var res = readResults();
+  if (!res.length){
+    try { var kept = JSON.parse(readMeta().lastWins || 'null'); if (kept && kept.wins) return kept.wins; } catch (e) {}
+    return {};
+  }
   var wins = {};
-  readResults().forEach(function(b){
+  res.forEach(function(b){
     var w = String(b.winner||'').toLowerCase(); if (w) wins[w] = (wins[w]||0) + 1;
   });
   return wins;
@@ -3308,12 +3351,72 @@ function openKeeperWindow(body){
   if (tournamentActive()) return { ok:false, error:'Wait until the tournament is over to set keepers.' };
   var kp = keeperPlan(L);
   if (!kp.limited) return { ok:false, error:'Set a keeper limit first \u2014 with no limit every wrestler carries over anyway.' };
+  var dl = keepDeadlineFrom_(body.deadline); if (dl.error) return { ok:false, error:dl.error };
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     deleteRowsWhere_(SHEET_KEEPS, 0, String(L.id));      // a fresh window starts clean
     sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue('keepers');
-    return { ok:true, keepMk:kp.mk, keepJr:kp.jr };
+    setKeepDeadline_(L, dl.iso);
+    return { ok:true, keepMk:kp.mk, keepJr:kp.jr, deadline:dl.iso };
   } finally { unlock_(lock); }
+}
+
+/* ---- the keeper deadline -------------------------------------------------------
+   A keeper window used to stay open until the commissioner closed it by hand,
+   and closing it before the new basho was started on the admin page re-drafted
+   from the OLD banzuke: just-promoted wrestlers missing from the pool, nobody
+   released for dropping out of it.
+
+   So a window can carry a deadline (Leagues column 23). After it, declarations
+   are refused, and the hourly import closes the window and opens the re-draft,
+   but only once the new basho is in Meta and its banzuke can be read, since
+   that is what the re-draft is drawn from (closeKeeperWindowLocked_). The
+   commissioner can still close early by hand, under the same condition. */
+function keepDeadlineFrom_(raw){
+  if (raw === undefined || raw === null || String(raw).trim() === '') return { iso:'' };
+  var t = new Date(String(raw)).getTime();
+  if (isNaN(t)) return { error:'That deadline isn\u2019t a date.' };
+  if (t < Date.now() + 10 * 60 * 1000) return { error:'Set the deadline at least ten minutes from now.' };
+  if (t > Date.now() + 45 * 24 * 3600 * 1000) return { error:'Set the deadline within the next six weeks.' };
+  return { iso:new Date(t).toISOString() };
+}
+function setKeepDeadline_(L, iso){
+  ensureKeepDeadlineHead_();
+  sh_(SHEET_LEAGUES).getRange(L.row, KEEP_DEADLINE_COL).setValue(iso || '');
+}
+function keepDeadlinePassed_(L){
+  var t = L && L.keepDeadline ? new Date(L.keepDeadline).getTime() : NaN;
+  return !isNaN(t) && Date.now() >= t;
+}
+/* The basho in Meta is the NEXT one, i.e. someone has pressed "start the new
+   basho" since the last was ranked. Until then bashoId_() still names the
+   finished basho, and a re-draft would be drawn from its banzuke. */
+function newBanzukeReady_(){
+  var m = readMeta(), b = String(m.basho || '').trim();
+  return !!b && b !== String(m.rankedBasho || '').trim();
+}
+
+/* The commissioner sets, moves or clears the deadline of an open window. */
+function setKeeperDeadline(body){
+  var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
+  var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
+  if (L.commissioner.toLowerCase() !== u.handle.toLowerCase()) return { ok:false, error:'Only the commissioner can set the deadline.' };
+  if (L.draftStatus !== 'keepers') return { ok:false, error:'Keeper declarations aren\u2019t open.' };
+  var dl = keepDeadlineFrom_(body.deadline); if (dl.error) return { ok:false, error:dl.error };
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try { setKeepDeadline_(leagueRow(L.id), dl.iso); return { ok:true, deadline:dl.iso }; }
+  finally { unlock_(lock); }
+}
+
+/* Every declaration, { leagueId: { handle(lower): true } }. Read path. */
+function keepsOfAll_(){
+  var sh = sh_(SHEET_KEEPS); if (!sh) return {};
+  var v = sh.getDataRange().getValues(), out = {};
+  for (var r = 1; r < v.length; r++){
+    var id = String(v[r][0] || ''), h = String(v[r][1] || '').toLowerCase();
+    if (id && h) (out[id] = out[id] || {})[h] = true;
+  }
+  return out;
 }
 
 /* A member declares who he is keeping. Re-declaring replaces the previous
@@ -3322,6 +3425,7 @@ function declareKeepers(body){
   var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
   var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
   if (L.draftStatus !== 'keepers') return { ok:false, error:'Keeper declarations aren\u2019t open.' };
+  if (keepDeadlinePassed_(L)) return { ok:false, closed:true, error:'Declarations have closed \u2014 the deadline has passed.' };
   if (!isMember(L.id, u.handle)) return { ok:false, error:'You\u2019re not in this league.' };
 
   var kp = keeperPlan(L);
@@ -3366,6 +3470,9 @@ function keeperState(id, handle){
   function withWins(list){ return list.map(function(n){ return { name:n, wins: wins[n.toLowerCase()] || 0 }; })
                                       .sort(function(a,b){ return b.wins - a.wins; }); }
   return { ok:true, open:true, keepMk:kp.mk, keepJr:kp.jr,
+           /* deadline '' = closes by hand only; closed = past it, declarations
+              refused; ready = the new basho is in, so the close can happen */
+           deadline: L.keepDeadline, closed: keepDeadlinePassed_(L), ready: newBanzukeReady_(),
            members: members,
            waiting: members.filter(function(m){ return !m.declared; }).length,
            mine: { makuuchi: withWins(mine.makuuchi), juryo: withWins(mine.juryo),
@@ -3383,15 +3490,51 @@ function closeKeeperWindow(body){
   if (L.draftStatus !== 'keepers') return { ok:false, error:'Keeper declarations aren\u2019t open.' };
 
   var lock = LockService.getScriptLock(); lock.waitLock(25000);
-  try {
-    recordLineups_(L.id);                      // before the cuts empty anyone's roster
-    var cut = applyKeeperCuts_(L);
-    deleteRowsWhere_(SHEET_KEEPS, 0, String(L.id));
-    var res = startSupplementalDraft_(L);
-    if (!res.ok) return res;
-    res.released = cut.released; res.autoKept = cut.autoKept;
-    return res;
-  } finally { unlock_(lock); }
+  try { return closeKeeperWindowLocked_(leagueRow(L.id)); }
+  finally { unlock_(lock); }
+}
+
+/* The close itself, by hand or on the deadline. CALLER HOLDS THE SCRIPT LOCK
+   and has decided who may do this. Everything that can refuse is checked
+   BEFORE the first write: the cuts delete roster rows, and a close that cut
+   and then failed to open the re-draft would leave the window open with its
+   declarations gone, so the next attempt would cut again. */
+function closeKeeperWindowLocked_(L){
+  if (!L || L.draftStatus !== 'keepers') return { ok:false, error:'Keeper declarations aren\u2019t open.' };
+  if (!newBanzukeReady_())
+    return { ok:false, notReady:true, error:'Start the new basho on the admin page first \u2014 the re-draft is drawn from the new banzuke.' };
+  var bz = fetchBanzukeNames(bashoId_());
+  if (!bz.makuuchi.length && !bz.juryo.length)
+    return { ok:false, notReady:true, error:'The new banzuke can\u2019t be read from sumo-api yet. Try again shortly.' };
+  recordLineups_(L.id);                        // before the cuts empty anyone's roster
+  var cut = applyKeeperCuts_(L);
+  deleteRowsWhere_(SHEET_KEEPS, 0, String(L.id));
+  setKeepDeadline_(L, '');                     // a closed window has no deadline
+  var res = startSupplementalDraft_(L);
+  if (!res.ok) return res;
+  res.released = cut.released; res.autoKept = cut.autoKept;
+  return res;
+}
+
+/* Windows past their deadline close themselves on the hourly import, once the
+   new basho is in. A window that can't close yet (no new basho, banzuke not
+   readable) is simply tried again next hour. */
+function closeDueKeeperWindows_(){
+  if (!newBanzukeReady_()) return [];
+  var lv = sh_(SHEET_LEAGUES).getDataRange().getValues(), due = [], r;
+  for (r = 1; r < lv.length; r++){
+    if (String(lv[r][7]) !== 'keepers') continue;
+    var t = new Date(isoCell_(lv[r][KEEP_DEADLINE_COL - 1]) || NaN).getTime();
+    if (!isNaN(t) && Date.now() >= t) due.push(String(lv[r][0]));
+  }
+  return due.map(function(id){
+    var lock = LockService.getScriptLock(); lock.waitLock(25000);
+    try {
+      var res = closeKeeperWindowLocked_(leagueRow(id));
+      if (res && res.ok) setMeta_('keepclosed:' + id, new Date().toISOString());
+      return { id:id, ok:!!(res && res.ok), error:(res && res.error) || '' };
+    } finally { unlock_(lock); }
+  });
 }
 
 /* The cut itself. Caller holds the script lock. */
@@ -3520,6 +3663,8 @@ function openSupplementalDraft(body){
   if (keeperPlan(L).limited)
     return { ok:false, needsKeepers:true,
              error:'Open keeper declarations first \u2014 the re-draft fills rosters back up after the cut.' };
+  if (!newBanzukeReady_())                     // see closeKeeperWindowLocked_
+    return { ok:false, notReady:true, error:'Start the new basho on the admin page first \u2014 the re-draft is drawn from the new banzuke.' };
   var lock0 = LockService.getScriptLock(); lock0.waitLock(25000);
   try { return startSupplementalDraft_(L); } finally { unlock_(lock0); }
 }
@@ -4227,32 +4372,51 @@ function recordLineupsLocked_(){
   try { return recordLineups_(); } finally { unlock_(lock); }
 }
 
-/* One league's members, scored and placed, with the per-rikishi rows. */
+/* Every league's members, scored and placed, with the per-rikishi rows: a
+   keeper league from the lineups that played, a classic league from each
+   member's league team (scored as championScopesFor_ crowns it). Classic
+   leagues joined the record in October 2026 for the league history page;
+   their standings board empties at the roll-over just as a keeper league's
+   did. The sheet keeps its old name. */
 function keeperSnapshotFor_(basho, tiers){
   var lv = sh_(SHEET_LEAGUES).getDataRange().getValues(), out = [], modelCache = {}, r;
   for (r = 1; r < lv.length; r++){
     var id = String(lv[r][0] || ''); if (!id) continue;
-    if (String(lv[r][5] || 'classic') !== 'keepers') continue;
+    var keepers = String(lv[r][5] || 'classic') === 'keepers';
     var name = String(lv[r][1] || 'League');
     var scoring = parseScoring(lv[r][11]);
     var ck = JSON.stringify(scoring);
     var model = modelCache[ck] || (modelCache[ck] = serverScoreModel_(scoring, tiers));
 
-    var lineups = lineupsFor_(leagueRow(id), basho), entries = [];
-    membersOf(id).forEach(function(mh){
-      var lu = lineups[mh.toLowerCase()];
-      if (!lu || !lu.active.length) return;              // no lineup set, no entry
-
-      var a = serverTeamRows_(listToTeam_(lu.active), model, tiers);
-      var b = serverTeamRows_(listToTeam_(lu.held), model, tiers);
+    var entries = [];
+    var entry = function(mh, team, held, updated){
+      var a = serverTeamRows_(team, model, tiers);
+      var b = held ? serverTeamRows_(listToTeam_(held), model, tiers) : { rows:[], pts:0 };
       var raw = 0, bon = 0, ex = 0;
       a.rows.forEach(function(x){
         raw += x.wins; bon += x.bonus;
         ex += (x.sansho ? scoring.sansho : 0) + (x.yusho ? scoring.yusho : 0);
       });
       entries.push({ handle:mh, score:a.pts, wins:raw, bonus:bon, extras:ex,
-                     active:a.rows, bench:b.rows, benchPts:b.pts });
-    });
+                     active:a.rows, bench:b.rows, benchPts:b.pts, updated:updated || '' });
+    };
+    if (keepers){
+      var lineups = lineupsFor_(leagueRow(id), basho);
+      membersOf(id).forEach(function(mh){
+        var lu = lineups[mh.toLowerCase()];
+        if (!lu || !lu.active.length) return;            // no lineup set, no entry
+        entry(mh, listToTeam_(lu.active), lu.held);
+      });
+    } else {
+      var teams = leagueTeamsOf(id);
+      membersOf(id).forEach(function(mh){
+        var t = teams[mh.toLowerCase()]; if (!t) return;
+        var team = {};
+        Object.keys(t.team || {}).forEach(function(k){ if (t.team[k]) team[k] = t.team[k]; });
+        if (!Object.keys(team).length) return;            // never picked, no entry
+        entry(mh, team, null, t.updated);
+      });
+    }
 
     entries.sort(function(x, y){
       return y.score - x.score || String(x.handle).toLowerCase().localeCompare(String(y.handle).toLowerCase());
@@ -4293,6 +4457,56 @@ function snapshotKeeperBasho_(basho, tiers, opts){
 
   var sh = kpHistSheet_(), v = sh.getDataRange().getValues(), had = [], r;
   for (r = 1; r < v.length; r++) if (String(v[r][1]) === basho) had.push(r + 1);
+
+  /* `fill` writes only the leagues with no record for this basho yet, and
+     leaves every existing row alone. It is for a basho fought before a league
+     kind was recorded (classic leagues, and keeper leagues ranked before the
+     record existed), so it scores from the rosters as they are NOW. That is
+     only the basho as fought if nothing has changed since, so a league is
+     written only when it has a title for the basho, no classic team was saved
+     after that title was awarded, and its computed winner and score match the
+     title; anything else is reported and skipped. A record that disagreed
+     with its own trophy would be worse than none. (A keeper lineup carries no
+     timestamp, so for a keeper league the title match is the whole check.) */
+  if (opts.fill){
+    var haveL = {};
+    for (r = 1; r < v.length; r++) if (String(v[r][1]) === basho) haveL[String(v[r][2])] = 1;
+    var called = leagueTitlesFor_(basho), keep = [], skipped = [];
+    keeperSnapshotFor_(basho, tiers).forEach(function(s){
+      if (haveL[s.leagueId] || !s.entries.length) return;
+      /* No title, no record: the league wasn't there (it was made since) or
+         had nothing to crown, and either way its teams say nothing about
+         that basho. */
+      var t = called[s.leagueId]; if (!t) return;
+      var titled = t.handles.join(', ') + ' ' + t.score;
+      /* A team saved after the title was awarded isn't the team that was
+         scored, even when the winner still comes out the same. */
+      var at = new Date(t.awardedAt).getTime();
+      var moved = s.entries.filter(function(e){
+        var u = e.updated ? new Date(String(e.updated)).getTime() : NaN;
+        return !isNaN(u) && !isNaN(at) && u > at;
+      }).map(function(e){ return e.handle; });
+      if (moved.length){
+        skipped.push({ league:s.leagueName, title:titled, now:'team changed since: ' + moved.join(', ') });
+        return;
+      }
+      var top = s.entries[0].score;
+      var won = s.entries.filter(function(e){ return e.score === top; })
+                         .map(function(e){ return String(e.handle).toLowerCase(); }).sort().join(', ');
+      if (won !== t.handles.slice().sort().join(', ') || top !== t.score){
+        skipped.push({ league:s.leagueName, title:titled, now:won + ' ' + top });
+        return;
+      }
+      keep.push(s);
+    });
+    var fillRows = keeperSnapshotRows_(basho, keep);
+    var names = keep.map(function(s){ return s.leagueName; });
+    if (!opts.apply && !opts.write)
+      return { ok:true, dryRun:true, fill:true, basho:basho, would:fillRows.length, leagues:names, skipped:skipped };
+    if (fillRows.length) sh.getRange(sh.getLastRow() + 1, 1, fillRows.length, KPHIST_HEAD.length).setValues(fillRows);
+    return { ok:true, fill:true, basho:basho, written:fillRows.length, leagues:names, skipped:skipped };
+  }
+
   if (had.length && !opts.force) return { ok:true, already:true, basho:basho, rows:had.length };
 
   var rows = keeperSnapshotRows_(basho, keeperSnapshotFor_(basho, tiers));
@@ -4346,8 +4560,81 @@ function adminSnapshotKeepers(body){
       return { ok:false, error:'No usable banzuke for ' + basho +
                ' — refusing to write a record that would zero every upset bonus.' };
     return snapshotKeeperBasho_(basho, tiers,
-      { apply: !!(body && body.apply), force: !!(body && body.force) });
+      { apply: !!(body && body.apply), force: !!(body && body.force), fill: !!(body && body.fill) });
   } finally { unlock_(lock); }
+}
+
+/* { leagueId: { handles:[lower], score, awardedAt } } for one basho's league titles. Read path. */
+function leagueTitlesFor_(basho){
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CHAMPS); if (!sh) return {};
+  var v = sh.getDataRange().getValues(), out = {};
+  for (var r = 1; r < v.length; r++){
+    if (String(v[r][1]) !== String(basho) || String(v[r][2]) !== 'league') continue;
+    var t = out[String(v[r][3])] = out[String(v[r][3])] || { handles:[], score:Number(v[r][6] || 0), awardedAt:isoCell_(v[r][10]) };
+    t.handles.push(String(v[r][5]).toLowerCase());
+  }
+  return out;
+}
+
+/* ---- league history ---------------------------------------------------------
+   Everything a league has on record, newest first: its titles (Champions) and
+   the final standings of every basho with a stored record (KeeperHistory). A
+   read path, so it never creates a sheet. Nothing here is private: titles are
+   already public in every trophy case, and a record is scores and lineups,
+   with no chat, draft boards or declarations. */
+function leagueHistory(id){
+  var L = leagueRow(id); if (!L) return { ok:false, error:'League not found.' };
+  var nameOf = {};
+  readUsers().forEach(function(u){ nameOf[u.handle.toLowerCase()] = u.name; });
+  var nm = function(h){ return nameOf[String(h).toLowerCase()] || String(h); };
+
+  var titles = [], csh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_CHAMPS), r;
+  if (csh){
+    var cv = csh.getDataRange().getValues(), byBasho = {};
+    for (r = 1; r < cv.length; r++){
+      if (String(cv[r][2]) !== 'league' || String(cv[r][3]) !== String(L.id)) continue;
+      var b = String(cv[r][1]);
+      var t = byBasho[b];
+      if (!t){
+        t = byBasho[b] = { basho:b, champions:[], score:Number(cv[r][6] || 0),
+          runnerUp:String(cv[r][7] || ''), runnerUpName:cv[r][7] ? nm(cv[r][7]) : '',
+          runnerUpScore:(cv[r][8] === '' || cv[r][8] == null) ? null : Number(cv[r][8]),
+          entrants:Number(cv[r][9] || 0), awardedAt:isoCell_(cv[r][10]),
+          stands:!!String(cv[r][11] || ''), note:String(cv[r][12] || ''),
+          correctedHandle:String(cv[r][13] || ''),
+          correctedScore:(cv[r][14] === '' || cv[r][14] == null) ? null : Number(cv[r][14]) };
+        titles.push(t);
+      }
+      t.champions.push({ handle:String(cv[r][5]), name:nm(cv[r][5]) });
+    }
+  }
+  titles.sort(function(a, b){ return a.awardedAt < b.awardedAt ? 1 : a.awardedAt > b.awardedAt ? -1 : 0; });
+
+  var records = [], ksh = kpHistSheetIfAny_();
+  if (ksh){
+    var kv = ksh.getDataRange().getValues(), byB = {};
+    for (r = 1; r < kv.length; r++){
+      if (String(kv[r][2]) !== String(L.id)) continue;
+      var bb = String(kv[r][1]);
+      var rec = byB[bb] = byB[bb] || { basho:bb, savedAt:'', entries:[] };
+      var saved = isoCell_(kv[r][14]); if (saved > rec.savedAt) rec.savedAt = saved;
+      var act = []; try { act = JSON.parse(kv[r][11] || '[]'); } catch (e) {}
+      rec.entries.push({ handle:String(kv[r][4]), name:nm(kv[r][4]), pos:Number(kv[r][5] || 0),
+        score:Number(kv[r][6] || 0), wins:Number(kv[r][7] || 0), bonus:Number(kv[r][8] || 0),
+        extras:Number(kv[r][9] || 0), benchPts:Number(kv[r][13] || 0), active:act });
+    }
+    Object.keys(byB).forEach(function(k){
+      byB[k].entries.sort(function(a, b){ return a.pos - b.pos; });
+      byB[k].entrants = byB[k].entries.length;
+      records.push(byB[k]);
+    });
+    records.sort(function(a, b){ return a.savedAt < b.savedAt ? 1 : a.savedAt > b.savedAt ? -1 : 0; });
+  }
+
+  return { ok:true,
+    league:{ id:L.id, name:L.name, mode:L.mode, commissioner:L.commissioner, commissionerName:nm(L.commissioner), created:isoCell_(L.created) },
+    members: membersOf(L.id).map(function(h){ return { handle:h, name:nm(h) }; }),
+    titles: titles, records: records };
 }
 
 /* Re-crown one basho from scratch, because the first crowning was wrong.
@@ -4796,6 +5083,10 @@ function refreshResults() {
      calling it on every tick costs one Meta read while the basho is running. */
   try { archiveBasho_({}); }
   catch (err) { try { setMeta_('archiveError', new Date().toISOString() + ' ' + String(err)); } catch (e2) {} }
+
+  /* Keeper windows past their deadline close themselves once the new basho is in. */
+  try { closeDueKeeperWindows_(); }
+  catch (e5) {}
 }
 
 /* Pull the y\u016bsh\u014d winner and the special prizes out of a torikumi payload.

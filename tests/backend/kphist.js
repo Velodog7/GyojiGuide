@@ -154,7 +154,7 @@ console.log('\nwhat gets written down');
   });
   t('a member who never set one is left out entirely', () =>
     assert.strictEqual(find(ctx, 'lgA', 'cid'), undefined));
-  t('a classic league is not in the record at all', () =>
+  t('a classic league whose members never picked a team has no rows', () =>
     assert.ok(!rowsOf(ctx).some(r => String(r[2]) === 'lgC')));
 
   t('the league name travels with the row, so a rename cannot orphan it', () => {

@@ -58,11 +58,18 @@ whole point. Override the path with `GG_GS=/some/other/sumo-fantasy.gs`.
 | `league.js` | league lifecycle end to end — create, join, draft, roster, trades |
 | `keepers.js` | keeper limits and the basho roll-over |
 | `lineups.js` | the lineups that played: recorded once per basho while locked, read by the title, the basho record, the standings board and the re-draft order, so a lineup changed afterwards can't re-score it |
+| `keepdeadline.js` | the keeper deadline: set, move and clear it (commissioner only, open window only); declarations refused after it; the hourly import closes the window only once the new basho is started and its banzuke reads, cutting nothing before then; undecided teams auto-keep by the finished basho's wins (`Meta.lastWins`) |
+| `kphist.js` | the basho record (`KeeperHistory`): written at ranking, it survives the roll-over and agrees with the title minted beside it |
+| `history.js` | the league history page's read (`leagueHistory`, which never creates a sheet), classic leagues in the basho record, and `fill`: back-filling a basho only where a title vouches for it (no title, a team saved since the title, or a winner that disagrees are all skipped) and never touching a row already there |
 | `archive.js` | the day-15 archive, honours capture, champion pass |
 | `champions.js` | champion awarding and trophies |
 | `clock.js` | the pick clock and server-side auto-draft |
 | `draftlock.js` | the `unlock_` flush discipline and one-pick-per-turn |
 | `standscalled.js` | a title that stands as called: the mark, the re-crown that works around it, and both answers staying on the record |
+| `recrown.js` | the tier map's order of trust (a stale posted map can't crown a basho) and the re-crown that puts a wrong crown right |
+| `rerank.js` | undoing a ranking pass, so a pass built on bad input isn't permanent |
+| `savename.js` | `saveName` writes the name and nothing else, so a rename works mid-basho |
+| `whatsnew.js` | the one poll every open tab makes stays cheap, and answers sensibly signed out |
 | `draftload.js` | the shared draftState snapshot (busted by every write, never served with work to do), short lock waits, chat tail read, and the tripwire that auto-pauses a draft on a broken pick log |
 | `draftctl.js` | commissioner pause / resume / undo / rewind, and the stale-league-row guard (`draftRowStale_`) |
 | `teamlock.js` | `saveTeam` refused once a basho is under way |
