@@ -180,7 +180,10 @@ board read. Who counts is `lineupOf_()`: Makuuchi men marked active, in roster
 order, up to `rosterSize`, which is the board's own rule; Jūryō is farm. Lineups
 stay locked until the last day's results have all come in (`lineupsLocked_`),
 not just until the first day-15 bout. At Aki 2026 a lineup set after the basho
-moved a league's title weeks later. `lineups.js` pins all of it.
+moved a league's title weeks later. The re-draft's worst-first order
+(`keeperStandings`) is the same standings: the stored basho record, which
+survives the keeper cuts and the roll-over, else the lineups that played.
+`lineups.js` pins all of it.
 
 ### Keep writes off read paths
 

@@ -70,7 +70,8 @@ function makeCtx(sheets){
    Juryo man marked active (farm: the board never counted him). bob starts a
    Yokozuna and a Maegashira who never wins, with a Komusubi on the bench who
    wins five. cid never set a lineup, so all three of his Makuuchi read as
-   active, and the board takes the first two in roster order. */
+   active, and the board takes the first two in roster order. dan joined but
+   has no roster at all. */
 const TIERS = { Onosato:'Y', Hoshoryu:'Y', Aonishiki:'O', Kirishima:'O', Fujinokawa:'S', Atamifuji:'S',
                 Daieisho:'K', Hakunofuji:'K', Kazuma:'J' };
 const HEAD = ['day','division','east','west','winner','kimarite'];
@@ -97,12 +98,12 @@ function base(meta, extra){
     Results: results(),
     Meta: [['key','value']].concat(Object.keys(M).map(k => [k, M[k]])),
     Users:[['handle','name','auth','team','updated','avatar','status','warnMsg'],
-      ['ace','Ace','h1','{}','','','',''], ['bob','Bob','h1','{}','','','',''], ['cid','Cid','h1','{}','','','','']],
+      ['ace','Ace','h1','{}','','','',''], ['bob','Bob','h1','{}','','','',''], ['cid','Cid','h1','{}','','','',''], ['dan','Dan','h1','{}','','','','']],
     Leagues:[LEAGUE_HEAD,
       ['lgA','Stable Wars','ace','','AAA','keepers',2,'complete','[]',0,'',SCORING,'','{}',1,1],
       ['lgC','Old Guard','ace','','CCC','classic',7,'none','[]',0,'',SCORING,'','{}',0,0]],
     LeagueMembers:[['leagueId','handle','joined'],
-      ['lgA','ace',''], ['lgA','bob',''], ['lgA','cid',''], ['lgC','ace','']],
+      ['lgA','ace',''], ['lgA','bob',''], ['lgA','cid',''], ['lgA','dan',''], ['lgC','ace','']],
     LeagueTeams:[['leagueId','handle','team','updated']],
     KeeperRosters:[ROS_HEAD,
       ['lgA','ace','Fujinokawa','makuuchi','draft','','active'],
@@ -243,6 +244,25 @@ console.log('\nbelt and braces: nothing on record yet when a roster changes');
   t('so the title still counts what played', () =>
     assert.strictEqual(JSON.stringify(ctx.championScopesFor_('Kyushu 2026', TIERS)
       .find(s => s.leagueId === 'lgA').res.winners.map(w => w.handle)), '["ace"]'));
+}
+
+console.log('\nthe re-draft order is the standings, worst first');
+{
+  const ctx = makeCtx(base());
+  ctx.refreshResults();
+  finishBasho(ctx, false);
+  bobSwaps(ctx);
+  /* the old order was raw wins of each roster's active men: cid 2, ace 5 with
+     his Juryo man, bob 6 with the man he swapped in after the basho */
+  t('it scores the lineups that played under the league\'s points; no lineup picks first', () =>
+    assert.strictEqual(JSON.stringify(ctx.keeperStandings('lgA')), '["dan","bob","cid","ace"]'));
+  ctx.snapshotKeeperBasho_('Kyushu 2026', TIERS, { apply:true });
+  setMeta(ctx, 'rankedBasho', 'Kyushu 2026');
+  ctx.__store.KeeperRosters.rows = ctx.__store.KeeperRosters.rows.filter(r => r[2] !== 'Fujinokawa');  // a keeper cut
+  ctx.__store.Results.rows = [HEAD];                                                                   // the roll-over
+  setMeta(ctx, 'basho', 'Hatsu 2027');
+  t('after the cuts and the roll-over it reads the finished basho\'s stored record', () =>
+    assert.strictEqual(JSON.stringify(ctx.keeperStandings('lgA')), '["dan","bob","cid","ace"]'));
 }
 
 console.log('\nreads stay reads');

@@ -57,7 +57,7 @@ whole point. Override the path with `GG_GS=/some/other/sumo-fantasy.gs`.
 |---|---|
 | `league.js` | league lifecycle end to end — create, join, draft, roster, trades |
 | `keepers.js` | keeper limits and the basho roll-over |
-| `lineups.js` | the lineups that played: recorded once per basho while locked, read by the title, the basho record and the standings board, so a lineup changed afterwards can't re-score it |
+| `lineups.js` | the lineups that played: recorded once per basho while locked, read by the title, the basho record, the standings board and the re-draft order, so a lineup changed afterwards can't re-score it |
 | `archive.js` | the day-15 archive, honours capture, champion pass |
 | `champions.js` | champion awarding and trophies |
 | `clock.js` | the pick clock and server-side auto-draft |

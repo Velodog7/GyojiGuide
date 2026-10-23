@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-10-22-lineups';
+var BACKEND_VERSION = '2026-10-22-redraft-order';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -3452,14 +3452,35 @@ function fetchBanzukeNames(bashoId){
   }
   return out;
 }
-function keeperStandings(id){          // member handles, worst-first, by last-basho active-lineup wins
-  var wins = {}; readResults().forEach(function(b){ var w=String(b.winner||'').toLowerCase(); if(w) wins[w]=(wins[w]||0)+1; });
-  var rosters = keeperRostersOf(id);
-  return membersOf(id).map(function(h){
-    var r = rosters[h.toLowerCase()] || { active:[] };
-    var score = (r.active||[]).reduce(function(s,n){ return s + (wins[String(n).toLowerCase()]||0); }, 0);
-    return { h:h, score:score };
-  }).sort(function(a,b){ return a.score - b.score; }).map(function(x){ return x.h; });
+/* Member handles, worst first: the re-draft's pick order, by how the basho
+   just finished. That used to be raw wins of each roster's active men, read
+   when the re-draft opened, which is AFTER the keeper cuts (a team that kept
+   fewer men looked worse) and often after the roll-over had emptied Results
+   (everyone scored 0). Now it is the league's own standings: the stored basho
+   record, which survives both, or else the lineups that played, under the
+   league's points. A member with no lineup picks first. */
+function keeperStandings(id){
+  var members = membersOf(id), pts = {}, meta = readMeta();
+  var inResults = readResults().length > 0;
+  // the basho just finished: the one in Results, or the last ranked once Results is empty
+  var basho = String((inResults ? meta.basho : meta.rankedBasho) || '').trim();
+  var rec = keeperHistoryFor_(id);
+  if (rec && rec.basho === basho && rec.entries.length){
+    rec.entries.forEach(function(e){ pts[String(e.handle).toLowerCase()] = e.score; });
+  } else if (inResults){
+    var L = leagueRow(id), lineups = lineupsFor_(L, basho);
+    var model = serverScoreModel_(L.scoring, tierMapFor_(basho, null));
+    members.forEach(function(h){
+      var lu = lineups[h.toLowerCase()];
+      if (lu && lu.active.length) pts[h.toLowerCase()] = serverTeamScore_(lu.active, model);
+    });
+  }
+  return members.map(function(h){
+    var k = h.toLowerCase();
+    return { h:h, score: pts.hasOwnProperty(k) ? pts[k] : -1 };
+  }).sort(function(a, b){
+    return a.score - b.score || String(a.h).toLowerCase().localeCompare(String(b.h).toLowerCase());
+  }).map(function(x){ return x.h; });
 }
 function getRedraft_(id){ try { return JSON.parse(readMeta()['redraft:'+id] || 'null'); } catch(e){ return null; } }
 function setRedraft_(id, obj){ setMeta_('redraft:'+id, obj ? JSON.stringify(obj) : ''); }
