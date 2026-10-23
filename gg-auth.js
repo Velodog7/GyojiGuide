@@ -141,6 +141,8 @@
     ".gga-title__note{color:#c9b7a4;font-style:normal;line-height:1.45;margin-top:4px;"+
       "white-space:normal;overflow:visible;text-overflow:clip}"+
     ".gga-title__ast{color:#c58f6a;font-weight:700}"+
+    /* a league title opens that league's history page */
+    ".gga-title__lk{color:inherit;text-decoration:none}.gga-title__lk:hover{text-decoration:underline}"+
     ".gga-title.stands .gga-title__nm,.gga-title.stands .gga-title__sub{white-space:normal}"+
     ".gga-title__nm{font-size:.88rem;font-weight:700;color:#f2ead6;line-height:1.25;white-space:nowrap}"+
     ".gga-title.is-league .gga-title__nm{color:#e9dfd2;font-size:.85rem}"+
@@ -620,7 +622,9 @@
     return '<div class="gga-title '+(pub?"is-public":"is-league")+(t.stands?" stands":"")+'">'+
       '<span class="gga-title__ico">'+(pub?EMBLEM.cup:EMBLEM.gunbai)+'</span>'+
       '<span class="gga-title__txt">'+
-        '<span class="gga-title__nm">'+esc(pub ? "Sumo Slap Down League" : t.leagueName)+'</span>'+
+        '<span class="gga-title__nm">'+(pub ? "Sumo Slap Down League" : t.leagueId
+          ? '<a class="gga-title__lk" href="history.html?league='+encodeURIComponent(t.leagueId)+'">'+esc(t.leagueName)+'</a>'
+          : esc(t.leagueName))+'</span>'+
         '<span class="gga-title__sub">'+(pub?"Champion":"League champion")+' \u00b7 '+esc(t.basho)+
           (t.stands?' <span class="gga-title__ast" title="Title stands as called">*</span>':'')+'</span>'+
         '<span class="gga-title__meta">'+meta+'</span>'+

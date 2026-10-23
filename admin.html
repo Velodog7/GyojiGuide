@@ -348,6 +348,17 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
         <div id="stMsg" style="margin-top:10px;font-size:.9rem"></div>
         <div id="stOut" style="margin-top:10px;font-size:.85rem"></div>
       </div>
+      <div class="card" style="max-width:640px">
+        <h3>League records &#8212; fill in a basho</h3>
+        <p class="v-sub" style="margin:0 0 12px">Writes the final table to a league&#8217;s history page for a basho that was ranked before tables were kept. It scores each league from its teams as they stand <b>now</b>, so it only writes a league that has a title for that basho, where no team has been saved since the title was awarded and the winner and score still match it; anything else is listed and left alone. Leagues that already have a table are never touched. Needs that basho&#8217;s results still on the sheet, so run it before starting the next basho. <b>Preview first.</b></p>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <input id="fillBasho" placeholder="Aki 2026" style="flex:1 1 170px">
+          <button class="btn" id="fillPreviewBtn">Preview</button>
+          <button class="btn gold" id="fillApplyBtn">Write records</button>
+        </div>
+        <div id="fillMsg" style="margin-top:10px;font-size:.9rem"></div>
+        <div id="fillOut" style="margin-top:10px;font-size:.85rem"></div>
+      </div>
     </section>
 
     <section class="view" id="v-basho">
@@ -750,6 +761,34 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
   };
   $("stPreviewBtn").onclick = function(){ stRecrown(false); };
   $("stApplyBtn").onclick = function(){ stRecrown(true); };
+
+  /* ---------- league records: fill in a basho ---------- */
+  function fillSay(msg, bad){
+    var el = $("fillMsg"); el.style.color = bad ? "#e23b2e" : ""; el.textContent = msg || "";
+  }
+  async function fillRecords(apply){
+    var basho = ($("fillBasho").value || "").trim();
+    if (!basho){ fillSay("Which basho?", true); return; }
+    if (apply && !confirm("Write league records for " + basho + "?\n\nOnly leagues with no table yet, and only where the computed winner matches the title on record.")) return;
+    fillSay(apply ? "Writing\u2026" : "Computing\u2026");
+    $("fillOut").innerHTML = "";
+    var res = await aPost("adminSnapshotKeepers", { basho: basho, fill: true, apply: !!apply });
+    if (!res || !res.ok){ fillSay((res && res.error) || "That didn\u2019t go through.", true); return; }
+    var n = (res.leagues || []).length, sk = res.skipped || [];
+    fillSay((apply ? "Done. " + (res.written || 0) + " rows written" : "Preview only \u2014 nothing written. " + (res.would || 0) + " rows") +
+      " \u00b7 " + n + " league" + (n === 1 ? "" : "s") + " \u00b7 " + sk.length + " skipped");
+    var html = "";
+    if (n) html += "<p class='v-sub' style='margin:0 0 8px'>" + (apply ? "Written: " : "Would write: ") + res.leagues.map(esc).join(", ") + "</p>";
+    if (sk.length){
+      html += "<table><thead><tr><th>Skipped league</th><th>Title on record</th><th>Teams now give</th></tr></thead><tbody>";
+      sk.forEach(function(x){ html += "<tr><td>" + esc(x.league) + "</td><td>" + esc(x.title) + "</td><td>" + esc(x.now) + "</td></tr>"; });
+      html += "</tbody></table>";
+    }
+    if (!n && !sk.length) html = "<p class='v-sub'>Every league already has a table for " + esc(basho) + ", or none had a team.</p>";
+    $("fillOut").innerHTML = html;
+  }
+  $("fillPreviewBtn").onclick = function(){ fillRecords(false); };
+  $("fillApplyBtn").onclick = function(){ fillRecords(true); };
 
   $("bashoReloadBtn").onclick = function(){ $("bashoMsg").textContent = ""; loadBasho(); };
   $("bashoRefreshBtn").onclick = async function(){

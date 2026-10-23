@@ -21,6 +21,7 @@ same folder on whatever static host you use.
 | `analysis.html` | Analysis | Per-rikishi stats and matchup analysis. |
 | `dohyo.html` | Simulation | Basho simulator. |
 | `fantasy.html` | Fantasy | Drafting, leagues, leaderboard, message board. |
+| `history.html` | Fantasy | One league's history: every title and final table, newest first, and an all-time table. Opened from the league page (`?league=<id>`). |
 | `admin.html` | — | Private admin dashboard. Not linked from anywhere; password-gated by `ADMIN_KEY`. See DEPLOY.md. |
 | `banzuke.html` | — | Legacy home page, superseded by `index.html`. Still served so old links resolve; `gg-nav.js` treats it as an alias for About. |
 | `keepers-mock-draft.html` | — | Snake-draft practice room, opened from Fantasy → My Leagues on a keepers league. Works standalone too (generic bots) if opened directly. |

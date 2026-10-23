@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>League history · Sumo Slap Down</title>
+<meta name="description" content="Every title and final table a Sumo Slap Down fantasy league has played for.">
+<!-- private leagues: shareable by link, kept out of search -->
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/svg+xml" href="SumoSlapdown-logoTall.svg">
+<link rel="preload" as="script" href="gg-nav.js">
+<link rel="preload" as="script" href="gg-auth.js">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Potta+One&family=WDXL+Lubrifont+TC&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000; --surface:#181a22; --surface-2:#20232e; --line:#2a2e3a; --line2:#3a4050;
+    --ink:#f1f2f6; --dim:#a7adbe; --faint:#7d8496; --sun:#d8b25a; --sun-rgb:216,178,90;
+    --copper:197,143,106; --win:#43c08a; --loss:#ef6f53; --radius:14px;
+  }
+  *{ box-sizing:border-box }
+  html,body{ margin:0 }
+  body{ background:var(--bg); color:var(--ink); font-family:"Inter",system-ui,sans-serif;
+        -webkit-font-smoothing:antialiased; min-height:100vh; display:flex; flex-direction:column }
+  main{ width:100%; max-width:820px; margin:0 auto; padding:26px 16px 70px; flex:1 }
+  a{ color:var(--sun) }
+  .num{ font-family:"WDXL Lubrifont TC",monospace }
+  .hs-back{ display:inline-block; font-size:.86rem; text-decoration:none; color:var(--dim); margin-bottom:16px }
+  .hs-back:hover{ color:var(--sun) }
+  .hs-eyebrow{ font-family:"WDXL Lubrifont TC",monospace; font-size:.78rem; letter-spacing:.14em; text-transform:uppercase; color:var(--sun); margin:0 0 4px }
+  h1{ font-family:"Potta One","Zen Maru Gothic",sans-serif; font-weight:400; letter-spacing:.02em; text-transform:uppercase;
+        font-size:clamp(1.5rem,5vw,2.1rem); margin:0; line-height:1.2; display:flex; align-items:center; gap:10px; flex-wrap:wrap }
+  .hs-badge{ font-family:"WDXL Lubrifont TC",monospace; font-size:.7rem; letter-spacing:.12em; text-transform:uppercase; border:1px solid rgba(var(--sun-rgb),.55);
+        color:var(--sun); border-radius:999px; padding:3px 9px; font-weight:700 }
+  .hs-sub{ color:var(--dim); font-size:.9rem; margin:6px 0 22px }
+  h2{ font-family:"Zen Maru Gothic",sans-serif; font-weight:700; font-size:1.05rem; margin:30px 0 12px; color:var(--sun) }
+  .hs-note{ color:var(--faint); font-size:.82rem; margin:8px 0 0 }
+
+  /* the strip of headline numbers */
+  .hs-stats{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px }
+  .hs-stat{ border:1px solid var(--line); background:var(--surface); border-radius:12px; padding:12px 14px }
+  .hs-stat .k{ font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--faint) }
+  .hs-stat .v{ font-size:1.35rem; margin-top:4px }
+  .hs-stat .v small{ font-size:.8rem; color:var(--dim) }
+
+  /* all-time table: flex rows so a phone needs no sideways scroll */
+  .hs-table{ border:1px solid var(--line); border-radius:12px; overflow:hidden }
+  .hs-tr{ display:grid; grid-template-columns:minmax(0,1fr) repeat(5, 3.9rem); align-items:center; gap:4px;
+        padding:9px 12px; border-top:1px solid var(--line); font-size:.9rem }
+  .hs-tr:first-child{ border-top:0 }
+  .hs-tr.head{ background:var(--surface-2); color:var(--faint); font-size:.7rem; letter-spacing:.08em; text-transform:uppercase }
+  .hs-tr > span:not(:first-child){ text-align:right }
+  .hs-tr .who{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  .hs-tr .who small{ color:var(--faint); margin-left:6px }
+  .hs-trophies{ color:var(--sun) }
+  @media (max-width:520px){
+    .hs-tr{ grid-template-columns:minmax(0,1fr) repeat(3, 3.4rem) }
+    .hs-tr .hide-sm{ display:none }
+  }
+
+  /* basho by basho */
+  .hs-basho{ border:1px solid var(--line); background:var(--surface); border-radius:var(--radius); padding:14px 16px; margin-bottom:12px }
+  .hs-basho__head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap }
+  .hs-basho__name{ font-family:"Zen Maru Gothic",sans-serif; font-size:1.08rem; font-weight:700 }
+  .hs-basho__meta{ color:var(--faint); font-size:.8rem }
+  .hs-title{ display:flex; align-items:center; gap:10px; margin:10px 0 4px; padding:8px 12px 8px 8px; border-radius:12px;
+        border:1px solid rgba(var(--copper),.42); background:linear-gradient(135deg, rgba(var(--copper),.16), rgba(var(--copper),.04)) }
+  .hs-title svg{ width:26px; height:33px; color:rgb(var(--copper)); flex:none }
+  .hs-title__txt small{ display:block; font-size:.68rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint) }
+  .hs-title__txt b{ font-family:"Zen Maru Gothic",sans-serif; font-size:1rem }
+  .hs-title__txt .vs{ color:var(--dim); font-size:.85rem }
+  .hs-title__note{ display:block; color:var(--dim); font-size:.8rem; margin-top:3px; font-style:italic }
+  .hs-rows{ margin-top:10px }
+  .hs-row{ border-top:1px solid var(--line); padding:8px 2px; cursor:pointer }
+  .hs-row:first-child{ border-top:0 }
+  .hs-row__top{ display:flex; align-items:center; gap:10px }
+  .hs-row__pos{ min-width:1.6em; text-align:center; color:var(--faint) }
+  .hs-row.lead .hs-row__pos{ color:#e8b04b }
+  .hs-row__name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+  .hs-row__parts{ color:var(--faint); font-size:.78rem }
+  .hs-row__pts{ min-width:4.2em; text-align:right; font-weight:700 }
+  .hs-row__chev{ color:var(--faint); font-size:.8rem; transition:transform .15s }
+  .hs-row.open .hs-row__chev{ transform:rotate(90deg) }
+  .hs-team{ display:none; flex-wrap:wrap; gap:6px; margin:8px 0 2px 2.2em }
+  /* on a phone the breakdown gets its own line rather than an ellipsis */
+  @media (max-width:520px){
+    .hs-row__name{ white-space:normal }
+    .hs-row__parts{ display:block; margin-top:1px }
+    .hs-stat{ padding:10px 11px }
+    .hs-stat .k{ font-size:.64rem; letter-spacing:.06em }
+    .hs-stat .v{ font-size:1.15rem }
+  }
+  .hs-row.open .hs-team{ display:flex }
+  .hs-rik{ border:1px solid var(--line2); border-radius:8px; padding:4px 8px; font-size:.78rem; color:var(--dim); background:var(--surface-2) }
+  .hs-rik b{ color:var(--ink) }
+  .hs-empty{ border:1px dashed var(--line2); border-radius:12px; padding:18px; color:var(--dim); text-align:center }
+  .hs-missing{ color:var(--faint); font-size:.85rem; margin:8px 0 0 }
+  .hs-load{ color:var(--dim); padding:30px 0; text-align:center }
+  @media (prefers-reduced-motion: reduce){ .hs-row__chev{ transition:none } }
+</style>
+</head>
+<body>
+<script src="gg-config.js"></script><script src="gg-account.js"></script>
+<script src="gg-mawashi.js"></script><script src="gg-auth.js"></script><script src="gg-nav.js"></script>
+
+<main>
+  <a class="hs-back" href="fantasy.html">&larr; Back to leagues</a>
+  <div id="hsHead"></div>
+  <div id="hsBody"><p class="hs-load">Loading the league&rsquo;s history&hellip;</p></div>
+</main>
+
+<script>
+/* League history: every title a league has awarded and the final table of
+   every basho it has on record, newest first, with an all-time table worked
+   out from them. Read-only, and shareable by link: ?league=<id>. */
+(function(){
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+  const id = new URLSearchParams(location.search).get("league") || "";
+  const GG = window.GyojiGuide || {};
+  const gunbai = () => (GG.EMBLEM && GG.EMBLEM.gunbai) || "";
+  const fmtMonth = iso => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString(undefined, { month:"long", year:"numeric" }); };
+  const sign = n => (n > 0 ? "+" : "") + n;
+
+  function fail(msg){ $("hsBody").innerHTML = `<div class="hs-empty">${msg}</div>`; }
+
+  async function load(){
+    if (!id) return fail("Open a league&rsquo;s history from its page on <a href=\"fantasy.html\">Fantasy</a>.");
+    if (!GG.leagueHistory) return fail("The site isn&rsquo;t connected right now. Try again in a moment.");
+    let h = null; try { h = await GG.leagueHistory(id); } catch(e){}
+    /* a backend without this action answers with its default payload, so
+       check the shape rather than trusting ok */
+    if (!h || !h.ok || !h.league) return fail(esc((h && h.error) || "Couldn’t load this league’s history."));
+    try { render(h); } catch(e){ fail("Couldn’t show this league’s history."); }
+  }
+
+  function render(h){
+    const L = h.league;
+    document.title = L.name + " · League history · Sumo Slap Down";
+    $("hsHead").innerHTML =
+      `<p class="hs-eyebrow">League history</p>
+       <h1>${esc(L.name)}<span class="hs-badge">${L.mode === "keepers" ? "Keepers" : "Classic"}</span></h1>
+       <p class="hs-sub">Commissioner ${esc(L.commissionerName || L.commissioner)} · ${h.members.length} member${h.members.length === 1 ? "" : "s"}${L.created ? " · since " + esc(fmtMonth(L.created)) : ""}</p>`;
+
+    const nameOf = {};
+    h.members.forEach(m => nameOf[m.handle.toLowerCase()] = m.name);
+    const nm = handle => nameOf[String(handle).toLowerCase()] || handle;
+
+    /* one card per basho, joining the title and the stored table by name */
+    const byBasho = new Map();
+    const slot = b => byBasho.get(b) || (byBasho.set(b, { basho:b, title:null, record:null, at:"" }), byBasho.get(b));
+    h.titles.forEach(t => { const s = slot(t.basho); s.title = t; s.at = s.at > t.awardedAt ? s.at : t.awardedAt; });
+    h.records.forEach(r => { const s = slot(r.basho); s.record = r; s.at = s.at > r.savedAt ? s.at : r.savedAt; });
+    const seasons = [...byBasho.values()].sort((a, b) => a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
+
+    if (!seasons.length){
+      $("hsBody").innerHTML = `<div class="hs-empty">Nothing on record yet. Titles and final tables appear here once a basho has been ranked.</div>`;
+      return;
+    }
+
+    /* the all-time table */
+    const A = new Map(), row = (handle, name) => {
+      const k = String(handle).toLowerCase();
+      if (!A.has(k)) A.set(k, { handle, name: name || nameOf[k] || handle, titles:0, played:0, finish:0, best:null, points:0 });
+      return A.get(k);
+    };
+    h.members.forEach(m => row(m.handle, m.name));
+    h.titles.forEach(t => t.champions.forEach(c => row(c.handle, c.name).titles++));
+    h.records.forEach(r => r.entries.forEach(e => {
+      const a = row(e.handle, e.name); a.played++; a.finish += e.pos; a.points += e.score;
+      a.best = a.best == null ? e.score : Math.max(a.best, e.score);
+    }));
+    const table = [...A.values()].sort((a, b) =>
+      b.titles - a.titles || (a.played ? a.finish / a.played : 99) - (b.played ? b.finish / b.played : 99) || b.points - a.points);
+    const topTitles = table[0] && table[0].titles ? table.filter(a => a.titles === table[0].titles) : [];
+
+    const statHTML =
+      `<div class="hs-stats">
+        <div class="hs-stat"><div class="k">Basho on record</div><div class="v num">${seasons.length}</div></div>
+        <div class="hs-stat"><div class="k">Titles awarded</div><div class="v num">${h.titles.length}</div></div>
+        <div class="hs-stat"><div class="k">Most titles</div><div class="v">${topTitles.length
+          ? (topTitles.length > 2 ? topTitles.length + " tied" : esc(topTitles.map(a => a.name).join(" & "))) +
+            ` <small class="num">×${topTitles[0].titles}</small>` : "—"}</div></div>
+      </div>`;
+
+    const tableHTML =
+      `<div class="hs-table" role="table" aria-label="All-time table">
+        <div class="hs-tr head" role="row"><span>Member</span><span>Titles</span><span>Basho</span><span>Avg finish</span>
+          <span class="hide-sm">Best</span><span class="hide-sm">Points</span></div>
+        ${table.map(a => `<div class="hs-tr" role="row">
+          <span class="who">${esc(a.name)}<small>@${esc(a.handle)}</small></span>
+          <span class="num ${a.titles ? "hs-trophies" : ""}">${a.titles || "—"}</span>
+          <span class="num">${a.played || "—"}</span>
+          <span class="num">${a.played ? (a.finish / a.played).toFixed(1) : "—"}</span>
+          <span class="num hide-sm">${a.best == null ? "—" : a.best}</span>
+          <span class="num hide-sm">${a.played ? a.points : "—"}</span></div>`).join("")}
+      </div>
+      <p class="hs-note">Placings and points count the basho with a stored final table; titles count every basho.</p>`;
+
+    const seasonHTML = seasons.map(s => {
+      const t = s.title, r = s.record;
+      const champs = t ? t.champions.map(c => esc(c.name)).join(" &amp; ") : "";
+      const titleHTML = t ? `<div class="hs-title">${gunbai()}<span class="hs-title__txt"><small>Champion${t.champions.length > 1 ? "s" : ""}</small>
+          <b>${champs}</b> <span class="num">${t.score} pts</span>${t.runnerUp ? ` <span class="vs">· beat ${esc(t.runnerUpName || t.runnerUp)}${t.runnerUpScore != null ? ` (<span class="num">${t.runnerUpScore}</span>)` : ""}</span>` : ""}
+          ${t.stands ? `<span class="hs-title__note">${esc(t.note || "Recorded as called at the end of the basho; a later scoring fix would have changed it.")}${t.correctedHandle
+            ? " Corrected scoring gives it to " + esc(nm(t.correctedHandle)) + (t.correctedScore != null ? " (" + t.correctedScore + " to " + t.score + ")" : "") + "." : ""}</span>` : ""}
+        </span></div>` : "";
+      const rowsHTML = r ? `<div class="hs-rows">${r.entries.map(e => `<div class="hs-row${e.pos === 1 ? " lead" : ""}" tabindex="0" role="button" aria-expanded="false">
+          <div class="hs-row__top"><span class="hs-row__pos num">${e.pos}</span>
+            <span class="hs-row__name">${esc(e.name)} <span class="hs-row__parts">${e.wins} W${e.bonus ? " · " + sign(e.bonus) + " upset" : ""}${e.extras ? " · " + sign(e.extras) + " prizes" : ""}</span></span>
+            <span class="hs-row__pts num">${e.score} pts</span><span class="hs-row__chev" aria-hidden="true">›</span></div>
+          <div class="hs-team">${(e.active || []).map(x => `<span class="hs-rik"><b>${esc(x.name)}</b> ${x.wins}W${x.bonus ? " " + sign(x.bonus) : ""}${x.sansho ? " · 賞" : ""}${x.yusho ? " · 優" : ""} · <span class="num">${x.pts}</span></span>`).join("") || `<span class="hs-rik">No lineup recorded.</span>`}</div>
+        </div>`).join("")}</div>` : `<p class="hs-missing">The final table for this basho wasn’t recorded.</p>`;
+      return `<section class="hs-basho">
+        <div class="hs-basho__head"><span class="hs-basho__name">${esc(s.basho)}</span>
+          <span class="hs-basho__meta">${r ? r.entrants + " teams · final" : (t && t.entrants ? t.entrants + " teams" : "")}</span></div>
+        ${titleHTML}${rowsHTML}</section>`;
+    }).join("");
+
+    $("hsBody").innerHTML = statHTML + `<h2>All-time</h2>` + tableHTML + `<h2>Basho by basho</h2>` + seasonHTML;
+    $("hsBody").querySelectorAll(".hs-row").forEach(el => {
+      const flip = () => { el.classList.toggle("open"); el.setAttribute("aria-expanded", el.classList.contains("open")); };
+      el.onclick = flip;
+      el.onkeydown = e => { if (e.key === "Enter" || e.key === " "){ e.preventDefault(); flip(); } };
+    });
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", load); else load();
+})();
+</script>
+</body>
+</html>

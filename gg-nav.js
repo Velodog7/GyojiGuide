@@ -15,7 +15,7 @@
     { href: "index.html",    label: "About",      match: ["", "index.html", "index", "banzuke.html", "banzuke"] },
     { href: "analysis.html", label: "Analysis",     match: ["analysis.html", "analysis", "rikishi.html", "rikishi"] },
     { href: "dohyo.html",   label: "Simulation",   match: ["dohyo.html", "dohyo"] },
-    { href: "fantasy.html", label: "Fantasy",      match: ["fantasy.html", "fantasy"] }
+    { href: "fantasy.html", label: "Fantasy",      match: ["fantasy.html", "fantasy", "history.html", "history"] }
   ];
 
   var here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
