@@ -150,6 +150,11 @@ function leaguePayload(S){
     const jr=[...document.querySelectorAll('.kw-cb[data-div="juryo"]')].slice(0,1);
     mk.concat(jr).forEach(c=>{c.checked=true;c.dispatchEvent(new Event('change'));});
   });
+  // the screen repaints from the server every 5 s, which used to wipe unsaved
+  // ticks: anyone slower than that could never hold a selection
+  await p.waitForTimeout(6000);
+  const held = await p.evaluate(()=>[...document.querySelectorAll('.kw-cb')].filter(c=>c.checked && !c.disabled).length);
+  chk('unsaved ticks survive the five-second repaint', held===3, 'ticked='+held);
   await p.evaluate(()=>document.getElementById('kwSave').click());
   await p.waitForTimeout(1800);
   chk('a legal declaration is sent', Array.isArray(S.declared) && S.declared.length===3, JSON.stringify(S.declared));

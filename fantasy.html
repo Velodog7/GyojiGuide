@@ -2417,6 +2417,12 @@ function paintTick(){
 }
 let redraftPollTimer = null;
 let keepPollTimer = null;
+/* The keeper screen repaints from the server every five seconds, and the
+   repaint used to put every box back to the last SAVED answer, so anyone who
+   took longer than that to decide lost his ticks. Unsaved ticks live here
+   instead, and win over the server until they are saved. */
+let kwDraft = null;            // { league, picks: Set of lower-case names }
+let kwSeq = 0, kwMsg = null, kwSaving = false;
 /* does this league cut anyone at the roll-over? null in BOTH divisions means no */
 function keepLimited(lg){ return !!lg && (lg.keepMk != null || lg.keepJr != null); }
 function stopDraftPolling(){ if (draftPollTimer){ clearInterval(draftPollTimer); draftPollTimer=null; } draftPollMs = 0; stopDraftTick();
@@ -2954,14 +2960,23 @@ async function renderKeepers(lg, meCommish){
    order they'd be auto-kept in if you never got round to it. */
 async function renderKeeperWindow(lg){
   const body = document.getElementById("keepBody"); if (!body) return;
+  const seq = ++kwSeq;
   let res=null; try { res = await GyojiGuide.keeperState(lg.id); } catch(e){}
-  if (!res || !res.ok){ body.innerHTML = `<p class="status err">Couldn\u2019t load the keeper window.</p>`; return; }
+  if (seq !== kwSeq) return;                             // a newer paint, or a save, overtook this one
+  if (!res || !res.ok){
+    // a failed poll leaves the screen alone; only an empty screen gets the error
+    if (!body.querySelector(".kw-cb")) body.innerHTML = `<p class="status err">Couldn\u2019t load the keeper window.</p>`;
+    return;
+  }
   if (!res.open){                                        // closed -> back to the normal view
     if (keepPollTimer) clearInterval(keepPollTimer);
+    kwDraft = null; kwMsg = null;
     lg.draftStatus = res.draftStatus; renderLeague(); return;
   }
   const isCommish = acct && lg.commissioner && acct.handle.toLowerCase()===String(lg.commissioner).toLowerCase();
   const declared = new Set((res.mine.declared||[]).map(n=>String(n).toLowerCase()));
+  if (kwDraft && kwDraft.league !== lg.id){ kwDraft = null; kwMsg = null; }
+  const picks = kwDraft ? kwDraft.picks : declared;
   const cap = { makuuchi: res.keepMk, juryo: res.keepJr };
 
   const group = (div, label, list) => {
@@ -2970,7 +2985,7 @@ async function renderKeeperWindow(lg){
     return `<div class="lg-teams"><h5>${label} <span class="lg-rm-window open" id="kwCount_${div}"></span></h5>
       ${lim == null ? `<p class="lg-myteam__hint" style="margin-top:0">No limit — all of these carry over.</p>` : ""}
       <div class="rd-pool">${list.map(r=>`<label class="lu-item"><input type="checkbox" class="kw-cb" data-div="${div}" value="${esc(r.name)}"
-        ${declared.has(r.name.toLowerCase())?"checked":""} ${lim==null?"disabled checked":""}> ${esc(r.name)}
+        ${picks.has(r.name.toLowerCase())?"checked":""} ${lim==null?"disabled checked":""}> ${esc(r.name)}
         <span class="lg-team-row__h">${r.wins} win${r.wins===1?"":"s"}</span></label>`).join("")}</div></div>`;
   };
 
@@ -2978,8 +2993,8 @@ async function renderKeeperWindow(lg){
     `<p class="rd-turn">Keep <b>${res.keepMk==null?"all":res.keepMk}</b> in Makuuchi and <b>${res.keepJr==null?"all":res.keepJr}</b> in J\u016bry\u014d. Everyone else goes back into the pool.</p>` +
     group("makuuchi","Makuuchi", res.mine.makuuchi) +
     group("juryo","J\u016bry\u014d", res.mine.juryo) +
-    `<div style="margin-top:10px"><button class="btn" id="kwSave">${res.mine.declared?"Update my keepers":"Confirm my keepers"}</button>
-      <span id="kwStatus" class="status"></span></div>
+    `<div style="margin-top:10px"><button class="btn" id="kwSave"${kwSaving?" disabled":""}>${res.mine.declared?"Update my keepers":"Confirm my keepers"}</button>
+      <span id="kwStatus" class="status${kwMsg && kwMsg.cls ? " "+kwMsg.cls : ""}">${kwMsg ? " "+esc(kwMsg.text) : ""}</span></div>
      <p class="lg-myteam__hint">${res.waiting} of ${res.members.length} still to decide${res.waiting?": "+res.members.filter(m=>!m.declared).map(m=>"@"+esc(m.handle)).join(", "):""}.</p>` +
     (isCommish ? `<div class="lg-teams"><h5>Close and re-draft</h5>
         <p class="lg-myteam__hint" style="margin-top:0">Applies every declaration, auto-keeps for anyone who hasn\u2019t decided, then opens the supplemental re-draft to refill rosters.</p>
@@ -2993,23 +3008,36 @@ async function renderKeeperWindow(lg){
                  el2.className = "lg-rm-window " + (lim!=null && n>lim ? "closed" : "open"); }
     });
   };
-  body.querySelectorAll(".kw-cb").forEach(c=>c.onchange = sync);
+  // the message outlives a repaint, like the ticks do
+  const say = (text, cls) => {
+    kwMsg = text ? { text, cls: cls || "" } : null;
+    const st = document.getElementById("kwStatus");
+    if (st){ st.textContent = text ? " "+text : ""; st.className = "status" + (cls ? " "+cls : ""); }
+  };
+  body.querySelectorAll(".kw-cb").forEach(c=>c.onchange = ()=>{
+    kwDraft = { league: lg.id, picks: new Set([...body.querySelectorAll(".kw-cb")]
+      .filter(x=>x.checked && !x.disabled).map(x=>x.value.toLowerCase())) };
+    if (!kwSaving) say("");
+    sync();
+  });
   sync();
 
   const sv = document.getElementById("kwSave");
   if (sv) sv.onclick = async ()=>{
-    const st = document.getElementById("kwStatus");
     const keep = [...body.querySelectorAll(".kw-cb")].filter(c=>c.checked && !c.disabled).map(c=>c.value);
     for (const div of ["makuuchi","juryo"]){
       const lim = cap[div]; if (lim == null) continue;
       const n = [...body.querySelectorAll('.kw-cb[data-div="'+div+'"]')].filter(c=>c.checked && !c.disabled).length;
-      if (n > lim){ st.textContent = " Keep at most "+lim+" in "+(div==="juryo"?"J\u016bry\u014d":"Makuuchi")+"."; st.className="status err"; return; }
+      if (n > lim){ say("Keep at most "+lim+" in "+(div==="juryo"?"J\u016bry\u014d":"Makuuchi")+".", "err"); return; }
     }
-    sv.disabled = true; st.textContent = " Saving\u2026"; st.className = "status";
+    sv.disabled = true; kwSaving = true; say("Saving\u2026");
     const r = await GyojiGuide.declareKeepers(lg.id, keep);
-    sv.disabled = false;
-    if (r && r.ok){ st.textContent = " Saved \u2713"; st.className = "status ok"; renderKeeperWindow(lg); }
-    else { st.textContent = " "+((r&&r.error)||"Couldn\u2019t save."); st.className = "status err"; }
+    kwSaving = false;
+    if (r && r.ok){ kwDraft = null; say("Saved \u2713", "ok"); renderKeeperWindow(lg); }
+    else {
+      say((r&&r.error)||"Couldn\u2019t save.", "err");
+      const b = document.getElementById("kwSave"); if (b) b.disabled = false;   // a repaint may have replaced sv
+    }
   };
 
   const cl = document.getElementById("kwClose");
