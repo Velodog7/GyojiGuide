@@ -270,6 +270,34 @@ Then verify live against
 A migration that fails stops the function deploying too: keep migrations
 re-runnable (`if not exists`, `create or replace`) and test them in PGlite.
 
+## Between basho
+
+Ranks look after themselves: every page that ranks or scores re-reads the
+current banzuke from sumo-api on load (`gg-roster.js`, `GG.ranksReady`). What
+doesn't move on its own is the bundled data, so each cycle has two jobs:
+
+1. **When a basho ends:** `node tools/finish-basho.mjs <id>` (dry run, then
+   `--write`). It moves `gg-dossier.js` and `analysis.html` onto the finished
+   basho: records and their history slots, honours, the rank slots, Elo from
+   sumostats.com and ages. The words come from `tools/basho-notes/<id>.json`
+   (form and injury notes, highlights, the recap, and profiles for new
+   sekitori, bundled hidden with `nu:1,gone:1` until a banzuke lists them),
+   written by hand from the records and the press. Until it runs, the analysis
+   page labels one basho's records with another's name. Check the result in a
+   browser: Chrome caches `gg-dossier.js` hard, so fetch it with
+   `{cache:"reload"}` first.
+2. **When the banzuke drops:** `node tools/check-banzuke.mjs <new id>`, then
+   `--write`. It puts every bundled table on the new ranks (the offline
+   fallbacks, and the home page game, which has no live sync), marks or drops
+   the men who left, and adds newcomers wherever a card works without a
+   portrait. Portraits are Sean's: an Illustrator cutout in `images/svg/`,
+   extracted to `images/rikishi/<Name>.webp` (see README). The banzuke art,
+   the game and the simulator take a newcomer only once he has one.
+
+Then roll the Sheet over (admin page: start the new basho) before any keeper
+league closes its declarations: the re-draft draws its pool from the banzuke
+of the basho in `Meta`.
+
 ## Two backends, one switch (October 2026)
 
 The same `sumo-fantasy.gs` is deployed in both places, and the site can
