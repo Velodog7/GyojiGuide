@@ -154,13 +154,17 @@
         var d = deriveFromRank(e.rank || "", division);
         var wins = (typeof e.wins === "number") ? e.wins : null;
         var losses = (typeof e.losses === "number") ? e.losses : null;
+        /* days missed, written the JSA way as a third number (5-7-3): without
+           it a withdrawal read as an ordinary losing record, and a full kyujo
+           as a bare 0-0 */
+        var absences = (typeof e.absences === "number") ? e.absences : 0;
         out.push({
           name: name, rikishiId: e.rikishiID || e.rikishiId || e.id || null,
           code: d.code, rk: d.rk, tier: d.tier, num: d.num,
           side: d.side, sideCap: d.sideCap, tierName: d.tierName,
           div: division === "Juryo" ? "juryo" : "makuuchi",
-          rankStr: e.rank || "", wins: wins, losses: losses,
-          record: (wins !== null && losses !== null) ? (wins + "-" + losses) : null
+          rankStr: e.rank || "", wins: wins, losses: losses, absences: absences,
+          record: (wins !== null && losses !== null) ? (wins + "-" + losses + (absences > 0 ? "-" + absences : "")) : null
         });
       }
       return out;

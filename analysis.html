@@ -84,8 +84,8 @@
    so the footer needs to clear it */
 @media(max-width:640px){footer{padding-bottom:118px}}
 </style><script src="gg-config.js"></script><script src="gg-basho.js"></script><script src="gg-account.js"></script><script src="gg-roster.js"></script><script src="gg-dossier.js"></script></head><body>
-<script src="gg-mawashi.js"></script><script src="gg-notify.js"></script><script src="gg-auth.js"></script><script src="gg-nav.js"></script><nav class="tabs" aria-label="Views"><div class="tabs-inner"><button class="tab" id="tab-browse" aria-selected="true" onclick="setView('browse')" aria-label="Draft" title="Draft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v2H9z"/><line x1="12" y1="10.5" x2="12" y2="16.5"/><line x1="9" y1="13.5" x2="15" y2="13.5"/></svg><span class="tab-lab">Banzuke</span></button><button class="tab" id="tab-rikishi" aria-selected="false" onclick="setView('rikishi')" aria-label="Rikishi" title="Rikishi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="tab-lab">Rikishi</span></button><button class="tab" id="tab-health" aria-selected="false" onclick="setView('health')" aria-label="Health watch" title="Health watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21l8.8-8.3a5 5 0 0 0 0-7.1z"/></svg><span class="tab-lab">Health</span></button><button class="tab" id="tab-compare" aria-selected="false" onclick="setView('compare')" aria-label="Compare" title="Compare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/></svg><span class="n" id="cmpN">0</span><span class="tab-lab">Compare</span></button><button class="tab" id="tab-tiers" aria-selected="false" onclick="setView('tiers')" aria-label="Tier list" title="Tier list"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="4" rx="1.2"/><rect x="4" y="10" width="12" height="4" rx="1.2"/><rect x="4" y="16" width="8" height="4" rx="1.2"/></svg><span class="tab-lab">Tiers</span></button><button class="tab" id="tab-draft" aria-selected="false" onclick="setView('draft')" aria-label="My Team" title="My Team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="n" id="drN">0/7</span><span class="tab-lab">Mock Draft</span></button></div></nav><main><div id="dataStatus" class="data-status" hidden></div><section class="view on" id="v-browse"><h2 class="v-title">Banzuke</h2><p class="view-sub">Every rikishi on the current banzuke — Makuuchi and Jūryō. Ranks come live from sumo-api, so the moment a new banzuke is published this page is on it; the strip above the cards says which one you are looking at. Filter by rank group or search, and tap any card for full records, fighting style, past-basho results and my projected Aki record. Hit <b>Draft</b> on a card to slot a wrestler into your team, or <b>Compare</b> to line rikishi up side by side.</p><div class="pills" id="pills" role="group" aria-label="Choose a rank group"></div><div class="group-head"><div><h2 id="gTitle"></h2><div class="hint" id="gHint"></div></div><input class="search" id="search" type="search" placeholder="Search this group…" aria-label="Search within this group" /></div><div class="cards" id="cards"></div><div class="float-dock"><div class="group-toggle"><div class="seg" id="grpSeg" role="group" aria-label="Rank group"></div></div><div class="dock-pair"><div class="layout-toggle"><div class="seg" role="group" aria-label="Card layout"><button class="seg-btn on" id="modeExpanded" aria-pressed="true" aria-label="Expanded cards" title="Expanded"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="9.5" x2="16" y2="9.5"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="16.5" x2="13" y2="16.5"/></svg></button><button class="seg-btn" id="modeCompact" aria-pressed="false" aria-label="Compact cards — hide the stats block" title="Compact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="7.5" y="7" width="9" height="3" rx="1.2" fill="currentColor" stroke="none"/><line x1="8" y1="14.5" x2="16" y2="14.5"/><line x1="8" y1="17.5" x2="12.5" y2="17.5"/></svg></button><button class="seg-btn" id="modeCollapsed" aria-pressed="false" aria-label="Collapsed cards" title="Collapsed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="5" rx="1.5"/></svg></button></div></div><div class="compare-toggle" id="cmpToggle" hidden><div class="seg"><button class="seg-btn" id="cmpClear" title="Clear comparison" aria-label="Clear comparison"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button><button class="seg-btn on" id="cmpView" title="View comparison" aria-label="View comparison"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="16" rx="1.5"/></svg><span class="cmp-count" id="cmpCount">0</span></button></div></div></div></div></section><section class="view" id="v-rikishi"><div id="rkDir"></div></section><section class="view" id="v-health"><h2 class="v-title">Health watch</h2><p class="view-sub">Injuries, absences and comeback watch heading into Aki 2026 — who's hurt, who's on the mend, and who never misses a day. Sorted worst first; the Iron Man tag means no missed days across the last six tournaments.</p><div class="health-grid" id="healthCards"></div><p class="src">Current as of the Aki 2026 banzuke — after Nagoya and the summer jungyo. Nagoya ran Jul 12–26 at IG Arena. Sekiwake <b>Aonishiki</b> took the Emperor’s Cup — his third yūshō — beating Atamifuji and Kirishima in a three-way playoff after all three finished 12–3; the run also restored him to ōzeki. Both yokozuna struggled: Onosato closed 9–6, and Hoshoryu went kyujo from day 14 at 7–7 and had knee ligament surgery on 29 July. Sekiwake <b>Wakatakakage</b> missed the whole basho after emergency thigh surgery in early July. Special prizes — Shukun-shō: Fujinokawa; Kantō-shō: Atamifuji, Kotoeiho &amp; Takayasu; Ginō-shō: Aonishiki. In Jūryō, Shonannoumi won an 11–4 four-way playoff. Records from JSA / SumoDB; injury detail from JSA announcements and Japanese press reporting.</p></section><section class="view" id="v-compare"><h2 class="v-title">Compare</h2><div class="cmp-modes" role="group" aria-label="What to compare"><button type="button" data-m="picked" class="on" aria-pressed="true">Selected</button><button type="button" data-m="field" aria-pressed="false">Whole field</button></div><div id="cmpPicked"><p class="view-sub">Line up the rikishi you picked side by side — rank, grade, Elo, career record, physique and my projected Aki record, row by row. Use <b>＋ Add wrestler</b> to include more, or toggle <b>Compare</b> on any card in Banzuke. Highest Elo, height and weight are highlighted.</p><div id="cmpBody"></div></div><div id="cmpField" hidden><p class="view-sub">Sort all 70 rikishi by any data point — tap a column header to sort, tap again to reverse. <b>Grade</b> is my own assessment (S best → F). <b>Proj</b> is my projected Aki record — a model built from current rank, grade, health and the last three basho (Nagoya weighted heaviest). Ranks track the live banzuke, so they shift the moment a new one is published. Not a bout-by-bout forecast.</p><div class="an-bar"><div class="an-scope" id="anScope"></div><div class="an-toggle" id="anToggle"><button data-v="list" class="on">List</button><button data-v="graph">Graph</button></div></div><div class="an-gopts" id="anGopts" style="display:none"><div class="an-presets" id="anPresets"></div><div class="an-gtype an-toggle" id="anGtype"><button data-t="bar">Bar</button><button data-t="scatter">Scatter</button></div><div class="an-toggle" id="anLbl" style="display:none"></div><div class="an-metrics" id="anMetricPills"></div><div class="an-ghint" id="anGhint"></div></div><div id="anBody"></div></div></section><section class="view" id="v-draft"><h2 class="v-title">Mock Draft</h2><p class="view-sub">Build a seven-strong stable: one Sanyaku, four Maegashira brackets, one wildcard Makuuchi pick and one Jūryō. Tap an empty slot to jump to the matching rank group, or draft from any card. Fill all seven for a projected win total and team grade.</p><div class="gg-acct" id="ggAcct"></div><p class="draft-note">Pick one rikishi per bracket. Use the <b>Draft</b> button on any Browse card — a wrestler can only hold one bracket, and “Any Makuuchi” is a wildcard for any top-division rikishi.</p><div class="draft-reslot" id="draftRestore" hidden></div><div class="draft-reslot" id="draftReslot" hidden></div><div class="draft-grid" id="slots"></div><div class="draft-grade" id="draftGrade" style="display:none"></div><div class="seal-wrap"><div class="seal" id="seal">満</div><div class="seal-text" id="sealText"></div></div><div><button class="reset" id="reset">Clear all picks</button></div></section><section class="view" id="v-tiers"><h2 class="v-title">Tier list</h2><p class="view-sub">Build your own tier list for Aki. Everyone starts in <b>Unassigned</b> at the bottom — tap a wrestler, then tap a tier to place him. <b>Auto-assign ✦</b> fills all eight tiers from my projected Aki wins if you would rather start from the model and edit; <b>Clear all</b> empties the board again. S = 12+, A+ = 11, A− = 10, B = 9, C+ = 8, C− = 7, D = 6, F = 5 or fewer. Build several lists — they save in your browser automatically.</p><div class="tier-lists" id="tierLists"></div><div class="an-scope tier-div" id="tierDivToggle"></div><div class="tier-tools"><input class="tl-name" id="tlName" maxlength="40" aria-label="List name" placeholder="List name"><button class="tl-btn" id="tlDup">Duplicate</button><button class="tl-btn" id="tierAuto" title="Fill the tiers from the projected Aki wins">Auto-assign ✦</button><button class="reset" id="tierReset" title="Send every rikishi back to Unassigned">Clear all</button><button class="tl-btn danger" id="tlDelete">Delete</button><span class="tier-hint" id="tierHint">Tap a rikishi to move them.</span><div class="tl-confirm" id="tierConfirm" role="alertdialog" aria-live="polite" hidden><span id="tierConfirmMsg"></span><button class="tl-btn danger" id="tierConfirmYes">Yes, do it</button><button class="tl-btn" id="tierConfirmNo">Cancel</button></div></div><div class="tiers" id="tiers"></div></section></main><div class="dmodal" id="draftModal" role="dialog" aria-modal="true" aria-label="Draft wrestler"><div class="dmodal-panel"><button class="dmodal-close" id="dmClose" aria-label="Close">✕</button><div class="dmodal-card scard" id="dmCard"></div><div class="dmodal-brackets"><p class="lab">Draft to bracket</p><div class="dmodal-chips" id="dmChips"></div></div><button class="dmodal-undraft" id="dmUndraft">Undraft</button></div></div><footer>
-Rankings from the official Nihon Sumo Kyokai July 2026 banzuke; official JSA kesho-mawashi portraits for all 70 rikishi. Records and ranks for the January, March and May 2026 tournaments are from the respective banzuke. Elo from sumostats.com — only verified values are shown (others “—”). Grades and projected records are my own model, not official. Not affiliated with the Nihon Sumo Kyokai.
+<script src="gg-mawashi.js"></script><script src="gg-notify.js"></script><script src="gg-auth.js"></script><script src="gg-nav.js"></script><nav class="tabs" aria-label="Views"><div class="tabs-inner"><button class="tab" id="tab-browse" aria-selected="true" onclick="setView('browse')" aria-label="Draft" title="Draft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v2H9z"/><line x1="12" y1="10.5" x2="12" y2="16.5"/><line x1="9" y1="13.5" x2="15" y2="13.5"/></svg><span class="tab-lab">Banzuke</span></button><button class="tab" id="tab-rikishi" aria-selected="false" onclick="setView('rikishi')" aria-label="Rikishi" title="Rikishi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span class="tab-lab">Rikishi</span></button><button class="tab" id="tab-health" aria-selected="false" onclick="setView('health')" aria-label="Health watch" title="Health watch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 21l8.8-8.3a5 5 0 0 0 0-7.1z"/></svg><span class="tab-lab">Health</span></button><button class="tab" id="tab-compare" aria-selected="false" onclick="setView('compare')" aria-label="Compare" title="Compare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/></svg><span class="n" id="cmpN">0</span><span class="tab-lab">Compare</span></button><button class="tab" id="tab-tiers" aria-selected="false" onclick="setView('tiers')" aria-label="Tier list" title="Tier list"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="4" rx="1.2"/><rect x="4" y="10" width="12" height="4" rx="1.2"/><rect x="4" y="16" width="8" height="4" rx="1.2"/></svg><span class="tab-lab">Tiers</span></button><button class="tab" id="tab-draft" aria-selected="false" onclick="setView('draft')" aria-label="My Team" title="My Team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="n" id="drN">0/7</span><span class="tab-lab">Mock Draft</span></button></div></nav><main><div id="dataStatus" class="data-status" hidden></div><section class="view on" id="v-browse"><h2 class="v-title">Banzuke</h2><p class="view-sub">Every rikishi on the current banzuke — Makuuchi and Jūryō. Ranks come live from sumo-api, so the moment a new banzuke is published this page is on it; the strip above the cards says which one you are looking at. Filter by rank group or search, and tap any card for full records, fighting style, past-basho results and my projected <span data-basho="proj">Aki</span> record. Hit <b>Draft</b> on a card to slot a wrestler into your team, or <b>Compare</b> to line rikishi up side by side.</p><div class="pills" id="pills" role="group" aria-label="Choose a rank group"></div><div class="group-head"><div><h2 id="gTitle"></h2><div class="hint" id="gHint"></div></div><input class="search" id="search" type="search" placeholder="Search this group…" aria-label="Search within this group" /></div><div class="cards" id="cards"></div><div class="float-dock"><div class="group-toggle"><div class="seg" id="grpSeg" role="group" aria-label="Rank group"></div></div><div class="dock-pair"><div class="layout-toggle"><div class="seg" role="group" aria-label="Card layout"><button class="seg-btn on" id="modeExpanded" aria-pressed="true" aria-label="Expanded cards" title="Expanded"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="8" y1="9.5" x2="16" y2="9.5"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="16.5" x2="13" y2="16.5"/></svg></button><button class="seg-btn" id="modeCompact" aria-pressed="false" aria-label="Compact cards — hide the stats block" title="Compact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="7.5" y="7" width="9" height="3" rx="1.2" fill="currentColor" stroke="none"/><line x1="8" y1="14.5" x2="16" y2="14.5"/><line x1="8" y1="17.5" x2="12.5" y2="17.5"/></svg></button><button class="seg-btn" id="modeCollapsed" aria-pressed="false" aria-label="Collapsed cards" title="Collapsed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="5" rx="1.5"/></svg></button></div></div><div class="compare-toggle" id="cmpToggle" hidden><div class="seg"><button class="seg-btn" id="cmpClear" title="Clear comparison" aria-label="Clear comparison"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button><button class="seg-btn on" id="cmpView" title="View comparison" aria-label="View comparison"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="16" rx="1.5"/></svg><span class="cmp-count" id="cmpCount">0</span></button></div></div></div></div></section><section class="view" id="v-rikishi"><div id="rkDir"></div></section><section class="view" id="v-health"><h2 class="v-title">Health watch</h2><p class="view-sub">Injuries, absences and comeback watch heading into <span data-basho="proj-label">Aki 2026</span> — who's hurt, who's on the mend, and who never misses a day. Sorted worst first; the Iron Man tag means no missed days across the last six tournaments.</p><div class="health-grid" id="healthCards"></div><p class="src" id="bashoRecap">Current as of late October 2026, after Aki and ahead of the Kyūshū banzuke. Aki ran Sept 13–27 at the Ryōgoku Kokugikan. Yokozuna <b>Onosato</b> won the Emperor’s Cup at 12–3, beating Aonishiki in the final bout after losses to Kirishima and Kotozakura on days 13 and 14; Ōzeki Aonishiki and Sekiwake Fujinokawa were runners-up at 11–4. Yokozuna <b>Hoshoryu</b> sat out the whole basho after right-knee surgery in July, as did Wakatakakage (left thigh) and Wakanosho (right knee); Kotoshoho withdrew from day 12 with a suspected concussion and Takanosho from day 13 with ankle ligament damage. Special prizes — Kantō-shō: Fujinokawa &amp; Churanoumi. Takayasu took the only kinboshi, over Onosato on day 4. In Jūryō, Kitanowaka won at 11–4 from a three-way tie with Kagayaki and Kayo. Records from sumo-api / JSA; injury detail from JSA medical certificates as reported in the Japanese press, and sumostats.com.</p></section><section class="view" id="v-compare"><h2 class="v-title">Compare</h2><div class="cmp-modes" role="group" aria-label="What to compare"><button type="button" data-m="picked" class="on" aria-pressed="true">Selected</button><button type="button" data-m="field" aria-pressed="false">Whole field</button></div><div id="cmpPicked"><p class="view-sub">Line up the rikishi you picked side by side — rank, grade, Elo, career record, physique and my projected <span data-basho="proj">Aki</span> record, row by row. Use <b>＋ Add wrestler</b> to include more, or toggle <b>Compare</b> on any card in Banzuke. Highest Elo, height and weight are highlighted.</p><div id="cmpBody"></div></div><div id="cmpField" hidden><p class="view-sub">Sort all 70 rikishi by any data point — tap a column header to sort, tap again to reverse. <b>Grade</b> is my own assessment (S best → F). <b>Proj</b> is my projected <span data-basho="proj">Aki</span> record — a model built from current rank, grade, health and the last three basho (<span data-basho="fin">Nagoya</span> weighted heaviest). Ranks track the live banzuke, so they shift the moment a new one is published. Not a bout-by-bout forecast.</p><div class="an-bar"><div class="an-scope" id="anScope"></div><div class="an-toggle" id="anToggle"><button data-v="list" class="on">List</button><button data-v="graph">Graph</button></div></div><div class="an-gopts" id="anGopts" style="display:none"><div class="an-presets" id="anPresets"></div><div class="an-gtype an-toggle" id="anGtype"><button data-t="bar">Bar</button><button data-t="scatter">Scatter</button></div><div class="an-toggle" id="anLbl" style="display:none"></div><div class="an-metrics" id="anMetricPills"></div><div class="an-ghint" id="anGhint"></div></div><div id="anBody"></div></div></section><section class="view" id="v-draft"><h2 class="v-title">Mock Draft</h2><p class="view-sub">Build a seven-strong stable: one Sanyaku, four Maegashira brackets, one wildcard Makuuchi pick and one Jūryō. Tap an empty slot to jump to the matching rank group, or draft from any card. Fill all seven for a projected win total and team grade.</p><div class="gg-acct" id="ggAcct"></div><p class="draft-note">Pick one rikishi per bracket. Use the <b>Draft</b> button on any Browse card — a wrestler can only hold one bracket, and “Any Makuuchi” is a wildcard for any top-division rikishi.</p><div class="draft-reslot" id="draftRestore" hidden></div><div class="draft-reslot" id="draftReslot" hidden></div><div class="draft-grid" id="slots"></div><div class="draft-grade" id="draftGrade" style="display:none"></div><div class="seal-wrap"><div class="seal" id="seal">満</div><div class="seal-text" id="sealText"></div></div><div><button class="reset" id="reset">Clear all picks</button></div></section><section class="view" id="v-tiers"><h2 class="v-title">Tier list</h2><p class="view-sub">Build your own tier list for <span data-basho="proj">Aki</span>. Everyone starts in <b>Unassigned</b> at the bottom — tap a wrestler, then tap a tier to place him. <b>Auto-assign ✦</b> fills all eight tiers from my projected <span data-basho="proj">Aki</span> wins if you would rather start from the model and edit; <b>Clear all</b> empties the board again. S = 12+, A+ = 11, A− = 10, B = 9, C+ = 8, C− = 7, D = 6, F = 5 or fewer. Build several lists — they save in your browser automatically.</p><div class="tier-lists" id="tierLists"></div><div class="an-scope tier-div" id="tierDivToggle"></div><div class="tier-tools"><input class="tl-name" id="tlName" maxlength="40" aria-label="List name" placeholder="List name"><button class="tl-btn" id="tlDup">Duplicate</button><button class="tl-btn" id="tierAuto" title="Fill the tiers from the projected wins">Auto-assign ✦</button><button class="reset" id="tierReset" title="Send every rikishi back to Unassigned">Clear all</button><button class="tl-btn danger" id="tlDelete">Delete</button><span class="tier-hint" id="tierHint">Tap a rikishi to move them.</span><div class="tl-confirm" id="tierConfirm" role="alertdialog" aria-live="polite" hidden><span id="tierConfirmMsg"></span><button class="tl-btn danger" id="tierConfirmYes">Yes, do it</button><button class="tl-btn" id="tierConfirmNo">Cancel</button></div></div><div class="tiers" id="tiers"></div></section></main><div class="dmodal" id="draftModal" role="dialog" aria-modal="true" aria-label="Draft wrestler"><div class="dmodal-panel"><button class="dmodal-close" id="dmClose" aria-label="Close">✕</button><div class="dmodal-card scard" id="dmCard"></div><div class="dmodal-brackets"><p class="lab">Draft to bracket</p><div class="dmodal-chips" id="dmChips"></div></div><button class="dmodal-undraft" id="dmUndraft">Undraft</button></div></div><footer>
+Ranks follow the current Nihon Sumo Kyokai banzuke, live from sumo-api; official JSA kesho-mawashi portraits. Records and ranks for past tournaments are from the respective banzuke. Elo from sumostats.com — only verified values are shown (others “—”). Grades and projected records are my own model, not official. Not affiliated with the Nihon Sumo Kyokai.
 </footer><script>
 /* The live banzuke sync below rewrites r.rk / r.side / r.num / r.chg to the
    NEW banzuke. The past-basho boxes need the ranks a wrestler actually held in
@@ -343,7 +343,7 @@ el.innerHTML=`
    ${tierProj}
    ${projBox(r)}
    ${r.live?liveBox(r):""}
-   ${r.rec?bashoBox(r,0,bashoLabel(bashoStep(FINISHED_BASHO_ID,-1)),PREV_RANK[r.n]||"")+bashoBox(r,1,bashoLabel(bashoStep(FINISHED_BASHO_ID,-2)),MARCH_RANK[r.n]||"")+bashoBox(r,2,bashoLabel(bashoStep(FINISHED_BASHO_ID,-3)),JAN_RANK[r.n]||""):""}
+   ${r.rec?bashoBox(r,0,bashoLabel(bashoStep(FINISHED_BASHO_ID,-1)),PREV_RANK[r.n]||"")+bashoBox(r,1,bashoLabel(bashoStep(FINISHED_BASHO_ID,-2)),AGO2_RANK[r.n]||"")+bashoBox(r,2,bashoLabel(bashoStep(FINISHED_BASHO_ID,-3)),AGO3_RANK[r.n]||""):""}
    ${r.inj?`<div class="injury ${r.lv}"><div class="blk-head"><span class="lab">Health</span><span class="hpill ${r.lv}">${hLabel(r.lv)}</span></div><p class="blk-txt">${r.inj}</p></div>`:""}
    <div class="c-actions">
      <button class="act cmpbtn ${cmp?"on":""}">${cmp?"✓ Comparing":"Compare"}</button>
@@ -409,7 +409,7 @@ const rows=[
 ["My grade",r=>r.grade||"—"],
 ["May 2026",r=>r.rec?r.rec[0].replace(/-/g,"–"):"—"],
 ["March 2026",r=>r.rec?r.rec[1].replace(/-/g,"–"):"—"],
-["Aki projection",r=>projRec(r)],
+[bashoJa(PROJ_BASHO_ID)+" projection",r=>projRec(r)],
 ["Style",r=>archetype(r.sig)],
 ["Age",r=>r.age?r.age+" yrs":"—"],
 ["Elo",r=>r.elo?(r.elo+(r.eloPk?` (pk ${r.eloPk})`:"")):"—",r=>r.elo&&r.elo===maxElo&&maxElo>0],
@@ -519,7 +519,7 @@ let lw=0,ll=0;BRACKETS.forEach(b=>{const pid=picks[b.id];if(pid==null)return;con
 dg.style.display="";
 dg.innerHTML=`<div class="dg-badge" style="background:${DGC[g]};color:${["B","C+","C","D"].includes(g)?"#0d0f15":"#fff"}">${g}</div>
       <div class="dg-body"><div class="dg-title">Draft grade</div>
-      <div class="dg-sub">Your team projects to <b>${totalW}</b> total wins across the seven picks at Aki. ${line} <span class="dg-live${BASHO_RUNNING?'':' done'}">At Nagoya\u2019s close your seven were a combined <b>${lw}\u2013${ll}</b>.</span></div></div>`;
+      <div class="dg-sub">Your team projects to <b>${totalW}</b> total wins across the seven picks at ${bashoJa(PROJ_BASHO_ID)}. ${line} <span class="dg-live${BASHO_RUNNING?'':' done'}">At ${bashoJa(FINISHED_BASHO_ID)}\u2019s close your seven were a combined <b>${lw}\u2013${ll}</b>.</span></div></div>`;
 }
 else{seal.classList.remove("show");txt.innerHTML=`<b>${7-n} to go</b>Draft from the Browse tab.`;dg.style.display="none";}
 }
@@ -585,7 +585,7 @@ const REC_W=[0.5,0.3,0.2];
 /* The most-recent-basho row renders in the green "live" treatment only while that
    basho is actually running. Once it is over it takes the same gold styling as the
    finished basho below it. Repoint BASHO_END whenever `live` moves to a new basho. */
-const BASHO_END="2026-07-26";
+const BASHO_END="2026-09-27";
 /* ---- basho identity, in ONE place --------------------------------------
    FINISHED_BASHO_ID is the basho that r.live describes — the most recent one
    actually fought. Every card label is derived from it by walking the odd-month
@@ -594,7 +594,7 @@ const BASHO_END="2026-07-26";
    basho (the one the new banzuke is for, and the one the projection is about)
    is one step forward from here, and the live sync confirms it against
    sumo-api. ---------------------------------------------------------------- */
-const FINISHED_BASHO_ID="202607";
+const FINISHED_BASHO_ID="202609";
 const BASHO_MONTHS=["01","03","05","07","09","11"];
 const BASHO_MON={"01":"January","03":"March","05":"May","07":"July","09":"Sept","11":"November"};
 const BASHO_NAME={"01":"Hatsu","03":"Haru","05":"Natsu","07":"Nagoya","09":"Aki","11":"Ky\u016bsh\u016b"};
@@ -610,28 +610,34 @@ function bashoStep(id,n){
 function bashoLabel(id){ return (BASHO_MON[id.slice(4)]||id.slice(4))+" "+id.slice(0,4); }
 function bashoJa(id){ return BASHO_NAME[id.slice(4)]||""; }
 const UPCOMING_BASHO_ID=bashoStep(FINISHED_BASHO_ID,1);
+/* Basho names in the page copy are data-basho spans, filled from the ids:
+   "proj" the projected basho, "proj-label" with its year, "fin" the finished one. */
+function fillBashoNames(){
+  document.querySelectorAll("[data-basho]").forEach(function(el){
+    var k=el.getAttribute("data-basho");
+    el.textContent = k==="fin" ? bashoJa(FINISHED_BASHO_ID) : k==="proj-label" ? bashoJa(PROJ_BASHO_ID)+" "+PROJ_BASHO_ID.slice(0,4) : bashoJa(PROJ_BASHO_ID);
+  });
+}
 /* The upcoming basho's id as the live banzuke actually reports it. The sync
    below overwrites this if sumo-api says otherwise, so a schedule change can
    never leave the projection box labelled for the wrong tournament. */
 let PROJ_BASHO_ID=UPCOMING_BASHO_ID;
+fillBashoNames();
 const BASHO_RUNNING=(new Date().toISOString().slice(0,10)<=BASHO_END);
-/* Nagoya 2026 honours, keyed like AWARDS but held separately so that
+/* Honours from the finished basho (FINISHED_BASHO_ID), keyed like AWARDS but held separately so that
    bashoBox()/awardChips() keep indexing the three past-basho rows correctly. */
-const NAGOYA_AW={
-"Aonishiki":{y:1,p:["Gin\u014d-sh\u014d"]},
-"Kirishima":{jy:1},
-"Atamifuji":{jy:1,p:["Kant\u014d-sh\u014d"]},
-"Fujinokawa":{k:2,p:["Shukun-sh\u014d"]},
-"Gonoyama":{k:1},
-"Hakunofuji":{k:1},
-"Kotoeiho":{p:["Kant\u014d-sh\u014d"]},
-"Takayasu":{p:["Kant\u014d-sh\u014d"]},
-"Shonannoumi":{ju:1}
+const FINISHED_AW={
+"Onosato":{y:1},
+"Aonishiki":{jy:1},
+"Fujinokawa":{jy:1,p:["Kantō-shō"]},
+"Churanoumi":{p:["Kantō-shō"]},
+"Takayasu":{k:1},
+"Kitanowaka":{ju:1}
 };
 /* The projection looks ahead to Aki, so the form window is Nagoya plus the two
    basho before it — July carries the most weight. */
 function formWindow(r){const past=r.rec||[];return [r.live||null,past[0]||null,past[1]||null];}
-function awardSlots(r){const past=AWARDS[r.n]||[];return [NAGOYA_AW[r.n]||null,past[0]||null,past[1]||null];}
+function awardSlots(r){const past=AWARDS[r.n]||[];return [FINISHED_AW[r.n]||null,past[0]||null,past[1]||null];}
 function awardBoost(r){
 const A=awardSlots(r);
 let t=0;
@@ -671,23 +677,28 @@ if(a>=10)return `<span class="kk kyujo">kyūjō</span>`;
 return `<span class="kk ${w>=8?"kachi":"make"}">${w>=8?"kachi-koshi":"make-koshi"}</span>`;
 }
 const HL={
-Kirishima:["12–3 and right in the hunt, edged for the cup on the final day.","Won the tournament — his 3rd career title (12–3) — and clinched his Ōzeki return."],
-Wakatakakage:["Won the Natsu championship (12–3) with the Technique prize.","Pulled out late, but 8 wins already banked a winning record."],
-Kazuma:["Won the Jūryō championship (12–3) to earn his top-division promotion.","A strong 10–5 up in Jūryō."],
-Dewanoryu:[null,"Won the Jūryō championship (11–4)."],
-Yoshinofuji:["11–4 with a Fighting-Spirit prize.",null],
-Hakunofuji:["11–4 and a Fighting-Spirit prize on his return.",null],
-Kotoshoho:[null,"11–4 with a Fighting-Spirit prize."],
-Fujiseiun:[null,"10–5 with a Fighting-Spirit prize."],
-Fujinokawa:[null,"8–7 with the Technique prize."],
-Onosato:["Sat out the entire tournament with a shoulder injury.","Withdrew on Day 4 and never returned."],
-Aonishiki:["Sat out injured (broken toe) and lost his Ōzeki rank.","7–8 at Ōzeki — a make-koshi that left him kadoban."],
-Kotozakura:["3–9–3, withdrew again with his Ōzeki rank on the line.",null],
-Onokatsu:[null,"1–6–8, wrecked by injury and demoted from the top division."],
-Wakanosho:[null,"11–4 in Jūryō to seal his top-division debut."],
-Takerufuji:["11–4 in Jūryō, charging back toward the top division.",null],
-Tamawashi:["A brutal 2–13 that sent the veteran tumbling.",null],
-Wakamotoharu:[null,"A dismal 3–12 that dropped him out of sanyaku."],
+"Kirishima":["12–3; lost the three-way playoff for the title.","12–3 and right in the hunt, edged for the cup on the final day.","Won the tournament — his 3rd career title (12–3) — and clinched his Ōzeki return."],
+"Wakatakakage":["Sat out the whole basho after July 1 thigh surgery.","Won the Natsu championship (12–3) with the Technique prize.","Pulled out late, but 8 wins already banked a winning record."],
+"Kazuma":[null,"Won the Jūryō championship (12–3) to earn his top-division promotion.","A strong 10–5 up in Jūryō."],
+"Dewanoryu":[null,null,"Won the Jūryō championship (11–4)."],
+"Yoshinofuji":[null,"11–4 with a Fighting-Spirit prize.",null],
+"Hakunofuji":[null,"11–4 and a Fighting-Spirit prize on his return.",null],
+"Kotoshoho":[null,null,"11–4 with a Fighting-Spirit prize."],
+"Fujiseiun":[null,null,"10–5 with a Fighting-Spirit prize."],
+"Fujinokawa":["8–7 with two kinboshi and the Shukun-shō.",null,"8–7 with the Technique prize."],
+"Onosato":[null,"Sat out the entire tournament with a shoulder injury.","Withdrew on Day 4 and never returned."],
+"Aonishiki":["Won the title in a three-way playoff after 12–3, with the Ginō-shō, to return to Ōzeki.","Sat out injured (broken toe) and lost his Ōzeki rank.","7–8 at Ōzeki — a make-koshi that left him kadoban."],
+"Kotozakura":[null,"3–9–3, withdrew again with his Ōzeki rank on the line.",null],
+"Onokatsu":[null,null,"1–6–8, wrecked by injury and demoted from the top division."],
+"Wakanosho":[null,null,"11–4 in Jūryō to seal his top-division debut."],
+"Takerufuji":[null,"11–4 in Jūryō, charging back toward the top division.",null],
+"Tamawashi":[null,"A brutal 2–13 that sent the veteran tumbling.",null],
+"Wakamotoharu":[null,null,"A dismal 3–12 that dropped him out of sanyaku."],
+"Atamifuji":["12–3 with the Kantō-shō; lost the three-way playoff."],
+"Kotoeiho":["11–4 with the Kantō-shō."],
+"Takayasu":["11–4 with the Kantō-shō."],
+"Shonannoumi":["Won the Jūryō title in an 11–4 four-way playoff."],
+"Hoshoryu":["Went kyūjō from day 14 at 7–7 with a knee injury."]
 };
 function recapText(r,idx,w,l,a){
 const hl=(HL[r.n]||[])[idx]; if(hl)return hl;
@@ -702,21 +713,25 @@ if(w>=5)return "A losing record, with ground to make up.";
 return "A rough tournament to forget.";
 }
 const AWARDS={
-"Nabatame":[null,{ld:"Sandanme"},null],
-"Wakatakakage":[{y:1,p:["Ginō-shō"]},{k:1},null],
-"Kirishima":[{jy:1},{y:1,p:["Shukun-shō"]},{p:["Kantō-shō"]}],
-"Yoshinofuji":[{p:["Kantō-shō"]},null,{k:2,p:["Shukun-shō"]}],
-"Hakunofuji":[{p:["Kantō-shō"]},null,{k:1}],
-"Kazuma":[{ju:1},null,null],
-"Hoshoryu":[null,{jy:1},null],
-"Kotoshoho":[null,{jy:1,p:["Kantō-shō"]},null],
-"Fujiseiun":[null,{p:["Kantō-shō"]},null],
-"Fujinokawa":[null,{k:2,p:["Ginō-shō"]},null],
-"Daieisho":[null,{k:1},{k:1}],
-"Dewanoryu":[null,{ju:1},null],
-"Aonishiki":[null,null,{y:1}],
-"Atamifuji":[null,null,{jy:1,k:2,p:["Kantō-shō"]}],
-"Wakanosho":[null,null,{ju:1}]
+"Aonishiki":[{y:1,p:["Ginō-shō"]},null,null],
+"Kirishima":[{jy:1},{jy:1},{y:1,p:["Shukun-shō"]}],
+"Atamifuji":[{jy:1,p:["Kantō-shō"]},null,null],
+"Fujinokawa":[{k:2,p:["Shukun-shō"]},null,{k:2,p:["Ginō-shō"]}],
+"Gonoyama":[{k:1},null,null],
+"Hakunofuji":[{k:1},{p:["Kantō-shō"]},null],
+"Kotoeiho":[{p:["Kantō-shō"]},null,null],
+"Takayasu":[{p:["Kantō-shō"]},null,null],
+"Shonannoumi":[{ju:1},null,null],
+"Nabatame":[null,null,{ld:"Sandanme"}],
+"Wakatakakage":[null,{y:1,p:["Ginō-shō"]},{k:1}],
+"Yoshinofuji":[null,{p:["Kantō-shō"]},null],
+"Kazuma":[null,{ju:1},null],
+"Hoshoryu":[null,null,{jy:1}],
+"Kotoshoho":[null,null,{jy:1,p:["Kantō-shō"]}],
+"Fujiseiun":[null,null,{p:["Kantō-shō"]}],
+"Daieisho":[null,null,{k:1}],
+"Dewanoryu":[null,null,{ju:1}],
+"Asahifuji":[{ld:"Makushita"},{ld:"Sandanme"},{ld:"Jonidan"}]
 };
 function awardChips(r,idx){return chipsFrom((AWARDS[r.n]||[])[idx]);}
 function chipsFrom(a){
@@ -730,8 +745,10 @@ if(a.k)c.push('<span class="aw kin" title="Kinboshi — a maegashira\'s win over
 (a.p||[]).forEach(p=>c.push('<span class="aw sansho" title="Special prize (sanshō)">'+p+'</span>'));
 return c.length?'<span class="awards">'+c.join("")+'</span>':"";
 }
-const JAN_RANK={"Toshinofuji":"Ms2","Enho":"Ms11","Arashifuji":"Ms9","Nabatame":"Sd28","Tanji":"Ms33","Tokifudo":"Ms5","Hoshoryu":"Y","Onosato":"Y","Kotozakura":"O","Aonishiki":"O","Kirishima":"S","Takayasu":"S","Oho":"K","Wakamotoharu":"K","Ichiyamamoto":"M1","Yoshinofuji":"M1","Ura":"M2","Wakatakakage":"M2","Takanosho":"M3","Hakunofuji":"M3","Daieisho":"M4","Atamifuji":"M4","Tamawashi":"M5","Churanoumi":"M5","Hiradoumi":"M6","Onokatsu":"M6","Oshoma":"M7","Fujinokawa":"M7","Shodai":"M8","Kinbozan":"M8","Gonoyama":"M9","Roga":"M9","Tokihayate":"M10","Kotoshoho":"M10","Chiyoshoma":"M11","Nishikifuji":"M11","Midorifuji":"M12","Abi":"M12","Tobizaru":"M13","Tomokaze":"M13","Shishi":"M14","Mitakeumi":"M14","Ryuden":"M15","Asakoryu":"M15","Asanoyama":"M16","Oshoumi":"M16","Asahakuryu":"M17","Hatsuyama":"M17","Kotoeiho":"J1","Fujiseiun":"J1","Daiseizan":"J2","Kagayaki":"J2","Fujiryoga":"J3","Shirokuma":"J3","Sadanoumi":"J4","Shonannoumi":"J4","Tamashoho":"J5","Takerufuji":"J5","Nishinoryu":"J6","Tochitaikai":"J7","Asasuiryu":"J7","Meisei":"J8","Kitanowaka":"J8","Hitoshi":"J9","Kayo":"J9","Kazekeno":"J10","Tohakuryu":"J10","Wakanosho":"J11","Nishikigi":"J12","Kyokukaiyu":"J12","Dewanoryu":"J13","Hakuyozan":"J14","Kazuma":"J14"};
-const MARCH_RANK={"Enho":"Ms4","Arashifuji":"Ms7","Hakuyozan":"Ms2","Tochitaikai":"Ms1","Nabatame":"Sd3","Tanji":"Ms12","Tokifudo":"Ms8","Kirishima":"S","Hoshoryu":"Y","Kotoshoho":"M5","Kotozakura":"O","Gonoyama":"M10","Fujiseiun":"M13","Chiyoshoma":"M14","Asahakuryu":"M16","Atamifuji":"K","Takanosho":"M4","Ichiyamamoto":"M6","Asakoryu":"M12","Nishikifuji":"M14","Kinbozan":"M16","Kotoeiho":"M17","Wakatakakage":"M1","Fujinokawa":"M2","Shodai":"M8","Asanoyama":"M12","Mitakeumi":"M15","Aonishiki":"O","Takayasu":"S","Yoshinofuji":"M1","Oho":"M3","Hiradoumi":"M3","Daieisho":"M4","Fujiryoga":"M17","Oshoma":"M7","Shishi":"M11","Tobizaru":"M13","Hakunofuji":"M7","Ura":"M8","Tokihayate":"M9","Tamawashi":"M9","Roga":"M10","Oshoumi":"M11","Churanoumi":"M2","Abi":"M5","Wakamotoharu":"K","Onokatsu":"M6","Onosato":"Y","Midorifuji":"M15","Ryuden":"J1","Sadanoumi":"J1","Asasuiryu":"J2","Tomokaze":"J2","Daiseizan":"J3","Wakanosho":"J3","Nishinoryu":"J4","Takerufuji":"J4","Kagayaki":"J5","Shirokuma":"J5","Hitoshi":"J6","Kayo":"J6","Meisei":"J7","Kyokukaiyu":"J7","Shonannoumi":"J8","Kitanowaka":"J8","Tamashoho":"J9","Hatsuyama":"J9","Dewanoryu":"J10","Tohakuryu":"J10","Kazuma":"J11","Toshinofuji":"J11","Nishikigi":"J12","Tsurugisho":"J12","Shimazuumi":"J13","Fujitensei":"J13","Kazekeno":"J14","Kotokuzan":"J14"};
+/* Ranks held two and three basho before the finished one (the past-basho boxes
+   beyond PREV_RANK). tools/finish-basho.mjs shifts these along each basho. */
+const AGO3_RANK={"Enho":"Ms4","Arashifuji":"Ms7","Hakuyozan":"Ms2","Tochitaikai":"Ms1","Nabatame":"Sd3","Tanji":"Ms12","Tokifudo":"Ms8","Kirishima":"S","Hoshoryu":"Y","Kotoshoho":"M5","Kotozakura":"O","Gonoyama":"M10","Fujiseiun":"M13","Chiyoshoma":"M14","Asahakuryu":"M16","Atamifuji":"K","Takanosho":"M4","Ichiyamamoto":"M6","Asakoryu":"M12","Nishikifuji":"M14","Kinbozan":"M16","Kotoeiho":"M17","Wakatakakage":"M1","Fujinokawa":"M2","Shodai":"M8","Asanoyama":"M12","Mitakeumi":"M15","Aonishiki":"O","Takayasu":"S","Yoshinofuji":"M1","Oho":"M3","Hiradoumi":"M3","Daieisho":"M4","Fujiryoga":"M17","Oshoma":"M7","Shishi":"M11","Tobizaru":"M13","Hakunofuji":"M7","Ura":"M8","Tokihayate":"M9","Tamawashi":"M9","Roga":"M10","Oshoumi":"M11","Churanoumi":"M2","Abi":"M5","Wakamotoharu":"K","Onokatsu":"M6","Onosato":"Y","Midorifuji":"M15","Ryuden":"J1","Sadanoumi":"J1","Asasuiryu":"J2","Tomokaze":"J2","Daiseizan":"J3","Wakanosho":"J3","Nishinoryu":"J4","Takerufuji":"J4","Kagayaki":"J5","Shirokuma":"J5","Hitoshi":"J6","Kayo":"J6","Meisei":"J7","Kyokukaiyu":"J7","Shonannoumi":"J8","Kitanowaka":"J8","Tamashoho":"J9","Hatsuyama":"J9","Dewanoryu":"J10","Tohakuryu":"J10","Kazuma":"J11","Toshinofuji":"J11","Nishikigi":"J12","Tsurugisho":"J12","Shimazuumi":"J13","Fujitensei":"J13","Kazekeno":"J14","Kotokuzan":"J14","Asahifuji":"Jd8","Ryuho":"Ms49"};
+const AGO2_RANK={"Hoshoryu":"Y","Onosato":"Y","Kirishima":"O2","Kotozakura":"O","Atamifuji":"S","Kotoshoho":"S","Wakatakakage":"K","Aonishiki":"O","Yoshinofuji":"M2","Oho":"M3","Fujinokawa":"M1","Takanosho":"M1","Gonoyama":"M4","Churanoumi":"M6","Hiradoumi":"M3","Hakunofuji":"M10","Daieisho":"M4","Ichiyamamoto":"M2","Ura":"M11","Oshoma":"M8","Shodai":"M5","Fujiseiun":"M6","Kotoeiho":"M13","Takayasu":"K","Wakamotoharu":"M5","Roga":"M14","Fujiryoga":"M17","Tobizaru":"M15","Asanoyama":"M10","Chiyoshoma":"M7","Wakanosho":"M16","Mitakeumi":"M14","Asahakuryu":"M8","Abi":"M9","Nishikifuji":"M9","Takerufuji":"J2","Kinbozan":"M11","Shishi":"M12","Onokatsu":"J1","Kazuma":"J6","Daiseizan":"J1","Asakoryu":"M7","Asasuiryu":"J4","Kyokukaiyu":"J4","Tokihayate":"M12","Sadanoumi":"J2","Ryuden":"M16","Dewanoryu":"J3","Tomokaze":"J5","Toshinofuji":"J7","Kitanowaka":"J5","Oshoumi":"M15","Shonannoumi":"J8","Kazekeno":"J11","Tamawashi":"M13","Meisei":"J6","Midorifuji":"J10","Hatsuyama":"J3","Shirokuma":"J8","Nishinoryu":"J9","Hitoshi":"J12","Tamashoho":"J12","Kagayaki":"J7","Enho":"J14","Tohakuryu":"J10","Kayo":"J9","Arashifuji":"Ms2e","Hakuyozan":"J13","Tochitaikai":"J14","Nishikigi":"J11","Nabatame":"Ms10w","Tanji":"Ms6e","Tokifudo":"Ms5e","Asahifuji":"Sd6","Ryuho":"Ms28"};
 function bashoBox(r,idx,label,rk){
 const rc=r.rec&&r.rec[idx]; if(!rc)return "";
 const rankTag=`<span class="brank">${rk||""}</span>`;
@@ -742,7 +759,7 @@ return `<div class="basho"><span class="lab">${label}</span>${rankTag}<b>${rc.re
 }
 function projRecap(r){
 const w=projWins(r);
-if(r.lv==="out")return "Expected out for Aki \u2014 no projection.";
+if(r.lv==="out")return "Expected out for "+bashoJa(PROJ_BASHO_ID)+" \u2014 no projection.";
 if(r.inj&&r.lv==="high")return "Fitness is the swing factor on this call.";
 if(w>=11)return "Projected right in the title conversation.";
 if(w>=9)return "Projected for a comfortable winning record.";
@@ -751,10 +768,24 @@ if(w===7)return "A coin-flip — projected one short.";
 if(w>=5)return "Projected to end up with a losing record.";
 return "Projected for a real struggle.";
 }
-function liveRecap(r){if(r.lk)return r.n==="Wakatakakage"?"Sat out the whole basho after July 1 thigh surgery.":"Sat out the basho \u2014 ky\u016bj\u014d.";var p=r.live.split("-").map(Number),w=p[0],l=p[1];if(r.aw==="yusho")return "Y\u016bsh\u014d \u2014 took the Emperor\u2019s Cup at "+w+"\u2013"+l+".";if(r.aw==="jun")return "Jun-y\u016bsh\u014d \u2014 runner-up at "+w+"\u2013"+l+".";if(w>l)return "Kachi-koshi \u2014 winning record at "+w+"\u2013"+l+".";if(w<l)return "Make-koshi \u2014 losing record at "+w+"\u2013"+l+".";return "Finished even at "+w+"\u2013"+l+".";}
+/* Curated one-liners for the finished basho, ahead of the generated ones. */
+const FIN_HL={
+"Fujinokawa":"Jun-yūshō at 11–4 with the Kantō-shō, beating all three Ōzeki.",
+"Churanoumi":"Kachi-koshi at 10–5 with the Kantō-shō.",
+"Takayasu":"Make-koshi at 7–8, but with the basho’s only kinboshi, over Onosato.",
+"Kotoshoho":"Withdrew from day 12 with a suspected concussion (5–7–3).",
+"Takanosho":"Withdrew from day 13 with an ankle injury (4–9–2).",
+"Hoshoryu":"Sat out the whole basho after July knee surgery.",
+"Wakatakakage":"Sat out a second straight basho after thigh surgery.",
+"Wakanosho":"Sat out the whole basho with a knee injury.",
+"Kitanowaka":"Won the Jūryō title at 11–4.",
+"Kagayaki":"11–4, level for the Jūryō title after a 10–0 start.",
+"Kayo":"11–4, level for the Jūryō title after a 7–0 start."
+};
+function liveRecap(r){if(FIN_HL[r.n])return FIN_HL[r.n];if(r.lk)return "Sat out the basho \u2014 ky\u016bj\u014d.";var p=r.live.split("-").map(Number),w=p[0],l=p[1];if(r.aw==="yusho")return "Y\u016bsh\u014d \u2014 took the Emperor\u2019s Cup at "+w+"\u2013"+l+".";if(r.aw==="jun")return "Jun-y\u016bsh\u014d \u2014 runner-up at "+w+"\u2013"+l+".";if(w>l)return "Kachi-koshi \u2014 winning record at "+w+"\u2013"+l+".";if(w<l)return "Make-koshi \u2014 losing record at "+w+"\u2013"+l+".";return "Finished even at "+w+"\u2013"+l+".";}
 function liveBox(r){if(!r.live)return "";
 var lld=lowDiv(r.live);
-if(lld)return `<div class="basho" title="${bashoLabel(FINISHED_BASHO_ID)} (${bashoJa(FINISHED_BASHO_ID)}) \u2014 below the salaried ranks"><span class="lab">${bashoLabel(FINISHED_BASHO_ID)}</span><span class="brank">${FINISHED_RANK[r.n]||""}</span>${lowCells(lld)}<span class="kkc">${chipsFrom(NAGOYA_AW[r.n])}${lowKk(lld)}</span><span class="recap">${lowText(lld," \u2014 promoted to the salaried ranks for "+bashoJa(PROJ_BASHO_ID))}</span></div>`;var AWL={yusho:"Y\u016bsh\u014d",jun:"Jun-y\u016bsh\u014d",sansho:"Sansh\u014d"};var rankTag=`<span class="brank">${FINISHED_RANK[r.n]||((r.rk||"")+(r.side?r.side.toLowerCase():""))}</span>`;var p=r.live.split("-").map(Number),w=p[0],l=p[1];var awTag=chipsFrom(NAGOYA_AW[r.n])||(r.aw?`<span class="aw ${r.aw}">${AWL[r.aw]}</span>`:"");var kk=r.lk?`<span class="kk kyujo">ky\u016bj\u014d</span>`:`<span class="kk ${w>l?"kachi":w<l?"make":"even"}">${w>l?"kachi-koshi":w<l?"make-koshi":"even"}</span>`;var rec=(r.lk&&w+l===0)?`<b class="dim2">0\u20130</b>`:`<b>${r.live.replace(/-/g,"\u2013")}</b>`;return `<div class="basho${BASHO_RUNNING?" live-box":""}" title="${bashoLabel(FINISHED_BASHO_ID)} (${bashoJa(FINISHED_BASHO_ID)}) \u2014 final"><span class="lab">${bashoLabel(FINISHED_BASHO_ID)}</span>${rankTag}${rec}<span class="kkc">${awTag}${kk}</span><span class="recap">${liveRecap(r)}</span></div>`;}
+if(lld)return `<div class="basho" title="${bashoLabel(FINISHED_BASHO_ID)} (${bashoJa(FINISHED_BASHO_ID)}) \u2014 below the salaried ranks"><span class="lab">${bashoLabel(FINISHED_BASHO_ID)}</span><span class="brank">${FINISHED_RANK[r.n]||""}</span>${lowCells(lld)}<span class="kkc">${chipsFrom(FINISHED_AW[r.n])}${lowKk(lld)}</span><span class="recap">${lowText(lld," \u2014 promoted to the salaried ranks for "+bashoJa(PROJ_BASHO_ID))}</span></div>`;var AWL={yusho:"Y\u016bsh\u014d",jun:"Jun-y\u016bsh\u014d",sansho:"Sansh\u014d"};var rankTag=`<span class="brank">${FINISHED_RANK[r.n]||((r.rk||"")+(r.side?r.side.toLowerCase():""))}</span>`;var p=r.live.split("-").map(Number),w=p[0],l=p[1];var awTag=chipsFrom(FINISHED_AW[r.n])||(r.aw?`<span class="aw ${r.aw}">${AWL[r.aw]}</span>`:"");var kk=r.lk?`<span class="kk kyujo">ky\u016bj\u014d</span>`:`<span class="kk ${w>l?"kachi":w<l?"make":"even"}">${w>l?"kachi-koshi":w<l?"make-koshi":"even"}</span>`;var rec=(r.lk&&w+l===0)?`<b class="dim2">0\u20130</b>`:`<b>${r.live.replace(/-/g,"\u2013")}</b>`;return `<div class="basho${BASHO_RUNNING?" live-box":""}" title="${bashoLabel(FINISHED_BASHO_ID)} (${bashoJa(FINISHED_BASHO_ID)}) \u2014 final"><span class="lab">${bashoLabel(FINISHED_BASHO_ID)}</span>${rankTag}${rec}<span class="kkc">${awTag}${kk}</span><span class="recap">${liveRecap(r)}</span></div>`;}
 /* The upcoming basho, as a card box. It carries the projection rather than a
    0\u20130: the tournament hasn't been fought, so there is no record to show, and
    the projection is the only thing worth saying about it. The rank IS real \u2014
@@ -959,7 +990,7 @@ const placed=R.filter(r=>!r.gone&&a[r.id]&&a[r.id]!=="U").length, left=R.filter(
 if(!placed)return "All "+R.length+" sit in Unassigned \u2014 tap a rikishi, then tap a tier to place him.";
 if(left)return placed+" placed \u00b7 "+left+" still unassigned \u2014 tap a rikishi to move them.";
 const d=listIsStale();
-return d?("Board complete \u00b7 "+d+" "+(d===1?"pick differs":"picks differ")+" from the current Aki projection."):"Board complete \u2014 tap a rikishi to move them.";}
+return d?("Board complete \u00b7 "+d+" "+(d===1?"pick differs":"picks differ")+" from the current "+bashoJa(PROJ_BASHO_ID)+" projection."):"Board complete \u2014 tap a rikishi to move them.";}
 function renderTierLists(){
 const wrap=document.getElementById("tierLists");
 wrap.innerHTML=tierLists.map((l,i)=>`<button class="tl-tab ${i===activeList?"on":""}" data-i="${i}">${tlEsc(l.name)||"(untitled)"}</button>`).join("")
@@ -1017,7 +1048,7 @@ tierAsk("Send all "+n+" placed rikishi back to Unassigned? This clears “"+(tie
   ()=>tierApply(emptyAssign(),"Cleared — all 70 back in Unassigned."));
 };
 document.getElementById("tierAuto").onclick=()=>{
-const run=()=>tierApply(projectionAssign(),"Filled from the projected Aki wins.");
+const run=()=>tierApply(projectionAssign(),"Filled from the projected "+bashoJa(PROJ_BASHO_ID)+" wins.");
 const n=tierPlaced();
 if(!n)return run();
 tierAsk("Auto-assign from the projection? This overwrites the "+n+" rikishi you have already placed.",run);
@@ -1119,8 +1150,10 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
     R.forEach(function(r){
       var was = !!r.gone;
       r.gone = !liveNames[r.n];
-      if (r.gone) departed.push(r.n);
-      if (was && !r.gone) arrived.push(r.n + " (back)");   // returned from Makushita
+      if (r.gone && !r.nu) departed.push(r.n);   // a newcomer not yet on a banzuke hasn’t left one
+      /* nu: a newcomer given a profile ahead of the banzuke that lists him. He
+         is bundled hidden, and appearing is his debut, not a return. */
+      if (was && !r.gone && !r.nu) arrived.push(r.n + " (back)");   // returned from Makushita
       delete liveNames[r.n];
     });
     for (k in liveNames) if (Object.prototype.hasOwnProperty.call(liveNames, k)) arrived.push(k);
@@ -1148,6 +1181,7 @@ renderPills(); renderCards(); updateDraftCount(); updateCmpBar();
        started, in which case the upcoming one is the next step forward. Either
        way the projection box now names the right tournament. */
     PROJ_BASHO_ID = res.started ? bashoStep(res.bashoId, 1) : res.bashoId;
+    try { fillBashoNames(); } catch(e){}
     try { resettlePicks(); } catch(e){}      // ranks just changed under the drafted team
     try { renderPills(); renderCards(); if (typeof renderTiers === "function") renderTiers(); } catch(e){}
     var note = res.started
