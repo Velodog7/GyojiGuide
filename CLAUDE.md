@@ -219,6 +219,33 @@ league only when a title vouches for it: no title, a classic team saved after
 the title was awarded, or a winner and score that disagree with the title are
 all skipped and listed. `history.js`.
 
+### A new banzuke checks every saved team
+
+Teams carry over from one basho to the next: the roll-over only clears
+Results. So `checkPicksForNewBasho_()` runs once per basho, from
+`adminResetBasho` (retried by `keeperClock` and the hourly import until
+sumo-api has the banzuke), and only between the roll-over and day 1, while
+Results is empty: once bouts are in, nothing may move a team. It:
+- takes every public (`Users`) and classic-league (`LeagueTeams`) pick that no
+  longer fits its slot out of the team, using the team builder's bands
+  (`pickFits_`, mirroring `BANDS` in fantasy.html), and leaves a note
+  (`teamNote`: Users column 9, LeagueTeams column 5) that the page shows until
+  the player saves again. The page also drops those picks from the copy in
+  `localStorage`, which it otherwise keeps over the server's;
+- moves keeper-roster men between Makuuchi and Jūryō in every drafted keeper
+  league (not one mid-draft), so declarations and keep limits count the new
+  divisions. Declared keeps that end up over a limit are trimmed by wins at the
+  close;
+- sets `Meta['rollover:<id>']` for each drafted keeper league with a roll-over
+  to run (limited keeps: declarations; no limit but someone left the banzuke:
+  a re-draft). `myLeagues` hands it to the commissioner's banner, and
+  `startSupplementalDraft_` clears it;
+- keeps the banzuke in `Meta.banzukeRanks`, so `saveTeam` and `saveLeagueTeam`
+  refuse a pick that doesn't fit (`misfits` in the reply).
+
+Classic-league teams lock while Results is on the sheet, like the public team
+(`saveLeagueTeam` refuses and the page locks the panel). `newbanzuke.js`.
+
 ### Keep writes off read paths
 
 `draftState` is polled every ~4s during a live draft and `leagueDetail` on every
@@ -331,9 +358,12 @@ doesn't move on its own is the bundled data, so each cycle has two jobs:
 Before rolling over, fill in the finished basho's league records if any are
 missing (admin page, "League records — fill in a basho"): it needs that
 basho's Results, which the roll-over clears. Then roll the Sheet over (admin
-page: start the new basho). After that a keeper league closes within five
-minutes of its draft day (the keeper clock), and the re-draft draws its pool
-from the banzuke of the basho in `Meta`.
+page: start the new basho), but only once sumo-api has the banzuke (step 2
+proves it): until then the fantasy page would draft from the old ranks, and
+the team check waits for it. The roll-over checks every saved team and keeper
+roster against the new banzuke and reports what it moved. After that a keeper
+league closes within five minutes of its draft day (the keeper clock), and the
+re-draft draws its pool from the banzuke of the basho in `Meta`.
 
 ## Two backends, one switch (October 2026)
 

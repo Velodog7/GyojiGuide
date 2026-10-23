@@ -308,7 +308,7 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
       </div>
       <div class="card" style="max-width:480px">
         <h3>New basho</h3>
-        <p class="v-sub" style="margin:0 0 12px">Clears the results sheet and resets the tournament meta &#8212; day counter, y&#363;sh&#333; and sansh&#333; &#8212; so the next basho scores from zero. Results carry no basho of their own, so leaving the last one in place would keep paying out its points, block the new bouts from importing, and hold the roster window open all fortnight. Run this once, after the ranking below has been applied.</p>
+        <p class="v-sub" style="margin:0 0 12px">Clears the results sheet and resets the tournament meta &#8212; day counter, y&#363;sh&#333; and sansh&#333; &#8212; so the next basho scores from zero. Results carry no basho of their own, so leaving the last one in place would keep paying out its points, block the new bouts from importing, and hold the roster window open all fortnight. Run this once, after the ranking below has been applied. It also checks every saved team and keeper roster against the new banzuke: picks that no longer fit their slot are taken out (each player is told), keeper wrestlers move to their new division, and keeper commissioners are told to run their roll-over. So start it after the banzuke is out and on sumo-api.</p>
         <label class="lab" for="newBashoName" style="display:block;margin-bottom:6px">Basho label</label>
         <input id="newBashoName" type="text" placeholder="Aki 2026" autocomplete="off"
                style="width:100%;padding:8px 10px;margin-bottom:12px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.25);color:inherit;font:inherit">
@@ -840,6 +840,15 @@ td.num{ font-family:"WDXL Lubrifont TC",monospace; text-align:right; white-space
       msg.textContent = "Ready for " + res.basho + " \u2014 cleared " + (res.clearedRows || 0) + " result row" + (res.clearedRows === 1 ? "" : "s") +
         (res.previous ? " from " + res.previous + "." : ".") +
         (res.bashoIdDerived ? " Importer set to " + res.bashoId + "." : "");
+      /* every saved team and keeper roster, checked against the new banzuke */
+      var pk = res.picks || {}, c = pk.counts;
+      if (c) msg.textContent += " Teams checked: " + c.picks + " pick" + (c.picks === 1 ? "" : "s") + " taken out of " +
+        c.teams + " public team" + (c.teams === 1 ? "" : "s") + ", " + c.leaguePicks + " out of " + c.leagueTeams +
+        " league team" + (c.leagueTeams === 1 ? "" : "s") + " (each player is told); " + c.keeperMoves +
+        " keeper wrestler" + (c.keeperMoves === 1 ? "" : "s") + " moved division; " + c.rollovers +
+        " keeper league" + (c.rollovers === 1 ? "" : "s") + " told to run the roll-over.";
+      else if (pk.notReady) msg.textContent += " ⚠ sumo-api doesn’t have the new banzuke yet, so teams aren’t checked;" +
+        " the keeper clock will check them within five minutes of it appearing.";
       /* A name we can't parse leaves the importer pointed at the old basho, and
          that is a silent fortnight of no results if nobody is told. */
       if (!res.bashoIdDerived){

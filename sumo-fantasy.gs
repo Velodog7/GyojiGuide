@@ -116,7 +116,7 @@ function parseScoring(cell) {
 // Bump this whenever the backend changes. Fetch <exec>?action=version to
 // confirm which code is actually LIVE — if this number doesn't match, the
 // deploy didn't land (you saved but didn't "Deploy → New version").
-var BACKEND_VERSION = '2026-10-23-draft-day';
+var BACKEND_VERSION = '2026-10-23-new-banzuke';
 /* The pick clock. A member with auto-draft ON is given only a short grace —
    he asked to be drafted for, so there is nothing to wait for. A member with
    it OFF gets the league's full clock before the board picks for him. Either
@@ -262,6 +262,18 @@ function ensureKeepDeadlineHead_(sh){
   sh = sh || sh_(SHEET_LEAGUES);
   var head = sh.getRange(1, 1, 1, Math.max(KEEP_DEADLINE_COL, sh.getLastColumn())).getValues()[0];
   if (String(head[KEEP_DEADLINE_COL - 1] || '').toLowerCase() !== 'keepdeadline') sh.getRange(1, KEEP_DEADLINE_COL).setValue('keepDeadline');
+}
+/* v9: the note a new banzuke leaves on a team it took picks out of (JSON
+   { basho, picks:[{slot, name, now}] }); cleared when the player saves again.
+   Users column 9, LeagueTeams column 5. See checkPicksForNewBasho_. */
+var USERS_NOTE_COL = 9, LGTEAMS_NOTE_COL = 5;
+function ensureColHead_(sh, col, name){
+  var head = sh.getRange(1, 1, 1, Math.max(col, sh.getLastColumn())).getValues()[0];
+  if (String(head[col - 1] || '') !== name) sh.getRange(1, col).setValue(name);
+}
+function parseNote_(cell){
+  if (!cell) return null;
+  try { return JSON.parse(String(cell)); } catch (e) { return null; }
 }
 /* A time in a cell as ISO, or ''. A Sheet turns an ISO string it is given
    into a Date of its own accord, so accept either. */
@@ -609,8 +621,11 @@ function saveTeam(body) {
         if (String(v[r][2] || '') !== auth) return { ok: false, error: 'Not authorised for this handle.' };
         if (teamsLocked_()) return { ok: false, locked: true,
           error: 'The basho is under way \u2014 teams are locked until it ends.' };
+        var misfits = misfitPicks_(body.team || {});
+        if (misfits.length) return { ok: false, misfits: misfits, error: misfitText_(misfits) };
         var name = String(body.name || v[r][1] || handle).trim().slice(0, 60);
         sh.getRange(r + 1, 1, 1, 5).setValues([[String(v[r][0]), name, auth, JSON.stringify(body.team || {}), new Date().toISOString()]]);
+        if (String(v[r][USERS_NOTE_COL - 1] || '')) sh.getRange(r + 1, USERS_NOTE_COL).setValue('');   // he has seen to it
         return { ok: true, updated: true, handle: handle };
       }
     }
@@ -699,7 +714,9 @@ function readUsers() {
     var team = {};
     try { team = JSON.parse(v[r][3] || '{}'); } catch (e) {}
     var rk = ranks[String(v[r][0]).toLowerCase()] || { idx:0, label:RANK_LADDER[0].label, div:RANK_LADDER[0].div };
-    out.push({ handle: String(v[r][0]), name: String(v[r][1] || v[r][0]), team: team, updated: String(v[r][4] || ''), avatar: String(v[r][5] || ''), rank: rk });
+    var row = { handle: String(v[r][0]), name: String(v[r][1] || v[r][0]), team: team, updated: String(v[r][4] || ''), avatar: String(v[r][5] || ''), rank: rk };
+    var note = parseNote_(v[r][USERS_NOTE_COL - 1]); if (note) row.teamNote = note;
+    out.push(row);
   }
   return out;
 }
@@ -825,6 +842,7 @@ function myLeagues(handle){
   for (var r=1;r<mem.length;r++) if (String(mem[r][1]).toLowerCase()===k) mine[String(mem[r][0])]=true;
   var lv = sh_(SHEET_LEAGUES).getDataRange().getValues(), out=[];
   var declared = null;                         // read only if a keeper window is open somewhere
+  var meta = null;                             // read only for a drafted keeper league
   for (var i=1;i<lv.length;i++){
     var id=String(lv[i][0]); if (!mine[id]) continue;
     var status = String(lv[i][7]||'none') || 'none';
@@ -839,6 +857,13 @@ function myLeagues(handle){
       row.keepDeadline = isoCell_(lv[i][KEEP_DEADLINE_COL - 1]);
       row.keepDeclared = !!(declared[id] && declared[id][k]);
     }
+    /* a new banzuke is in and this keeper league hasn't run its roll-over:
+       'keepers' (open declarations) or 'redraft' (see checkPicksForNewBasho_) */
+    if (status === 'complete' && row.mode === 'keepers'){
+      if (!meta) meta = readMeta();
+      var ro = String(meta['rollover:' + id] || '').split('|');
+      if (ro[1] && ro[0] === String(meta.basho || '').trim()) row.rollover = ro[1];
+    }
     out.push(row);
   }
   return { ok:true, leagues:out };
@@ -850,7 +875,7 @@ function leagueTeamsOf(id){
     if (String(v[r][0])!==String(id)) continue;
     var h = String(v[r][1]||''); if (!h) continue;
     var team = {}; try { team = JSON.parse(v[r][2] || '{}'); } catch(e){}
-    out[h.toLowerCase()] = { team: team, updated: String(v[r][3]||'') };
+    out[h.toLowerCase()] = { team: team, updated: String(v[r][3]||''), note: parseNote_(v[r][LGTEAMS_NOTE_COL - 1]) };
   }
   return out;
 }
@@ -870,6 +895,7 @@ function leagueDetail(id, handle){
     var ros = rosters[h.toLowerCase()] || { makuuchi:[], juryo:[] };
     var bd = boards[h.toLowerCase()] || null;
     return { handle:h, name: byh[h.toLowerCase()] || h, team: t ? t.team : {}, teamUpdated: t ? t.updated : '',
+      teamNote: t ? t.note : null,
       roster: ros,
       /* everyone sees WHETHER a member has set a board (so the commissioner can
          chase the stragglers) but only you get to see your own order */
@@ -1515,13 +1541,20 @@ function saveLeagueTeam(body){
   var u = verifyAuth(body.handle, body.auth); if (!u) return { ok:false, error:'Not authorised.' };
   var L = leagueRow(body.id); if (!L) return { ok:false, error:'League not found.' };
   if (!isMember(L.id, u.handle)) return { ok:false, error:'Join the league to draft a team there.' };
+  /* Locked while a basho's results are on the sheet, like the public team: a
+     league team changed on day 13 could take the day's leaders. */
+  if (teamsLocked_()) return { ok:false, locked:true, error:'The basho is under way — teams are locked until it ends.' };
   var teamJson = typeof body.team === 'string' ? body.team : JSON.stringify(body.team || {});
+  var teamObj = {}; try { teamObj = JSON.parse(teamJson) || {}; } catch (e) {}
+  var misfits = misfitPicks_(teamObj);
+  if (misfits.length) return { ok:false, misfits:misfits, error:misfitText_(misfits) };
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var sh = sh_(SHEET_LGTEAMS), v = sh.getDataRange().getValues(), key = u.handle.toLowerCase();
     for (var r=1;r<v.length;r++){
       if (String(v[r][0])===String(L.id) && String(v[r][1]).toLowerCase()===key){
         sh.getRange(r+1, 1, 1, 4).setValues([[L.id, u.handle, teamJson, new Date().toISOString()]]);
+        if (String(v[r][LGTEAMS_NOTE_COL - 1] || '')) sh.getRange(r+1, LGTEAMS_NOTE_COL).setValue('');
         return { ok:true, updated:true };
       }
     }
@@ -3138,8 +3171,11 @@ function adminResetBasho(body){
        alone and says so, rather than guessing and importing the wrong basho. */
     var newId = bashoIdForName_(label);
     if (newId) setMeta_('bashoId', newId);
+    /* every saved team and keeper roster, against the new banzuke (retried
+       later if sumo-api hasn't published it yet) */
+    var picks = checkPicksForNewBasho_();
     return { ok:true, basho:label, previous:was, clearedRows:cleared,
-             bashoId: newId || bashoId_(), bashoIdDerived: !!newId };
+             bashoId: newId || bashoId_(), bashoIdDerived: !!newId, picks:picks };
   } finally { unlock_(lock); }
 }
 
@@ -3532,6 +3568,7 @@ function closeKeeperWindowLocked_(L){
   if (!bz.makuuchi.length && !bz.juryo.length)
     return { ok:false, notReady:true, error:'The new banzuke can\u2019t be read from sumo-api yet. Try again shortly.' };
   recordLineups_(L.id);                        // before the cuts empty anyone's roster
+  checkPicksForNewBasho_();                    // the cut counts the divisions they'll fight in
   var cut = applyKeeperCuts_(L);
   deleteRowsWhere_(SHEET_KEEPS, 0, String(L.id));
   setKeepDeadline_(L, '');                     // a closed window has no deadline
@@ -3547,7 +3584,8 @@ function closeKeeperWindowLocked_(L){
    window is due. */
 function keeperClock(){
   if (forwardTarget_(null)) return { ok:true, forwarded:true };
-  return { ok:true, closed:closeDueKeeperWindows_() };
+  var picks = checkPicksLocked_();            // a banzuke sumo-api was late with
+  return { ok:true, picks:picks, closed:closeDueKeeperWindows_() };
 }
 
 /* Windows past their deadline close themselves on the keeper clock and the
@@ -3588,7 +3626,11 @@ function applyKeeperCuts_(L){
       var list = (ros[div] || []).slice(), keep;
       if (want){
         var set = {}; want.forEach(function(n){ set[String(n).toLowerCase()] = 1; });
-        keep = list.filter(function(n){ return set[n.toLowerCase()]; }).slice(0, cap);
+        /* over the limit only if a new banzuke moved a keeper into this
+           division after he was declared: the best by wins stay */
+        keep = list.filter(function(n){ return set[n.toLowerCase()]; })
+                   .sort(function(a, b){ return (wins[b.toLowerCase()]||0) - (wins[a.toLowerCase()]||0); })
+                   .slice(0, cap);
       } else {
         keep = list.sort(function(a, b){ return (wins[b.toLowerCase()]||0) - (wins[a.toLowerCase()]||0); }).slice(0, cap);
       }
@@ -3629,6 +3671,158 @@ function fetchBanzukeNames(bashoId){
   }
   return out;
 }
+/* ---- a new banzuke, applied to everything already picked -------------------------
+   Teams carry over from one basho to the next, and nothing re-checked them, so
+   a new banzuke left saved picks in slots they no longer fit: a man promoted to
+   Komusubi still in M1-M4, a demoted one still in a Makuuchi band, men who left
+   the top two divisions entirely. Keeper rosters kept the division each man
+   was drafted in. Once per basho, as soon as the new basho has been started and
+   sumo-api has its banzuke, checkPicksForNewBasho_:
+     - takes every public and classic-league pick that no longer fits its slot
+       out of the team, and leaves the player a note of what went and why (the
+       page shows it until he saves again);
+     - moves keeper-roster men between Makuuchi and Juryo to match, so keeper
+       declarations and keep limits count the divisions they'll fight in;
+     - marks each keeper league with a roll-over to run, so its commissioner
+       is told (myLeagues.rollover);
+     - keeps the banzuke in Meta, so a save can be checked against it.
+   It runs from the roll-over, and the keeper clock and the hourly import retry
+   it until sumo-api has the banzuke. */
+function fetchBanzukeRanks_(bashoId){
+  var out = {}, n = 0, divs = ['Makuuchi', 'Juryo'];
+  for (var d = 0; d < divs.length; d++){
+    try {
+      var resp = UrlFetchApp.fetch('https://sumo-api.com/api/basho/' + bashoId + '/banzuke/' + divs[d], { muteHttpExceptions:true });
+      if (resp.getResponseCode() !== 200) continue;
+      var data = JSON.parse(resp.getContentText());
+      [].concat(data.east || [], data.west || []).forEach(function(row){
+        var name = String(row.shikonaEn || row.shikona || ''); if (!name) return;
+        var num = String(row.rank || '').match(/(\d+)/);
+        out[name.toLowerCase()] = [tierFromRank_(row.rank, divs[d]), num ? Number(num[1]) : 0];
+        n++;
+      });
+    } catch (e) {}
+  }
+  return n ? out : null;                        // name(lower) -> [tier, number]
+}
+/* The team builder's bands (fantasy.html BANDS). A slot this doesn't know is
+   left alone. r is [tier, number], or null for a man off the banzuke. */
+function pickFits_(slot, r){
+  var t = r ? r[0] : '', n = r ? r[1] : 0;
+  switch (slot){
+    case 'sanyaku': return !!r && 'YOSK'.indexOf(t) >= 0;
+    case 'm1':      return t === 'M' && n >= 1 && n <= 4;
+    case 'm5':      return t === 'M' && n >= 5 && n <= 8;
+    case 'm9':      return t === 'M' && n >= 9 && n <= 12;
+    case 'm13':     return t === 'M' && n >= 13;
+    case 'any':     return !!r && 'YOSKM'.indexOf(t) >= 0;
+    case 'juryo':   return t === 'J';
+  }
+  return true;
+}
+var BAND_LABEL_ = { sanyaku:'Sanyaku', m1:'M1–M4', m5:'M5–M8', m9:'M9–M12', m13:'M13–M16+', any:'Any Makuuchi', juryo:'Jūryō' };
+function rankWords_(r){
+  var name = { Y:'Yokozuna', O:'Ōzeki', S:'Sekiwake', K:'Komusubi', M:'Maegashira', J:'Jūryō' }[r[0]] || r[0];
+  return (r[0] === 'M' || r[0] === 'J') && r[1] ? name + ' ' + r[1] : name;
+}
+function misfitText_(misfits){
+  return misfits.map(function(m){
+    return m.now ? m.name + ' is now ' + m.now + ' and can’t stay in ' + (BAND_LABEL_[m.slot] || m.slot) + '.'
+                 : m.name + ' has left the top two divisions.';
+  }).join(' ') + ' Pick again for ' + (misfits.length === 1 ? 'that slot.' : 'those slots.');
+}
+/* The banzuke kept by the check, if it is this basho's; null before it has run. */
+function banzukeRanksNow_(){
+  var m = readMeta(), o = parseNote_(m.banzukeRanks);
+  return o && o.basho === String(m.basho || '').trim() ? o.ranks : null;
+}
+/* The picks in a team that don't fit their slots: [{slot, name, now}], where
+   now is his new rank in words, or '' if he is off the banzuke. Nothing to say
+   before the banzuke is known. */
+function misfitPicks_(team, ranks){
+  ranks = ranks || banzukeRanksNow_(); if (!ranks) return [];
+  var out = [];
+  Object.keys(team || {}).forEach(function(slot){
+    var name = team[slot]; if (!name) return;
+    var r = ranks[String(name).toLowerCase()] || null;
+    if (!pickFits_(slot, r)) out.push({ slot:slot, name:String(name), now: r ? rankWords_(r) : '' });
+  });
+  return out;
+}
+/* Caller holds the script lock. */
+function checkPicksForNewBasho_(){
+  var meta = readMeta(), basho = String(meta.basho || '').trim();
+  /* only between the roll-over and day 1: once bouts are in, teams are what
+     is being scored, and nothing may move them */
+  if (!basho || String(meta.picksChecked || '') === basho || !newBanzukeReady_() || teamsLocked_()) return { ok:true, skipped:true };
+  var ranks = fetchBanzukeRanks_(bashoId_());
+  if (!ranks) return { ok:false, notReady:true };
+  var counts = { teams:0, picks:0, leagueTeams:0, leaguePicks:0, keeperMoves:0, rollovers:0 };
+  var sweep = function(team){
+    var cleared = misfitPicks_(team, ranks), gone = {}, kept = {};
+    cleared.forEach(function(m){ gone[m.slot] = 1; });
+    Object.keys(team || {}).forEach(function(slot){ if (!gone[slot] && team[slot]) kept[slot] = team[slot]; });
+    return { kept:kept, cleared:cleared };
+  };
+  var note = function(cleared){ return JSON.stringify({ basho:basho, picks:cleared }); };
+
+  var ush = sh_(SHEET_USERS), uv = ush.getDataRange().getValues(), r, s;
+  for (r = 1; r < uv.length; r++){
+    var team = parseNote_(uv[r][3]); if (!team) continue;
+    s = sweep(team); if (!s.cleared.length) continue;
+    if (!counts.teams) ensureColHead_(ush, USERS_NOTE_COL, 'teamNote');
+    ush.getRange(r + 1, 4).setValue(JSON.stringify(s.kept));
+    ush.getRange(r + 1, USERS_NOTE_COL).setValue(note(s.cleared));
+    counts.teams++; counts.picks += s.cleared.length;
+  }
+  var tsh = sh_(SHEET_LGTEAMS), tv = tsh.getDataRange().getValues();
+  for (r = 1; r < tv.length; r++){
+    var lteam = parseNote_(tv[r][2]); if (!lteam) continue;
+    s = sweep(lteam); if (!s.cleared.length) continue;
+    if (!counts.leagueTeams) ensureColHead_(tsh, LGTEAMS_NOTE_COL, 'teamNote');
+    tsh.getRange(r + 1, 3).setValue(JSON.stringify(s.kept));
+    tsh.getRange(r + 1, LGTEAMS_NOTE_COL).setValue(note(s.cleared));
+    counts.leagueTeams++; counts.leaguePicks += s.cleared.length;
+  }
+
+  /* Keeper rosters, in leagues that have drafted (not one mid-draft): each man
+     into the division he'll fight in. A man off the banzuke stays put until
+     the re-draft releases him. */
+  var lv = sh_(SHEET_LEAGUES).getDataRange().getValues(), keepers = {}, off = {};
+  for (r = 1; r < lv.length; r++){
+    var st = String(lv[r][7] || '');
+    if (String(lv[r][5]) === 'keepers' && (st === 'complete' || st === 'keepers' || st === 'redraft')) keepers[String(lv[r][0])] = st;
+  }
+  var rsh = sh_(SHEET_ROSTERS), rv = rsh.getDataRange().getValues();
+  for (r = 1; r < rv.length; r++){
+    var lid = String(rv[r][0]); if (!keepers[lid]) continue;
+    var rk = ranks[String(rv[r][2] || '').toLowerCase()];
+    if (!rk){ off[lid] = (off[lid] || 0) + 1; continue; }
+    var div = rk[0] === 'J' ? 'juryo' : 'makuuchi';
+    if (String(rv[r][3] || '').toLowerCase() !== div){ rsh.getRange(r + 1, 4).setValue(div); counts.keeperMoves++; }
+  }
+  /* A drafted league still to run its roll-over: declarations if it keeps a
+     limited number, else a re-draft if anyone left the banzuke. */
+  Object.keys(keepers).forEach(function(lid){
+    if (keepers[lid] !== 'complete') return;
+    var L = leagueRow(lid); if (!L) return;
+    var kind = keeperPlan(L).limited ? 'keepers' : (off[lid] ? 'redraft' : '');
+    if (kind){ setMeta_('rollover:' + lid, basho + '|' + kind); counts.rollovers++; }
+  });
+
+  setMeta_('banzukeRanks', JSON.stringify({ basho:basho, ranks:ranks }));
+  setMeta_('picksChecked', basho);
+  setMeta_('picksCheckedInfo', JSON.stringify(counts));
+  return { ok:true, basho:basho, counts:counts };
+}
+/* The retry, for the keeper clock and the hourly import: one Meta read once it has run. */
+function checkPicksLocked_(){
+  var m = readMeta();
+  if (String(m.picksChecked || '') === String(m.basho || '').trim() || !newBanzukeReady_() || teamsLocked_()) return null;
+  var lock = LockService.getScriptLock(); lock.waitLock(25000);
+  try { return checkPicksForNewBasho_(); } finally { unlock_(lock); }
+}
+
 /* Member handles, worst first: the re-draft's pick order, by how the basho
    just finished. That used to be raw wins of each roster's active men, read
    when the re-draft opened, which is AFTER the keeper cuts (a team that kept
@@ -3719,6 +3913,7 @@ function startSupplementalDraft_(L){
       else if (String(v[r][3]||'').toLowerCase() !== div) sh.getRange(r+1,4).setValue(div);   // moved between the two divisions
     }
     del.sort(function(a,b){return b-a;}).forEach(function(row){ sh.deleteRow(row); });
+    if (readMeta()['rollover:' + L.id]) setMeta_('rollover:' + L.id, '');   // this basho's roll-over is under way
     var order = keeperStandings(L.id);                       // worst first
     setRedraft_(L.id, { order:order, cursor:0, banzuke:banzuke });
     sh_(SHEET_LEAGUES).getRange(L.row, 8).setValue('redraft');
@@ -5117,6 +5312,10 @@ function refreshResults() {
      calling it on every tick costs one Meta read while the basho is running. */
   try { archiveBasho_({}); }
   catch (err) { try { setMeta_('archiveError', new Date().toISOString() + ' ' + String(err)); } catch (e2) {} }
+
+  /* A new basho whose banzuke sumo-api was late with: check the teams now. */
+  try { checkPicksLocked_(); }
+  catch (e6) {}
 
   /* Keeper windows past their deadline close themselves once the new basho is in. */
   try { closeDueKeeperWindows_(); }

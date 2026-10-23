@@ -594,6 +594,11 @@
   .teamlock{ margin:0 0 12px; padding:10px 13px; border:1px solid var(--line2); border-radius:10px;
         background:var(--surface-2); color:var(--dim); font-size:.86rem; line-height:1.5 }
   .teamlock b{ color:var(--sun) }
+  /* what a new banzuke took out of a saved team */
+  .team-note{ margin:0 0 12px; padding:10px 13px; border:1px solid rgba(var(--sun-rgb),.45); border-radius:10px;
+        background:rgba(var(--sun-rgb),.08); color:var(--ink); font-size:.88rem; line-height:1.5 }
+  .team-note ul{ margin:6px 0; padding-left:18px }
+  .team-note li{ margin:2px 0 }
   .lg-draft-board{ display:flex; flex-direction:column; gap:4px; max-height:200px; overflow-y:auto; font-size:.8rem }
   .lg-draft-board div{ display:flex; justify-content:space-between; gap:8px; padding:4px 8px; border-radius:6px }
   .lg-draft-board div.me{ background:rgba(var(--sun-rgb),.1) }
@@ -925,6 +930,8 @@
       </div>
     </details>
 
+    <div class="team-note" id="teamNote" hidden></div>
+
     <div class="slots" id="slots"></div>
 
     <p class="teamlock" id="teamLock" hidden></p>
@@ -1047,7 +1054,9 @@
           <div class="lg-myteam">
             <h4>My team in this league</h4>
             <p class="lg-myteam__hint">Your own roster for <b id="lgTeamLeagueName">this league</b> — separate from your team on other leagues or the main leaderboard.</p>
+            <div class="team-note" id="lgTeamNote" hidden></div>
             <div class="slots lg-slots" id="lgSlots"></div>
+            <p class="teamlock" id="lgTeamLock" hidden></p>
             <div class="saverow">
               <button class="btn" id="lgTeamSave">Save team for this league</button>
               <button class="btn ghost" id="lgTeamClear">Clear picks</button>
@@ -1324,7 +1333,7 @@ function syncTeam(){
 const pickModal = $("pickModal"), pickGrid = $("pickGrid");
 let flipT = [];
 function openPicker(bandId, ctx){
-  if (draftLocked && (!ctx || !ctx.team)) return;   // main draft locked until banzuke drops
+  if (draftLocked) return;   // locked until the banzuke drops, and while a basho is on the sheet: league teams too
   ctx = ctx || {};
   const targetTeam = ctx.team || team;
   const onPick = ctx.onPick || function(){ saveLocal(); closePicker(); paintSlots(); };
@@ -1547,8 +1556,10 @@ $("saveBtn").onclick = async () => {
   setStatus("Saving…");
   try {
     const res = await apiPost({ action:"save", handle:acct.handle, name:acct.name, auth:acct.auth, team });
-    if (res && res.ok) setStatus(hasAPI() ? "Saved to the leaderboard ✓" : "Saved on this device ✓", "ok");
+    if (res && res.ok){ setStatus(hasAPI() ? "Saved to the leaderboard ✓" : "Saved on this device ✓", "ok"); $("teamNote").hidden = true; }
     else {
+      /* picks the new banzuke moved out of their slots: take them out here too */
+      if (res && res.misfits && dropPicks(team, res.misfits)){ saveLocal(); paintSlots(); }
       setStatus((res && res.error) ? ("Couldn't save: " + res.error) : "Couldn't save.", "err");
       /* A tab left open across the day-1 boundary still holds the pre-basho
          state, so its Save button looks live until someone reloads — and
@@ -1561,6 +1572,36 @@ $("saveBtn").onclick = async () => {
 };
 $("clearBtn").onclick = () => { team = {}; saveLocal(); paintSlots(); setStatus(""); };
 function setStatus(msg, cls){ const s=$("saveStatus"); s.textContent=msg; s.className="status" + (cls?(" "+cls):""); }
+
+/* ---------- picks a new banzuke moved ----------
+   When a new basho is started the server checks every saved team against its
+   banzuke, takes out any pick that no longer fits its slot, and leaves a note
+   (users[].teamNote, league members[].teamNote) until the player saves again.
+   This device may still hold the old picks, so they are dropped here too, or
+   the next save would put them back. */
+const BAND_LABEL = Object.fromEntries(BANDS.map(b => [b.id, b.label]));
+function dropPicks(t, picks){
+  let changed = false;
+  (picks || []).forEach(p => { if (t[p.slot] === p.name){ delete t[p.slot]; changed = true; } });
+  return changed;
+}
+function teamNoteHTML(n){
+  const lines = n.picks.map(p => `<li><b>${esc(p.name)}</b> ${p.now
+    ? `is now ${esc(p.now)}, so he can&rsquo;t stay in ${esc(BAND_LABEL[p.slot] || p.slot)}`
+    : "has left the top two divisions"}.</li>`).join("");
+  return `<b>The ${esc(n.basho)} banzuke took ${n.picks.length === 1 ? "a pick" : n.picks.length + " picks"} out of this team.</b>
+    <ul>${lines}</ul>Pick ${n.picks.length === 1 ? "a replacement" : "replacements"} and save before day 1.`;
+}
+const noteIsCurrent = n => !!(n && n.picks && n.picks.length && n.basho === cache.meta.basho);
+function applyTeamNote(){
+  const box = $("teamNote"); if (!box) return;
+  const me = acct && (cache.users || []).find(u => u.handle.toLowerCase() === acct.handle.toLowerCase());
+  const n = me && me.teamNote;
+  if (!noteIsCurrent(n)){ box.hidden = true; return; }
+  if (dropPicks(team, n.picks)){ saveLocal(); paintSlots(); }
+  box.innerHTML = teamNoteHTML(n);
+  box.hidden = false;
+}
 
 /* ---------- scoring ---------- */
 // Returns { totalW, kachi, yusho } per wrestler name, from the results list.
@@ -1609,6 +1650,7 @@ async function loadBoard(){
     cache = { users:data.users||[], results:data.results||[], meta:data.meta||{} };
     publicChampHandles = (data.champion && data.champion.handles) || [];
   }
+  applyTeamNote();
   renderBoard();
   const model = scoreModel({ results: cache.results, meta: cache.meta });
   renderCountdown(model);
@@ -1649,6 +1691,7 @@ function setDraftLocked(v, reason){
   if (draftLocked === v && lockReason === reason) return;
   draftLocked = v; lockReason = reason;
   try { paintSlots(); } catch (e) {}   // re-render slots into/out of the locked state
+  try { if (curLeagueId) renderLgTeamSlots(); } catch (e) {}   // a classic league's team locks with it
   paintTeamLock();
 }
 function banzukeDropped(b){ return !b || !b.banzuke || new Date(b.banzuke).getTime() <= Date.now(); }
@@ -2090,6 +2133,8 @@ async function renderLeague(){
     }
     const mine = members.find(m => acct && m.handle.toLowerCase()===acct.handle.toLowerCase());
     lgTeam = { ...(mine && mine.team ? mine.team : {}) };
+    const ln = $("lgTeamNote"), note = mine && mine.teamNote;
+    if (ln){ ln.hidden = !noteIsCurrent(note); if (!ln.hidden) ln.innerHTML = teamNoteHTML(note); }
     renderLgTeamSlots();
     renderLgTeamsBoard(lg);
   }
@@ -2483,8 +2528,16 @@ function keeperNudge(leagues){
   /* past its deadline a league can't take a declaration, so it drops out */
   const open = l => !l.keepDeadline || new Date(l.keepDeadline) > new Date();
   const owed = (leagues || []).filter(l => l.draftStatus === "keepers" && !l.keepDeclared && open(l));
-  if (!owed.length){ box.hidden = true; box.innerHTML = ""; return; }
-  box.innerHTML = owed.map(l => {
+  /* a commissioner whose keeper league has its roll-over to run, now that the
+     new banzuke is in (the server sets rollover when the basho is started) */
+  const roll = (leagues || []).filter(l => l.rollover && l.isCommissioner && l.draftStatus === "complete");
+  if (!owed.length && !roll.length){ box.hidden = true; box.innerHTML = ""; return; }
+  box.innerHTML = roll.map(l => `<div class="kw-nudge__row"><span>The new banzuke is in. ${l.rollover === "keepers"
+      ? `Open keeper declarations in <b>${esc(l.name)}</b>; keepers lock on draft day, and the re-draft runs then.`
+      : `Someone on a <b>${esc(l.name)}</b> roster has left the top two divisions: open the re-draft to replace him.`}
+      Finish before day 1.</span>
+      <button class="btn sm" type="button" data-lg="${esc(l.id)}">${l.rollover === "keepers" ? "Open declarations" : "Open the re-draft"}</button></div>`).join("") +
+    owed.map(l => {
     const due = l.keepDeadline ? ` &mdash; keepers lock at the draft, <b>${esc(fmtWhen(l.keepDeadline))}</b> (${fmtLeft(l.keepDeadline)} left)`
                                : " &mdash; keepers lock on draft day";
     return `<div class="kw-nudge__row"><span>Keeper declarations are open in <b>${esc(l.name)}</b>${due}.</span>
@@ -2495,7 +2548,8 @@ function keeperNudge(leagues){
     curLeagueId = b.dataset.lg;
     if ($("tab-leagues").getAttribute("aria-selected") !== "true") setView("leagues");
     else { renderSwitch(); renderLeague(); }
-    setTimeout(() => { const k = $("lgKeepers"); if (k) k.scrollIntoView({ behavior:"smooth", block:"start" }); }, 900);
+    /* straight to the commissioner's control when there is one */
+    setTimeout(() => { const k = $("lgOpenKeepers") || $("lgOpenRedraft") || $("lgKeepers"); if (k) k.scrollIntoView({ behavior:"smooth", block:"center" }); }, 900);
   });
 }
 async function checkKeeperNudge(){
@@ -4070,6 +4124,8 @@ function lgTeamCount(){ return new Set(Object.values(lgTeam).filter(Boolean)).si
 function renderLgTeamSlots(){
   $("lgSlots").innerHTML = BANDS.map(band=>{
     const cur = lgTeam[band.id] || "";
+    if (!cur && draftLocked) return `<div class="pcard empty locked" data-band="${band.id}"><div class="pc-empty"><b>${band.label}</b><span class="cta">🔒 ${
+        lockReason === "running" ? "Locked for the basho" : lockReason === "finished" ? "Locked until the next basho" : "Opens when the banzuke drops"}</span></div></div>`;
     if (!cur) return `<div class="pcard empty" data-band="${band.id}" role="button" tabindex="0">
         <div class="pc-empty"><b>${band.label}</b>Empty<span class="cta">Tap to draft →</span></div></div>`;
     return `<div class="pcard filled r-${RK[cur].code[0]}" data-band="${band.id}" role="button" tabindex="0">${pcardInner(cur,band.label)}</div>`;
@@ -4080,18 +4136,25 @@ function renderLgTeamSlots(){
     card.onkeydown = e => { if (e.key==="Enter"||e.key===" ") { e.preventDefault(); open(); } };
   });
   $("lgSlots").querySelectorAll(".pc-x").forEach(x=>{
+    if (draftLocked){ x.hidden = true; return; }
     x.onclick = e => { e.stopPropagation(); delete lgTeam[x.closest(".pcard").dataset.band]; renderLgTeamSlots(); };
   });
-  $("lgTeamSave").disabled = lgTeamCount() !== 7;
-  $("lgTeamSave").title = lgTeamCount()===7 ? "" : "Draft all seven bands first";
+  /* the same lock as the public team: the server refuses these saves too */
+  const lk = $("lgTeamLock");
+  if (lk){ lk.hidden = !draftLocked; if (draftLocked) lk.innerHTML = lockCopy(); }
+  $("lgTeamSave").disabled = draftLocked || lgTeamCount() !== 7;
+  $("lgTeamSave").title = draftLocked ? "Teams are locked right now" : lgTeamCount()===7 ? "" : "Draft all seven bands first";
+  $("lgTeamClear").disabled = draftLocked;
 }
-$("lgTeamClear").onclick = () => { if (confirm("Clear your picks for this league?")) { lgTeam = {}; renderLgTeamSlots(); } };
+$("lgTeamClear").onclick = () => { if (draftLocked) return; if (confirm("Clear your picks for this league?")) { lgTeam = {}; renderLgTeamSlots(); } };
 $("lgTeamSave").onclick = async () => {
   if (lgTeamCount() !== 7 || !curLeagueId) return;
   lgStatus2("Saving…");
   const r = await GyojiGuide.saveLeagueTeam(curLeagueId, lgTeam);
+  if (r && r.misfits && dropPicks(lgTeam, r.misfits)) renderLgTeamSlots();
   if (r && r.ok) {
     lgStatus2("Saved ✓","ok");
+    $("lgTeamNote").hidden = true;
     const lg = leaguesCache.find(l=>l.id===curLeagueId);
     if (lg){
       const mine = (lg.members||[]).find(m=>acct && m.handle.toLowerCase()===acct.handle.toLowerCase());
