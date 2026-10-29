@@ -54,8 +54,8 @@ assume it's live.
 | `SumoSlapdown-logoTall.svg` | The centerpiece in the home page's crowd |
 | `SumoSlapdown-logoMedium.svg` | The Fantasy leaderboard header |
 | `samples/` | 60 taiko `.mp3` hits for the radio and the loop constructor |
-| `images/rikishi/` | The 70 rikishi cutouts, transparent WebP, 420px tall, one file per shikona |
-| `images/svg/`, `images/jpg/` | Source art: Illustrator SVGs (each wrapping a full-res PNG) and background-intact JPGs |
+| `images/rikishi/` | The rikishi cutouts, transparent WebP, 420px tall, one file per shikona |
+| `images/svg/`, `images/jpg/` | Source art, all from the JSA's profile photos: the cutout (Illustrator SVGs wrapping a full-res PNG for the older ones, `<Name>.png` from `tools/jsa-portrait.py`) and the photo with its background (`.jpg`, or `.png` from the tool) |
 
 `images/rikishi/` is the set the site actually loads — `dohyo.html`,
 `fantasy.html` and `keepers-mock-draft.html` all reference the same files, so a
@@ -64,7 +64,10 @@ match the shikona keys** in each page's photo table exactly; that string is the
 lookup. The files were generated from `images/svg/` by extracting the embedded
 PNG, trimming to the alpha bounding box and resizing to 420px tall — the tight
 crop matters, because each rikishi's `ar`/`h`/face-position metadata is
-expressed as fractions of a tightly-cropped frame.
+expressed as fractions of a tightly-cropped frame. New ones come from
+`tools/jsa-portrait.py`, which does the same straight from the JSA's profile
+photo (https://www.sumo.or.jp/EnSumoDataRikishi, the only source for
+portraits) and measures the simulator's numbers the way the old ones were.
 
 The favicon and the simulator's scenery (dohyo, roof, gyoji, yobidashi, and the
 two `SHIKO` dohyo-iri poses) are still base64-inlined in `dohyo.html`. They're

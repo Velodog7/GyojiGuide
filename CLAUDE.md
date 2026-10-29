@@ -25,7 +25,7 @@ This file is the stuff that is easy to get wrong.
 | Backend runtime | `supabase/functions/api/`: `index.ts` (routes), `engine.js` (Apps Script on Postgres), `store.js`, and two generated files, `backend.js` (the .gs as a string) and `seed-sheets.js` |
 | Database | `supabase/migrations/`: the sheet store and the hourly pg_cron job |
 | Moving between backends | `apps-script/migrate.gs`: `cutover`, `revertToAppsScript`; the `__FORWARD_TO` switch in `sumo-fantasy.gs`; the routing in `gg-config.js` |
-| Tools | `tools/build-backend.mjs`, `tools/learn-sheets.mjs` |
+| Tools | `tools/build-backend.mjs`, `tools/learn-sheets.mjs`; between basho, `tools/finish-basho.mjs`, `tools/check-banzuke.mjs` and `tools/jsa-portrait.py` (portraits) |
 | Tests | `tests/`; see `tests/README.md` |
 
 Everything uses relative paths and must sit in one flat directory when deployed.
@@ -351,9 +351,15 @@ doesn't move on its own is the bundled data, so each cycle has two jobs:
    `--write`. It puts every bundled table on the new ranks (the offline
    fallbacks, and the home page game, which has no live sync), marks or drops
    the men who left, and adds newcomers wherever a card works without a
-   portrait. Portraits are Sean's: an Illustrator cutout in `images/svg/`,
-   extracted to `images/rikishi/<Name>.webp` (see README). The banzuke art,
-   the game and the simulator take a newcomer only once he has one.
+   portrait. Portraits always come from the JSA's own profile photos
+   (https://www.sumo.or.jp/EnSumoDataRikishi; Sean's rule):
+   `python3 tools/jsa-portrait.py <Name> …`, then `--write` (see its header).
+   The banzuke art, the game and the simulator take a newcomer only once he
+   has one. A new sekitori's JSA photo is a headshot until he is reshot in his
+   kesho-mawashi, some weeks in. A headshot does on the cards, but it is a
+   giant face in the banzuke art: after `--write`, take him back out of
+   `gg-banzuke.js` RIK, and run `jsa-portrait.py` again once the full-body
+   photo is up.
 
 Before rolling over, fill in the finished basho's league records if any are
 missing (admin page, "League records — fill in a basho"): it needs that
@@ -424,10 +430,11 @@ Hard-won, from deploying to it with a browser tool:
   `github.com/Velodog7/GyojiGuide`, branch `main`.
 - Sessions have run in a Linux shell (GNU `sed -i`) and on Sean's Mac (BSD,
   `sed -i ''`). Check `uname` before scripting edits.
-- The Mac has no Xcode command line tools: `git` and `python3` pop up an
-  installer instead of running (so `./tests/run.sh ui`, which starts a
-  `python3` server, does too). Node and Deno run fine from their official
-  standalone downloads.
+- The Mac has Xcode's Command Line Tools (since 2026-10-22): `git`,
+  `python3` 3.9 and `clang`. Their `swiftc` can't import Foundation (a
+  duplicate `SwiftBridging` module map), so a native helper is Objective-C
+  built with `clang` (`tools/jsa-mask.m`). There's no system Node: Node and
+  Deno run fine from their official standalone downloads.
 - `node --check` refuses a `.gs` extension. Copy to `.js` first.
 - Basho calendar: six a year, on fixed months — Hatsu 01, Haru 03, Natsu 05,
   Nagoya 07, Aki 09, Kyushu 11. Basho ids are `YYYYMM`.
